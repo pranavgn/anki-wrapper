@@ -1,0 +1,65 @@
+[package]
+authors = [
+    "Dilshod Tadjibaev (@antimora)",
+    "Nathaniel Simard (@nathanielsimard)",
+]
+categories = ["science", "mathematics", "algorithms"]
+description = "Common crate for CubeCL"
+edition.workspace = true
+keywords = ["gpu", "cuda", "wgpu"]
+license.workspace = true
+name = "cubecl-common"
+readme.workspace = true
+repository = "https://github.com/tracel-ai/cubecl/tree/main/crates/cubecl-common"
+version.workspace = true
+
+[features]
+default = ["std"]
+serde = []
+std = ["rand/std", "futures-lite", "rand/thread_rng", "serde_json?/std"]
+cache = ["std", "serde_json", "hashbrown", "dirs", "sanitize-filename"]
+
+[dependencies]
+# ** Please make sure all dependencies support no_std when std is disabled **
+bytemuck = { workspace = true, features = ["derive"] }
+derive-new = { workspace = true }
+derive_more = { workspace = true, features = [
+    "not",
+    "add",
+    "mul",
+    "add_assign",
+    "mul_assign",
+    "display",
+] }
+half = { workspace = true }
+log = { workspace = true }
+num-traits = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+spin = { workspace = true } # using in place of use std::sync::Mutex;
+
+# Cache
+hashbrown = { workspace = true, optional = true }
+serde_json = { workspace = true, features = ["alloc"], optional = true }
+dirs = { workspace = true, optional = true }
+sanitize-filename = { workspace = true, optional = true }
+
+# Only activate futures for std env
+embassy-futures = { version = "0.1.1" }
+futures-lite = { workspace = true, features = [
+    "std",
+], default-features = false, optional = true }
+
+[target.'cfg(target_has_atomic = "ptr")'.dependencies]
+spin = { workspace = true, features = ["mutex", "spin_mutex"] }
+
+[target.'cfg(not(target_has_atomic = "ptr"))'.dependencies]
+portable-atomic = { workspace = true }
+spin = { workspace = true, features = [
+    "mutex",
+    "spin_mutex",
+    "portable_atomic",
+] }
+
+[dev-dependencies]
+dashmap = { workspace = true }

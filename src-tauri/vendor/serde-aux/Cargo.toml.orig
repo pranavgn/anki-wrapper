@@ -1,0 +1,32 @@
+[package]
+name = "serde-aux"
+version = "4.7.0"
+authors = ["Victor Polevoy <maintainer@vpolevoy.com>"]
+description = "A serde crate's auxiliary library"
+readme = "README.md"
+license = "MIT"
+keywords = ["serde", "serialization", "deserialization"]
+edition = "2021"
+rust-version = "1.62"
+repository = "https://github.com/iddm/serde-aux"
+documentation = "https://docs.rs/serde-aux"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde-value = "0.7.0"
+serde_json = "1"
+
+[dependencies.chrono]
+optional = true
+version = "0.4"
+default-features = false
+features = ["alloc", "std", "clock"]
+
+[dev-dependencies]
+serde_qs = ">=0.10"
+
+[features]
+default = ["chrono"]
+
+[package.metadata.docs.rs]
+all-features = true

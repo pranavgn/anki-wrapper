@@ -1,0 +1,53 @@
+[package]
+name = "anki-wrapper"
+version = "0.1.0"
+description = "A custom desktop UI for Anki"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.6", features = [] }
+
+[dependencies]
+# Tauri and logging
+tauri = { version = "2.10.3", features = [] }
+tauri-plugin-log = "2"
+log = "0.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Anki Rust core from GitHub repository (main branch)
+# Using the official ankitects/anki repository
+anki = { git = "https://github.com/ankitects/anki.git", branch = "main" }
+anki_proto = { git = "https://github.com/ankitects/anki.git", branch = "main" }
+
+# Additional Anki dependencies that are commonly needed
+# These are typically required by the anki crate
+rusqlite = "0.36"
+
+# Base64 encoding for media files
+base64 = "0.22"
+
+# Directory paths
+dirs = "5.0"
+
+# Tauri dialog plugin for native file pickers
+tauri-plugin-dialog = "2"
+
+# Tauri fs plugin for file system access
+tauri-plugin-fs = "2"
+
+# Regex for HTML tag stripping
+regex = "1.10"

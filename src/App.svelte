@@ -20,7 +20,7 @@
   import ImageOcclusion from "./lib/ImageOcclusion.svelte";
   import { pluginEngine, setCurrentLoadingPlugin, clearCurrentLoadingPlugin } from "./lib/pluginEngine";
   import { loadAllPlugins } from "./lib/pluginLoader";
-  import { initMathJax } from "./lib/mathjax";
+
   import PluginManager from "./lib/PluginManager.svelte";
 
   // Page state
@@ -93,9 +93,9 @@
     
     browserCheckComplete = true;
     
-    // Load prefs and MathJax in parallel (non-critical)
+    // Load prefs (non-critical)
     try {
-      await Promise.all([prefs.load(), initMathJax()]);
+      await prefs.load();
     } catch (e) {
       console.error("Non-critical init error:", e);
     }
@@ -106,17 +106,44 @@
       collectionStatus = 'ready';
       isCollectionOpen = true;
 
-      // Load all plugins
-      try {
-        await loadAllPlugins();
-        await pluginEngine.runAction('app:ready', {});
-      } catch (pluginError) {
-        console.error("Plugin load error (non-fatal):", pluginError);
+      // Dev-only: seed test deck if env flag is set
+      if (import.meta.env.DEV) {
+        try {
+          const decks = await invoke<Array<{id: number; name: string}>>("get_all_decks");
+          const hasTestDeck = decks.some(d => d.name === "🧪 Test Deck (Dev)");
+          if (!hasTestDeck) {
+            // Create test deck
+            const deckId = await invoke<number>("create_deck", { name: "🧪 Test Deck (Dev)" });
+            // Seed with sample cards across difficulty levels
+            const testCards = [
+              { front: "What is spaced repetition?", back: "A learning technique that incorporates increasing intervals of time between subsequent review of previously learned material." },
+              { front: "What does FSRS stand for?", back: "Free Spaced Repetition Scheduler — an open-source, modern algorithm for scheduling flashcard reviews." },
+              { front: "What is the forgetting curve?", back: "A mathematical model showing how information is lost over time when there is no attempt to retain it. First described by Hermann Ebbinghaus in 1885." },
+              { front: "What is active recall?", back: "A principle of efficient learning that involves actively stimulating memory during the learning process, rather than passively reviewing material." },
+              { front: "What is the minimum information principle?", back: "The idea that flashcards should be as simple and atomic as possible — each card should test exactly one piece of knowledge." },
+              { front: "What is interleaving?", back: "A learning strategy where you mix different topics or types of problems during study, rather than focusing on one topic at a time (blocking)." },
+              { front: "Who created Anki?", back: "Damien Elmes. Anki was first released in 2006 and is open source." },
+              { front: "What is a leech in SRS?", back: "A card that has been failed many times (typically 8+ lapses). Leeches are automatically suspended to prevent wasting time on poorly-formed cards." },
+            ];
+            for (const card of testCards) {
+              await invoke("add_basic_card", { deckId, front: card.front, back: card.back });
+            }
+            console.log("🧪 Test deck seeded with", testCards.length, "cards");
+            window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
+          }
+        } catch (e) {
+          console.warn("Test deck seeding failed (non-critical):", e);
+        }
       }
+
+      // Load all plugins
+      await loadAllPlugins();
+      
+      // Fire the app:ready hook now that plugins are loaded
+      await pluginEngine.runAction('app:ready', {});
     } catch (error) {
       collectionStatus = 'error';
       collectionError = error instanceof Error ? error.message : String(error);
-      console.error("Collection init failed:", collectionError);
     }
   });
 

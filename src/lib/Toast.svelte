@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toasts } from "./toast";
   import { fly, fade } from "svelte/transition";
-  import { fly_if_enabled, fade_if_enabled } from "./animate";
+  import { fly_if_enabled, fade_if_enabled } from "./animate.svelte.ts";
 
   let toastList: Array<{ id: number; message: string; type: 'success' | 'error' | 'warning'; visible: boolean }> = [];
 

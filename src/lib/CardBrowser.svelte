@@ -1,8 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { fly, fade } from "svelte/transition";
-  import { prefs } from "./prefs";
-  import { fly_if_enabled } from "./animate";
+  import { prefs } from "./prefs.svelte.ts";
+  import { fly_if_enabled } from "./animate.svelte.ts";
   import { addToast } from "./toast";
   import CardDetailPanel from "./CardDetailPanel.svelte";
 

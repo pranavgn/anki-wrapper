@@ -82,7 +82,6 @@ use tauri::{command, State, AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
 use rusqlite::params;
 use serde_json;
-use regex;
 use anki::collection::CollectionBuilder;
 use anki::prelude::Collection;
 use anki::import_export::package::ImportAnkiPackageOptions;
@@ -578,14 +577,14 @@ async fn optimize_fsrs_weights(
     let mut weights = DEFAULT_FSRS_WEIGHTS.to_vec();
     
     // Adjust weights based on interval distribution
-    let avg_ivl: f64 = reviews.iter().map(|(i, _, _)| i).sum::<f64>() / reviews.len() as f64;
+    let _avg_ivl: f64 = reviews.iter().map(|(i, _, _)| i).sum::<f64>() / reviews.len() as f64;
     let short_reviews = reviews.iter().filter(|(i, _, _)| *i < 21.0).count();
     let medium_reviews = reviews.iter().filter(|(i, _, _)| *i >= 21.0 && *i < 100.0).count();
     let long_reviews = reviews.iter().filter(|(i, _, _)| *i >= 100.0).count();
     
     let short_ratio = short_reviews as f64 / reviews.len() as f64;
     let medium_ratio = medium_reviews as f64 / reviews.len() as f64;
-    let long_ratio = long_reviews as f64 / reviews.len() as f64;
+    let _long_ratio = long_reviews as f64 / reviews.len() as f64;
     
     // Adjust stability weights based on interval distribution
     // Higher short reviews = need more stability for short intervals
@@ -622,62 +621,99 @@ async fn optimize_fsrs_weights(
 }
 
 #[command]
-async fn init_standalone_collection(_app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    // Use app data directory for standalone collection
+async fn init_standalone_collection(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    // Check if already initialized
+    {
+        let col = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+        if col.is_some() {
+            log::info!("Collection already initialized, skipping");
+            return Ok(());
+        }
+    }
+
     let app_data_dir = dirs::data_local_dir()
         .ok_or("Could not find local data directory")?
         .join("anki-wrapper");
-    
-    // Create directory if it doesn't exist
+
     std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
-    
+
     let db_path = app_data_dir.join("collection.anki2");
-    
-    // Open or create the collection using CollectionBuilder
     let media_dir = app_data_dir.join("media");
     let _ = std::fs::create_dir_all(&media_dir);
     let media_db_path = app_data_dir.join("media.db");
-    let _ = std::fs::create_dir_all(&app_data_dir);
-    
-    let collection = CollectionBuilder::new(&db_path)
-        .set_media_paths(media_dir.clone(), media_db_path)
+
+    // Step 1: Remove stale WAL/SHM lock files from previous crashes
+    let wal_path = app_data_dir.join("collection.anki2-wal");
+    let shm_path = app_data_dir.join("collection.anki2-shm");
+    if wal_path.exists() {
+        log::warn!("Removing stale WAL file: {:?}", wal_path);
+        let _ = std::fs::remove_file(&wal_path);
+    }
+    if shm_path.exists() {
+        log::warn!("Removing stale SHM file: {:?}", shm_path);
+        let _ = std::fs::remove_file(&shm_path);
+    }
+
+    // Step 2: Try to open the collection
+    let collection = match CollectionBuilder::new(&db_path)
+        .set_media_paths(media_dir.clone(), media_db_path.clone())
         .build()
-        .map_err(|e| {
-            log::error!("Failed to open/create collection: {}", e);
-            e.to_string()
-        })?;
-    
-    log::info!("Collection opened/created at {:?}", db_path);
-    
+    {
+        Ok(col) => {
+            log::info!("Collection opened at {:?}", db_path);
+            col
+        }
+        Err(first_err) => {
+            log::error!("Failed to open collection: {}. Attempting recovery...", first_err);
+
+            // Step 3: If the DB exists but is corrupted, rename it and try fresh
+            if db_path.exists() {
+                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+                let corrupt_name = format!("collection_corrupt_{}.anki2", timestamp);
+                let corrupt_path = app_data_dir.join(&corrupt_name);
+
+                log::warn!("Renaming corrupt DB to {:?}", corrupt_path);
+                let _ = std::fs::rename(&db_path, &corrupt_path);
+                // Also clean up any lock files from the corrupt DB
+                let _ = std::fs::remove_file(&wal_path);
+                let _ = std::fs::remove_file(&shm_path);
+            }
+
+            // Step 4: Try again with a fresh database
+            CollectionBuilder::new(&db_path)
+                .set_media_paths(media_dir.clone(), media_db_path)
+                .build()
+                .map_err(|e| {
+                    log::error!("Failed to create fresh collection: {}", e);
+                    format!(
+                        "Could not open or create collection at {:?}: {}. Original error: {}",
+                        db_path, e, first_err
+                    )
+                })?
+        }
+    };
+
     // Store in state
     {
         let mut col = state.collection.lock().map_err(|_| "Failed to lock collection")?;
         *col = Some(collection);
-        // Store media path
         let mut media_path = state.media_path.lock().map_err(|_| "Failed to lock media path")?;
         *media_path = Some(media_dir);
     }
-    
-    // Initialize FSRS - wrap in its own scope so we release the lock
+
+    // Initialize FSRS
     {
         let mut col_guard = state.collection.lock().map_err(|_| "Failed to lock collection")?;
         if let Some(col) = col_guard.as_mut() {
-            // Step 1: Enable Sched2021 (v3 scheduler) 
             if let Err(e) = col.set_config_bool(BoolKey::Sched2021, true, false) {
-                eprintln!("FSRS init warning: Failed to enable Sched2021: {}", e);
-            } else {
-                log::info!("Enabled Sched2021 (v3 scheduler)");
+                log::warn!("FSRS init: Failed to enable Sched2021: {}", e);
             }
-            
-            // Step 2: Enable FSRS globally
             if let Err(e) = col.set_config_bool(BoolKey::Fsrs, true, false) {
-                eprintln!("FSRS init warning: Failed to enable FSRS: {}", e);
-            } else {
-                log::info!("Enabled FSRS globally");
+                log::warn!("FSRS init: Failed to enable FSRS: {}", e);
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -710,10 +746,10 @@ fn get_decks(state: State<AppState>) -> Result<Vec<DeckInfo>, String> {
         None => return Ok(vec![]),
     };
 
-    let tree = collection.deck_tree(None).map_err(|e| e.to_string())?;
+    let tree = collection.deck_tree(Some(TimestampSecs::now())).map_err(|e| e.to_string())?;
     
     // Build tree structure from the deck tree
-    let mut deck_tree = build_deck_tree(tree);
+    let deck_tree = build_deck_tree(tree);
     
     Ok(deck_tree)
 }
@@ -779,7 +815,7 @@ fn get_all_decks(state: State<AppState>) -> Result<Vec<DeckListItem>, String> {
         None => return Ok(vec![]),
     };
 
-    let tree = collection.deck_tree(None).map_err(|e| e.to_string())?;
+    let tree = collection.deck_tree(Some(TimestampSecs::now())).map_err(|e| e.to_string())?;
     
     // Build flat list from tree
     let deck_list = flatten_deck_tree_list(tree);
@@ -893,7 +929,7 @@ fn add_basic_card(deck_id: i64, front: String, back: String, tags: Vec<String>, 
     note.tags = tags;
 
     // Add the note to the deck
-    let result = collection.add_note(&mut note, anki::prelude::DeckId(deck_id))
+    let _result = collection.add_note(&mut note, anki::prelude::DeckId(deck_id))
         .map_err(|e| e.to_string())?;
 
     Ok(note.id.0)
@@ -933,6 +969,7 @@ fn add_note(deck_id: i64, notetype_id: i64, fields: Vec<String>, tags: Vec<Strin
     Ok(note.id.0)
 }
 
+#[allow(dead_code)]
 #[command]
 fn add_image_occlusion(
     image_data: String,       // base64 encoded image
@@ -950,27 +987,25 @@ fn add_image_occlusion(
     let media_path = state.media_path.lock().map_err(|_| "Failed to lock media path")?;
     let media_folder = media_path.as_ref().ok_or("Media path not set")?;
     
-    // Get immutable collection reference for media operations
-    let collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
-    let collection = collection.as_ref().ok_or("Collection not initialized")?;
-    
-    // Decode base64 image data
-    let image_bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &image_data)
-        .map_err(|e| format!("Failed to decode image: {}", e))?;
-    
-    // Save image to media folder
-    let mut mgr = collection.media().map_err(|e| e.to_string())?;
-    let actual_filename = mgr.add_file(&filename, &image_bytes)
-        .map_err(|e| format!("Failed to add media: {}", e))?;
-    
-    // Build the full path to the saved image
-    let image_path = Path::new(media_folder).join(actual_filename.as_ref())
-        .to_string_lossy()
-        .to_string();
-    
-    // Drop the collection lock before calling add_image_occlusion_note
-    drop(collection);
-    drop(media_path);
+    // Get immutable collection reference for media operations (scoped block)
+    let image_path = {
+        let collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+        let collection = collection.as_ref().ok_or("Collection not initialized")?;
+        
+        // Decode base64 image data
+        let image_bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &image_data)
+            .map_err(|e| format!("Failed to decode image: {}", e))?;
+        
+        // Save image to media folder
+        let mgr = collection.media().map_err(|e| e.to_string())?;
+        let actual_filename = mgr.add_file(&filename, &image_bytes)
+            .map_err(|e| format!("Failed to add media: {}", e))?;
+        
+        // Build the full path to the saved image
+        Path::new(media_folder).join(actual_filename.as_ref())
+            .to_string_lossy()
+            .to_string()
+    }; // collection lock drops here
     
     // Get mutable access to call add_image_occlusion_note
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
@@ -997,18 +1032,20 @@ fn add_image_occlusion(
 
 // ==================== Media Commands ====================
 
+#[allow(dead_code)]
 #[command]
 fn save_media_file(filename: String, data: Vec<u8>, state: State<AppState>) -> Result<String, String> {
     let collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = collection.as_ref().ok_or("Collection not initialized")?;
     
-    let mut mgr = collection.media().map_err(|e| e.to_string())?;
+    let mgr = collection.media().map_err(|e| e.to_string())?;
     let actual_filename = mgr.add_file(&filename, &data)
         .map_err(|e| e.to_string())?;
     
     Ok(actual_filename.into_owned())
 }
 
+#[allow(dead_code)]
 #[command]
 fn get_media_path(state: State<AppState>) -> Result<String, String> {
     let media_path = state.media_path.lock().map_err(|_| "Failed to lock media path")?;
@@ -1183,6 +1220,7 @@ fn delete_notetype(notetype_id: i64, state: State<AppState>) -> Result<(), Strin
 
 // ==================== Search Commands ====================
 
+#[allow(dead_code)]
 fn parse_search_query(query: &str) -> String {
     // Parse Anki-style search and convert to SQL WHERE
     // This is a simplified parser - handles basic queries
@@ -3344,7 +3382,7 @@ fn get_today_stats(state: State<AppState>) -> Result<TodayStats, String> {
     let conn = collection.storage.db();
     
     // Get today's date in local timezone
-    let today_start = chrono::Local::now().format("%Y-%m-%d 00:00:00").to_string();
+    let _today_start = chrono::Local::now().format("%Y-%m-%d 00:00:00").to_string();
     
     // Count cards reviewed today
     let cards_reviewed: i64 = conn.query_row(

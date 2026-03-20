@@ -1,4 +1,4 @@
-import { prefs } from './prefs';
+import { prefs } from './prefs.svelte.ts';
 
 export interface FlyParams {
   x?: number;

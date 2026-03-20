@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { fly, fade } from "svelte/transition";
   import { addToast } from "./toast";
-  import { prefs } from "./prefs";
+  import { prefs } from "./prefs.svelte.ts";
 
   interface Props {
     onClose: () => void;

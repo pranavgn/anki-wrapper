@@ -11,15 +11,16 @@
   import KeyboardShortcuts from "./lib/KeyboardShortcuts.svelte";
   import ImportModal from "./lib/ImportModal.svelte";
   import { exportCollectionColpkg, ImportError } from "./lib/importer";
-  import { prefs } from "./lib/prefs";
+  import { prefs } from "./lib/prefs.svelte.ts";
   import { addToast } from "./lib/toast";
-  import { fly_if_enabled } from "./lib/animate";
+  import { fly_if_enabled } from "./lib/animate.svelte.ts";
   import CardBrowser from "./lib/CardBrowser.svelte";
   import NotetypeManager from "./lib/NotetypeManager.svelte";
   import Settings from "./lib/Settings.svelte";
   import ImageOcclusion from "./lib/ImageOcclusion.svelte";
   import { pluginEngine, setCurrentLoadingPlugin, clearCurrentLoadingPlugin } from "./lib/pluginEngine";
   import { loadAllPlugins } from "./lib/pluginLoader";
+  import { initMathJax } from "./lib/mathjax";
   import PluginManager from "./lib/PluginManager.svelte";
 
   // Page state
@@ -68,8 +69,6 @@
     }
   }
 
-  // Deck stats for dashboard
-  let deckStats: Array<{ id: number; name: string; new_cards: number; learn_cards: number; review_cards: number }> = $state([]);
   let isCollectionOpen = $state(false);
 
   // Study view state
@@ -94,9 +93,9 @@
     
     browserCheckComplete = true;
     
-    // Load prefs - MathJax will lazy-load when first card with math is rendered
+    // Load prefs and MathJax in parallel (non-critical)
     try {
-      await prefs.load();
+      await Promise.all([prefs.load(), initMathJax()]);
     } catch (e) {
       console.error("Non-critical init error:", e);
     }
@@ -106,29 +105,20 @@
       await invoke("init_standalone_collection");
       collectionStatus = 'ready';
       isCollectionOpen = true;
-      getDeckStats();
 
       // Load all plugins
-      await loadAllPlugins();
-      
-      // Fire the app:ready hook now that plugins are loaded
-      await pluginEngine.runAction('app:ready', {});
+      try {
+        await loadAllPlugins();
+        await pluginEngine.runAction('app:ready', {});
+      } catch (pluginError) {
+        console.error("Plugin load error (non-fatal):", pluginError);
+      }
     } catch (error) {
       collectionStatus = 'error';
       collectionError = error instanceof Error ? error.message : String(error);
+      console.error("Collection init failed:", collectionError);
     }
   });
-
-  async function getDeckStats() {
-    if (!isCollectionOpen) return;
-    try {
-      const result = await invoke<Array<{ id: number; name: string; new_cards: number; learn_cards: number; review_cards: number }>>("get_deck_stats");
-      deckStats = result;
-    } catch (error) {
-      console.error("Error loading deck stats:", error);
-      deckStats = [];
-    }
-  }
 
   function startReview(deckId: number, deckName: string) {
     currentDeckId = deckId;
@@ -140,7 +130,6 @@
     currentPage = 'dashboard';
     currentDeckId = null;
     currentDeckName = "";
-    getDeckStats();
   }
 
   // Global keyboard shortcuts

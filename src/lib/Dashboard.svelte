@@ -19,9 +19,14 @@
   type DeckStat = {
     id: number;
     name: string;
-    new_cards: number;
-    learn_cards: number;
-    review_cards: number;
+    short_name: string;
+    level: number;
+    new_count: number;
+    learn_count: number;
+    review_count: number;
+    card_count: number;
+    is_filtered: boolean;
+    children?: DeckStat[];
   };
 
   // Import log type
@@ -34,6 +39,7 @@
 
   // State for decks and new deck creation
   let decks: DeckStat[] = $state([]);
+  let expandedDecks: Set<number> = $state(new Set());
   let isCreatingDeck = $state(false);
   let newDeckName = $state("");
   let isLoading = $state(true);
@@ -43,6 +49,15 @@
   let openDeckMenuId: number | null = $state(null);
   let selectedDecks: Set<number> = $state(new Set());
   let optionsDeckId: number | null = $state(null);
+  
+  // Custom Study modal state
+  let showCustomStudy = $state(false);
+  let customStudyName = $state("");
+  let customStudyQuery = $state("is:due");
+  let customStudyLimit = $state(50);
+  let customStudyOrder = $state(0);
+  let orderLabels: string[] = $state([]);
+  let isCreatingFilteredDeck = $state(false);
 
   function toggleDeckSelection(deckId: number) {
     if (selectedDecks.has(deckId)) {
@@ -113,7 +128,7 @@
   async function loadDeckStats() {
     isLoading = true;
     try {
-      const result = await invoke<DeckStat[]>("get_deck_stats");
+      const result = await invoke<DeckStat[]>("get_all_decks");
       decks = result;
     } catch (error) {
       console.error("Error loading deck stats:", error);
@@ -122,6 +137,38 @@
     } finally {
       isLoading = false;
     }
+  }
+
+  function toggleDeckExpanded(deckId: number) {
+    if (expandedDecks.has(deckId)) {
+      expandedDecks.delete(deckId);
+    } else {
+      expandedDecks.add(deckId);
+    }
+    expandedDecks = new Set(expandedDecks);
+  }
+
+  function getDeckIndent(level: number): string {
+    return `padding-left: ${level * 20}px`;
+  }
+
+  function shouldShowDeck(deck: DeckStat): boolean {
+    // Show root level decks always
+    if (deck.level <= 1) return true;
+    
+    // Check if any ancestor is collapsed
+    let currentLevel = deck.level;
+    for (const d of decks) {
+      if (d.level < deck.level && d.level >= 1) {
+        // Check if this is an ancestor
+        const nameParts = deck.name.split('::');
+        const ancestorName = nameParts.slice(0, d.level).join('::');
+        if (d.name === ancestorName && !expandedDecks.has(d.id)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   async function handleImportApkg() {
@@ -197,6 +244,71 @@
     newDeckName = "";
   }
 
+  async function openCustomStudyModal() {
+    showCustomStudy = true;
+    // Load order labels if not already loaded
+    if (orderLabels.length === 0) {
+      try {
+        const result = await invoke<{ labels: string[] }>("get_filtered_deck_order_labels");
+        orderLabels = result.labels;
+      } catch (error) {
+        console.error("Error loading order labels:", error);
+        // Use default labels
+        orderLabels = [
+          "Oldest reviewed first",
+          "Random",
+          "Increasing intervals",
+          "Decreasing intervals",
+          "Most lapses",
+          "Added order",
+          "Due date",
+          "Latest added first",
+          "Ascending retrievability",
+          "Descending retrievability",
+          "Relative overdueness"
+        ];
+      }
+    }
+  }
+
+  function closeCustomStudyModal() {
+    showCustomStudy = false;
+    customStudyName = "";
+    customStudyQuery = "is:due";
+    customStudyLimit = 50;
+    customStudyOrder = 0;
+    isCreatingFilteredDeck = false;
+  }
+
+  async function handleCreateFilteredDeck() {
+    if (!customStudyName.trim()) {
+      addToast("Please enter a deck name", "error");
+      return;
+    }
+    if (!customStudyQuery.trim()) {
+      addToast("Please enter a search query", "error");
+      return;
+    }
+    
+    isCreatingFilteredDeck = true;
+    try {
+      await invoke("create_filtered_deck", {
+        name: customStudyName.trim(),
+        searchQuery: customStudyQuery.trim(),
+        limit: customStudyLimit,
+        order: customStudyOrder
+      });
+      await loadDeckStats();
+      closeCustomStudyModal();
+      addToast("Custom Study deck created", "success");
+    } catch (error) {
+      console.error("Error creating filtered deck:", error);
+      addToast(error instanceof Error ? error.message : "Failed to create filtered deck", "error");
+    } finally {
+      isCreatingFilteredDeck = false;
+    }
+  }
+
   function handleKeyDown(event: KeyboardEvent) {
     if (event.key === "Enter") {
       handleCreateDeckSubmit();
@@ -248,18 +360,34 @@
   {/if}
   
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-    {#each decks as deck, index (deck.id)}
+    {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
       <div
         data-deck-id={deck.id}
         class="bg-bg-card border border-border rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-in fade-in slide-in-from-bottom-4 cursor-pointer relative"
-        style={`animation-delay: ${index * 40}ms`}
+        style={`animation-delay: ${index * 40}ms; ${deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}`}
         role="button"
         tabindex="0"
         onclick={() => handleDeckClick(deck.id, deck.name)}
         onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
       >
+        <!-- Expand/Collapse button for nested decks -->
+        {#if deck.level > 0}
+          <button
+            class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center text-text-secondary hover:text-text-primary cursor-pointer"
+            onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {#if expandedDecks.has(deck.id)}
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+              {:else}
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              {/if}
+            </svg>
+          </button>
+        {/if}
+        
         <!-- Checkbox -->
-        <label class="absolute top-4 left-4 cursor-pointer" onclick={(e) => e.stopPropagation()}>
+        <label class="absolute top-4 cursor-pointer" style={deck.level > 0 ? 'left-10' : 'left-4'} onclick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={selectedDecks.has(deck.id)}
@@ -269,7 +397,7 @@
         </label>
         
         <div class="flex justify-between items-start mb-4 pt-6">
-          <h3 class="text-lg font-semibold text-text-primary line-clamp-2">{deck.name}</h3>
+          <h3 class="text-lg font-semibold text-text-primary line-clamp-2">{deck.short_name || deck.name}</h3>
           <div class="relative">
             <button
               class="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-subtle transition-colors cursor-pointer"
@@ -316,24 +444,24 @@
         </div>
         
         <div class="flex flex-wrap gap-2 mb-6">
-          {#if deck.new_cards > 0}
+          {#if deck.new_count > 0}
             <span class="inline-flex items-center px-2 py-1 bg-[#DBEAFE] text-[#1D4ED8] text-xs font-medium rounded-full">
-              New: {deck.new_cards}
+              New: {deck.new_count}
             </span>
           {/if}
-          {#if deck.learn_cards > 0}
+          {#if deck.learn_count > 0}
             <span class="inline-flex items-center px-2 py-1 bg-[#FCE7F3] text-[#BE185D] text-xs font-medium rounded-full">
-              Learn: {deck.learn_cards}
+              Learn: {deck.learn_count}
             </span>
           {/if}
-          {#if deck.review_cards > 0}
+          {#if deck.review_count > 0}
             <span class="inline-flex items-center px-2 py-1 bg-[#D1FAE5] text-[#065F46] text-xs font-medium rounded-full">
-              Review: {deck.review_cards}
+              Review: {deck.review_count}
             </span>
           {/if}
         </div>
         
-        {#if deck.new_cards === 0 && deck.learn_cards === 0 && deck.review_cards === 0}
+        {#if deck.new_count === 0 && deck.learn_count === 0 && deck.review_count === 0}
           <div class="text-text-secondary text-sm text-center py-2">
             All caught up ✓
           </div>
@@ -372,6 +500,16 @@
         </svg>
         <span class="text-text-primary font-medium">+ New Deck</span>
       </button>
+      <!-- Custom Study Button -->
+      <button
+        onclick={openCustomStudyModal}
+        class="bg-bg-card border-2 border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] transition-all duration-200 hover:border-accent/50 hover:bg-accent-soft/20 cursor-pointer"
+      >
+        <svg class="h-10 w-10 text-text-secondary mb-3 transition-colors hover:text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        <span class="text-text-primary font-medium">Custom Study</span>
+      </button>
     {:else if isCreatingDeck}
       <div class="bg-bg-card border-2 border-dashed border-accent rounded-2xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] animate-in fade-in zoom-in-95">
         <div class="w-full mb-4">
@@ -407,9 +545,98 @@
       <DeckOptions 
         deckId={optionsDeckId} 
         deckName={selectedDeck.name} 
+        isFiltered={selectedDeck.is_filtered}
         onClose={() => optionsDeckId = null} 
       />
     {/if}
+  {/if}
+
+  <!-- Custom Study Modal -->
+  {#if showCustomStudy}
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-bg-card rounded-2xl p-6 w-full max-w-lg shadow-xl animate-in fade-in zoom-in-95">
+        <h2 class="text-xl font-bold text-text-primary mb-4">Custom Study</h2>
+        
+        <div class="space-y-4">
+          <!-- Deck Name -->
+          <div>
+            <label class="block text-sm font-medium text-text-secondary mb-1">Deck Name</label>
+            <input
+              type="text"
+              bind:value={customStudyName}
+              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+              placeholder="My Custom Study Deck"
+            />
+          </div>
+
+          <!-- Search Query -->
+          <div>
+            <label class="block text-sm font-medium text-text-secondary mb-1">
+              Search Query
+              <span class="text-xs font-normal text-text-secondary ml-2">(e.g., deck:MyDeck tag:exam is:due)</span>
+            </label>
+            <input
+              type="text"
+              bind:value={customStudyQuery}
+              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all font-mono text-sm"
+              placeholder="is:due"
+            />
+            <div class="mt-2 text-xs text-text-secondary">
+              <p class="font-medium mb-1">Search tips:</p>
+              <ul class="list-disc list-inside space-y-0.5">
+                <li><code class="bg-bg-subtle px-1 rounded">deck:Name</code> - cards in deck "Name"</li>
+                <li><code class="bg-bg-subtle px-1 rounded">tag:tagname</code> - cards with tag</li>
+                <li><code class="bg-bg-subtle px-1 rounded">is:due</code> - cards due for review</li>
+                <li><code class="bg-bg-subtle px-1 rounded">is:new</code> - new cards</li>
+                <li><code class="bg-bg-subtle px-1 rounded">rated:7:1</code> - answered within 7 days</li>
+                <li><code class="bg-bg-subtle px-1 rounded">prop:ivl>30</code> - interval over 30 days</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Card Limit -->
+          <div>
+            <label class="block text-sm font-medium text-text-secondary mb-1">Card Limit</label>
+            <input
+              type="number"
+              bind:value={customStudyLimit}
+              min="1"
+              max="9999"
+              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+            />
+          </div>
+
+          <!-- Sort Order -->
+          <div>
+            <label class="block text-sm font-medium text-text-secondary mb-1">Sort Order</label>
+            <select
+              bind:value={customStudyOrder}
+              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+            >
+              {#each orderLabels as label, index}
+                <option value={index}>{label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-6">
+          <button
+            onclick={handleCreateFilteredDeck}
+            disabled={isCreatingFilteredDeck}
+            class="flex-1 px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors text-sm font-medium disabled:opacity-50 cursor-pointer"
+          >
+            {isCreatingFilteredDeck ? 'Creating...' : 'Create'}
+          </button>
+          <button
+            onclick={closeCustomStudyModal}
+            class="px-4 py-2 bg-bg-subtle text-text-primary rounded-xl hover:bg-bg-subtle/80 transition-colors text-sm font-medium cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
 

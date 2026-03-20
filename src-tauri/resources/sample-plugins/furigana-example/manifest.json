@@ -1,0 +1,9 @@
+{
+  "id": "furigana-example",
+  "name": "Furigana Example",
+  "version": "1.0.0",
+  "description": "Adds ruby annotations to demonstrate the plugin system. Wraps any text inside {kanji|reading} in <ruby> tags.",
+  "entry_point": "index.js",
+  "hooks": ["card:render:front", "card:render:back"],
+  "author": "Anki Wrapper Team"
+}

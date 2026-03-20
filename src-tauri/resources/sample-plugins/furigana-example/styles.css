@@ -1,0 +1,9 @@
+/* furigana-example plugin styles */
+[data-plugin="furigana-example"] ruby {
+  font-size: 1em;
+}
+
+[data-plugin="furigana-example"] rt {
+  font-size: 0.6em;
+  color: var(--text-secondary, #78716C);
+}

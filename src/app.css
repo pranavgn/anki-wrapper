@@ -36,6 +36,22 @@
   --radius-2xl: 1rem;
 }
 
+/* Dark Theme */
+:root.dark {
+  --bg-base: #1C1917;
+  --bg-card: #292524;
+  --bg-subtle: #44403C;
+  --text-primary: #FAFAF9;
+  --text-secondary: #A8A29E;
+  --accent: #C4714F;
+  --accent-soft: #44403C;
+  --success: #6B8F71;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --border: #44403C;
+  --shadow-warm: 0 4px 24px rgba(0,0,0,0.3);
+}
+
 /* Tailwind v4 Theme Configuration */
 
 @theme {

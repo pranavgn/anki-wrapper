@@ -3,7 +3,7 @@ import { writable } from "svelte/store";
 export interface Toast {
   id: number;
   message: string;
-  type: 'success' | 'error' | 'warning';
+  type: 'success' | 'error' | 'warning' | 'info';
   visible: boolean;
 }
 
@@ -16,9 +16,10 @@ export const toast = {
   success: (message: string) => addToast(message, 'success'),
   error: (message: string) => addToast(message, 'error'),
   warning: (message: string) => addToast(message, 'warning'),
+  info: (message: string) => addToast(message, 'info'),
 };
 
-export function addToast(message: string, type: 'success' | 'error' | 'warning') {
+export function addToast(message: string, type: 'success' | 'error' | 'warning' | 'info') {
   const id = ++toastIdCounter;
   const toast: Toast = {
     id,
@@ -30,7 +31,7 @@ export function addToast(message: string, type: 'success' | 'error' | 'warning')
   toasts.update(currentToasts => [...currentToasts, toast]);
 
   // Auto-remove after timeout
-  const timeoutMs = type === 'success' ? 2000 : (type === 'warning' ? 6000 : 4000);
+  const timeoutMs = type === 'success' ? 2000 : (type === 'warning' || type === 'info' ? 6000 : 4000);
   setTimeout(() => {
     // First make invisible for fade out animation
     toasts.update(currentToasts =>

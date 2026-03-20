@@ -1,8 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
-  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { fade, fly } from "svelte/transition";
   import StudyView from "./lib/StudyView.svelte";
   import CardEditor from "./lib/CardEditor.svelte";
@@ -18,6 +17,11 @@
   import { initMathJax } from "./lib/mathjax";
   import CardBrowser from "./lib/CardBrowser.svelte";
   import NotetypeManager from "./lib/NotetypeManager.svelte";
+  import Settings from "./lib/Settings.svelte";
+  import ImageOcclusion from "./lib/ImageOcclusion.svelte";
+  import { pluginEngine, setCurrentLoadingPlugin, clearCurrentLoadingPlugin } from "./lib/pluginEngine";
+  import { loadAllPlugins } from "./lib/pluginLoader";
+  import PluginManager from "./lib/PluginManager.svelte";
 
   // Page state
   type Page = 'dashboard' | 'study' | 'editor' | 'stats' | 'browser';
@@ -47,9 +51,13 @@
   
   // Settings panel state
   let showSettings = $state(false);
+  let showImageOcclusion = $state(false);
   
   // Notetype manager state
   let showNotetypeManager = $state(false);
+
+  // Plugin manager state
+  let showPluginManager = $state(false);
 
   async function handleExportCollection() {
     try {
@@ -69,8 +77,6 @@
   let currentDeckId: number | null = $state(null);
   let currentDeckName = $state("");
 
-  let unlistenCollectionReady: UnlistenFn | null = null;
-
   // Initialize on mount
   onMount(async () => {
     // Expose function to open browser with query
@@ -89,29 +95,28 @@
     
     browserCheckComplete = true;
     
-    // Listen for collection ready event
-    unlistenCollectionReady = await listen<{ success: boolean; error?: string }>("collection:ready", (event) => {
-      if (event.payload.success) {
-        collectionStatus = 'ready';
-        isCollectionOpen = true;
-        getDeckStats();
-      } else {
-        collectionStatus = 'error';
-        collectionError = event.payload.error || 'Unknown error';
-      }
-    });
-    
-    // Fire and forget - don't await
-    // Load prefs, init MathJax, and init collection concurrently
-    Promise.all([prefs.load(), initMathJax(), invoke("init_standalone_collection")]).catch((error) => {
+    // Load prefs and MathJax in parallel, but handle collection init separately
+    try {
+      await Promise.all([prefs.load(), initMathJax()]);
+    } catch (e) {
+      console.error("Non-critical init error:", e);
+    }
+
+    // Initialize collection — this is the critical path
+    try {
+      await invoke("init_standalone_collection");
+      collectionStatus = 'ready';
+      isCollectionOpen = true;
+      getDeckStats();
+
+      // Load all plugins
+      await loadAllPlugins();
+      
+      // Fire the app:ready hook now that plugins are loaded
+      await pluginEngine.runAction('app:ready', {});
+    } catch (error) {
       collectionStatus = 'error';
       collectionError = error instanceof Error ? error.message : String(error);
-    });
-  });
-
-  onDestroy(() => {
-    if (unlistenCollectionReady) {
-      unlistenCollectionReady();
     }
   });
 
@@ -242,6 +247,27 @@
         >
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </button>
+        <button
+          onclick={() => showImageOcclusion = true}
+          class="p-2 rounded-lg transition-colors cursor-pointer text-text-secondary hover:bg-bg-subtle"
+          title="Image Occlusion"
+          aria-label="Image Occlusion"
+        >
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        </button>
+        <button
+          onclick={() => showPluginManager = true}
+          class="p-2 rounded-lg transition-colors cursor-pointer text-text-secondary hover:bg-bg-subtle"
+          title="Plugins"
+          aria-label="Plugins"
+        >
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
           </svg>
         </button>
         <button
@@ -377,78 +403,17 @@
 
     <!-- Settings Panel -->
     {#if showSettings}
-      <div 
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        onclick={() => showSettings = false}
-        onkeydown={(e) => e.key === 'Escape' && (showSettings = false)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-      >
-        <div 
-          class="bg-bg-card border border-border rounded-2xl shadow-xl w-full max-w-md p-6"
-          onclick={(e) => e.stopPropagation()}
-          onkeydown={(e) => e.stopPropagation()}
-          role="document"
-        >
-          <div class="flex items-center justify-between mb-6">
-            <h2 id="settings-title" class="text-lg font-semibold text-text-primary">Settings</h2>
-            <button 
-              onclick={() => showSettings = false}
-              class="p-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
-              aria-label="Close settings"
-            >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div class="space-y-6">
-            <!-- Note Types Section -->
-            <div>
-              <h3 class="text-sm font-medium text-text-secondary mb-3">Note Types</h3>
-              <button
-                onclick={() => { showSettings = false; showNotetypeManager = true; }}
-                class="w-full px-4 py-2 bg-bg-subtle hover:bg-bg-active text-text-primary rounded-lg transition-colors text-left"
-              >
-                Manage Note Types
-              </button>
-            </div>
-
-            <!-- Animations Section -->
-            <div>
-              <h3 class="text-sm font-medium text-text-secondary mb-3">Animations</h3>
-              <div class="space-y-3">
-                <label class="flex items-center justify-between cursor-pointer">
-                  <span class="text-text-primary">Enable animations</span>
-                  <input 
-                    type="checkbox" 
-                    checked={prefs.animations_enabled}
-                    onchange={(e) => {
-                      prefs.animations_enabled = e.currentTarget.checked;
-                      prefs.save();
-                    }}
-                    class="w-5 h-5 rounded border-border text-accent focus:ring-accent focus:ring-offset-0 bg-bg-base"
-                  />
-                </label>
-                <label class="flex items-center justify-between cursor-pointer">
-                  <span class="text-text-primary">Reduce motion</span>
-                  <input 
-                    type="checkbox" 
-                    checked={prefs.reduce_motion}
-                    onchange={(e) => {
-                      prefs.reduce_motion = e.currentTarget.checked;
-                      prefs.save();
-                    }}
-                    class="w-5 h-5 rounded border-border text-accent focus:ring-accent focus:ring-offset-0 bg-bg-base"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Settings onClose={() => showSettings = false} />
+    {/if}
+    
+    <!-- Plugin Manager Modal -->
+    {#if showPluginManager}
+      <PluginManager onClose={() => showPluginManager = false} />
+    {/if}
+    
+    <!-- Image Occlusion Modal -->
+    {#if showImageOcclusion}
+      <ImageOcclusion onClose={() => showImageOcclusion = false} />
     {/if}
   </div>
 {/if}

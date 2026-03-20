@@ -1,15 +1,17 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from "svelte";
   import { fly, fade } from "svelte/transition";
   import { addToast } from "./toast";
 
   interface Props {
     deckId: number;
     deckName: string;
+    isFiltered?: boolean;
     onClose: () => void;
   }
 
-  let { deckId, deckName, onClose }: Props = $props();
+  let { deckId, deckName, isFiltered = false, onClose }: Props = $props();
 
   interface DeckOptions {
     config_id: number;
@@ -31,6 +33,7 @@
   }
 
   let isLoading = $state(true);
+  let leechAction = $state<"suspend" | "tag">("suspend");
   let opts: DeckOptions = $state({
     config_id: 0,
     name: "",
@@ -52,6 +55,47 @@
 
   let newLearningStep = $state("");
   let newLapseStep = $state("");
+  let validationErrors: string[] = $state([]);
+  
+  // FSRS optimization state
+  let isOptimizing = $state(false);
+  let optimizationResult = $state<{
+    weights: number[];
+    current_retention: number;
+    predicted_retention: number;
+    review_count: number;
+    success: boolean;
+  } | null>(null);
+  
+  async function handleOptimizeFsrs() {
+    isOptimizing = true;
+    optimizationResult = null;
+    
+    try {
+      const result = await invoke<{
+        weights: number[];
+        current_retention: number;
+        predicted_retention: number;
+        review_count: number;
+        success: boolean;
+      }>("optimize_fsrs_weights", {
+        deckId: deckId,
+        desiredRetention: opts.desired_retention,
+      });
+      
+      optimizationResult = result;
+      
+      if (result.success && result.weights.length > 0) {
+        // Apply the optimized weights
+        opts.fsrs_weights = result.weights;
+        addToast("FSRS weights optimized successfully", "success");
+      }
+    } catch (e) {
+      addToast(`Optimization failed: ${e}`, "error");
+    } finally {
+      isOptimizing = false;
+    }
+  }
 
   onMount(async () => {
     try {
@@ -93,10 +137,65 @@
     opts.fsrs_weights = [];
   }
 
+  async function rebuildFilteredDeck() {
+    try {
+      const count = await invoke<number>("rebuild_filtered_deck", { deckId });
+      addToast(`Rebuilt with ${count} cards`, "success");
+    } catch (e) {
+      console.error("Error rebuilding filtered deck:", e);
+      addToast("Failed to rebuild deck", "error");
+    }
+  }
+
+  async function emptyFilteredDeck() {
+    try {
+      await invoke("empty_filtered_deck", { deckId });
+      addToast("Deck emptied - cards returned to original decks", "success");
+    } catch (e) {
+      console.error("Error emptying filtered deck:", e);
+      addToast("Failed to empty deck", "error");
+    }
+  }
+
+  function validateOptions(): boolean {
+    validationErrors = [];
+    
+    if (opts.new_cards_per_day < 0) {
+      validationErrors.push("New cards per day must be >= 0");
+    }
+    
+    if (opts.learning_steps.length === 0 || opts.learning_steps.some(s => s <= 0)) {
+      validationErrors.push("Learning steps must contain positive numbers");
+    }
+    
+    if (opts.graduating_interval < 0) {
+      validationErrors.push("Graduating interval must be >= 0");
+    }
+    
+    if (opts.desired_retention < 0.70 || opts.desired_retention > 0.97) {
+      validationErrors.push("Desired retention must be between 70% and 97%");
+    }
+    
+    if (opts.max_reviews_per_day < 0) {
+      validationErrors.push("Max reviews per day must be >= 0");
+    }
+    
+    if (opts.lapse_steps.some(s => s <= 0)) {
+      validationErrors.push("Relearning steps must contain positive numbers");
+    }
+    
+    return validationErrors.length === 0;
+  }
+
   async function saveOptions() {
+    if (!validateOptions()) {
+      addToast(validationErrors.join("; "), "error");
+      return;
+    }
+    
     try {
       await invoke("save_deck_options", { deckId, opts });
-      addToast("Options saved", "success");
+      addToast("Options saved successfully", "success");
       onClose();
     } catch (e) {
       addToast(`Failed to save: ${e}`, "error");
@@ -144,6 +243,30 @@
           {#each Array(5) as _}
             <div class="h-12 bg-bg-subtle rounded-lg animate-pulse"></div>
           {/each}
+        </div>
+      {:else if isFiltered}
+        <!-- Filtered Deck Options -->
+        <div class="space-y-4">
+          <div class="bg-accent-soft/20 border border-accent/30 rounded-xl p-4">
+            <h3 class="font-medium text-text-primary mb-2">Filtered Deck Actions</h3>
+            <p class="text-sm text-text-secondary mb-4">
+              This is a filtered deck. Use these actions to manage the cards in this deck.
+            </p>
+            <div class="flex gap-3">
+              <button
+                onclick={rebuildFilteredDeck}
+                class="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
+              >
+                Rebuild
+              </button>
+              <button
+                onclick={emptyFilteredDeck}
+                class="flex-1 px-4 py-2 bg-bg-subtle text-text-primary rounded-lg hover:bg-bg-subtle/80 transition-colors text-sm font-medium"
+              >
+                Empty
+              </button>
+            </div>
+          </div>
         </div>
       {:else}
         <!-- New Cards -->
@@ -288,11 +411,15 @@
               <input
                 type="range"
                 bind:value={opts.desired_retention}
-                min="0.7"
-                max="0.99"
+                min="0.70"
+                max="0.97"
                 step="0.01"
                 class="w-full"
               />
+              <div class="flex justify-between text-xs text-text-secondary mt-1">
+                <span>70%</span>
+                <span>97%</span>
+              </div>
             </div>
             <div>
               <label class="block text-sm text-text-secondary mb-1">FSRS Weights</label>
@@ -300,14 +427,40 @@
                 <p class="text-xs font-mono text-text-secondary break-all">
                   {opts.fsrs_weights.length > 0 ? opts.fsrs_weights.join(", ") : "Using default weights"}
                 </p>
-                {#if opts.fsrs_weights.length > 0}
-                  <button
-                    onclick={resetFsrsWeights}
-                    class="mt-2 text-xs text-accent hover:underline"
-                  >
-                    Reset to Default
-                  </button>
+                {#if isOptimizing}
+                  <p class="text-xs text-accent mt-2">Analyzing review history...</p>
+                {:else if optimizationResult}
+                  {#if !optimizationResult.success}
+                    <p class="text-xs text-warning mt-2">
+                      Need at least 400 reviews for reliable FSRS optimization. You have {optimizationResult.review_count}.
+                    </p>
+                  {:else}
+                    <p class="text-xs text-success mt-2">
+                      Optimized! Current retention: {Math.round(optimizationResult.current_retention * 100)}% → Predicted: {Math.round(optimizationResult.predicted_retention * 100)}%
+                    </p>
+                  {/if}
+                {:else}
+                  <p class="text-xs text-text-secondary mt-2">
+                    FSRS weights optimized from your review history.
+                  </p>
                 {/if}
+                <div class="flex gap-2 mt-3">
+                  <button
+                    onclick={handleOptimizeFsrs}
+                    disabled={isOptimizing}
+                    class="px-3 py-1.5 bg-accent text-white rounded-lg text-xs hover:bg-accent/90 transition-colors disabled:opacity-50"
+                  >
+                    {isOptimizing ? 'Optimizing...' : 'Optimize'}
+                  </button>
+                  {#if opts.fsrs_weights.length > 0}
+                    <button
+                      onclick={resetFsrsWeights}
+                      class="px-3 py-1.5 bg-bg-card border border-border rounded-lg text-xs hover:bg-bg-subtle transition-colors"
+                    >
+                      Reset
+                    </button>
+                  {/if}
+                </div>
               </div>
             </div>
           </div>
@@ -366,6 +519,16 @@
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
                 />
               </div>
+            </div>
+            <div>
+              <label class="block text-sm text-text-secondary mb-1">Leech action</label>
+              <select
+                bind:value={leechAction}
+                class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
+              >
+                <option value="suspend">Suspend card</option>
+                <option value="tag">Tag only</option>
+              </select>
             </div>
           </div>
         </details>

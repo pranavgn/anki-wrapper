@@ -1,0 +1,9 @@
+{
+  "id": "study-timer",
+  "name": "Study Session Timer",
+  "version": "1.0.0",
+  "description": "Logs study session duration and card count to the console. Demonstrates action hooks.",
+  "entry_point": "index.js",
+  "hooks": ["deck:study:start", "deck:study:end", "review:answer"],
+  "author": "Anki Wrapper Team"
+}

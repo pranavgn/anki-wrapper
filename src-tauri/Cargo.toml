@@ -43,6 +43,9 @@ base64 = "0.22"
 # Directory paths
 dirs = "5.0"
 
+# Open URLs/folders in system default app
+open = "5"
+
 # Tauri dialog plugin for native file pickers
 tauri-plugin-dialog = "2"
 
@@ -51,3 +54,6 @@ tauri-plugin-fs = "2"
 
 # Regex for HTML tag stripping
 regex = "1.10"
+
+# Date/time handling for statistics
+chrono = "0.4"

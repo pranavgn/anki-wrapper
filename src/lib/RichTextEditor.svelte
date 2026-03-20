@@ -2,6 +2,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { readFile } from "@tauri-apps/plugin-fs";
+  import { onMount, onDestroy } from "svelte";
+  import { EditorView, basicSetup } from "codemirror";
+  import { html } from "@codemirror/lang-html";
+  import { EditorState } from "@codemirror/state";
 
   let { 
     value = $bindable(''), 
@@ -16,12 +20,61 @@
   } = $props();
 
   let editorEl: HTMLDivElement;
+  let codeMirrorEl: HTMLDivElement;
+  let codeMirrorView: EditorView | null = null;
+  
+  // Mode state
+  let showHtmlSource = $state(false);
   
   // Toolbar state
   let toolbarVisible = $state(false);
   let toolbarX = $state(0);
   let toolbarY = $state(0);
   let activeFormats = $state({ bold: false, italic: false, underline: false });
+
+  // Initialize CodeMirror when switching to HTML source mode
+  $effect(() => {
+    if (showHtmlSource && codeMirrorEl && !codeMirrorView) {
+      codeMirrorView = new EditorView({
+        state: EditorState.create({
+          doc: value,
+          extensions: [
+            basicSetup,
+            html(),
+            EditorView.updateListener.of((update) => {
+              if (update.docChanged) {
+                value = update.state.doc.toString();
+                onchange?.(value);
+              }
+            }),
+            EditorView.theme({
+              "&": { height: "100%", fontSize: "14px" },
+              ".cm-scroller": { overflow: "auto" },
+              ".cm-content": { fontFamily: "monospace" },
+            }),
+          ],
+        }),
+        parent: codeMirrorEl,
+      });
+    } else if (!showHtmlSource && codeMirrorView) {
+      // When switching back to WYSIWYG, update the editor
+      if (editorEl) {
+        editorEl.innerHTML = value;
+      }
+      codeMirrorView.destroy();
+      codeMirrorView = null;
+    }
+  });
+
+  onDestroy(() => {
+    if (codeMirrorView) {
+      codeMirrorView.destroy();
+    }
+  });
+
+  function toggleHtmlSource() {
+    showHtmlSource = !showHtmlSource;
+  }
 
   // Initialize editor content on mount
   $effect(() => {
@@ -88,7 +141,64 @@
     code:        () => wrapSelectionInTag('code'),
     superscript: () => format('superscript'),
     subscript:   () => format('subscript'),
+    orderedList: () => format('insertOrderedList'),
+    unorderedList: () => format('insertUnorderedList'),
   };
+
+  // MathJax insertion
+  function insertMath(type: 'inline' | 'display') {
+    const sel = window.getSelection();
+    const hasSelection = sel && !sel.isCollapsed;
+    
+    if (type === 'inline') {
+      if (hasSelection) {
+        wrapSelectionWith('\\(', '\\)');
+      } else {
+        insertAtCursor('\\(\\)');
+        // Move cursor between the delimiters
+        moveCursor(-2);
+      }
+    } else {
+      if (hasSelection) {
+        wrapSelectionWith('\\[', '\\]');
+      } else {
+        insertAtCursor('\\[\\]');
+        moveCursor(-2);
+      }
+    }
+    value = editorEl.innerHTML;
+    onchange?.(value);
+  }
+
+  function wrapSelectionWith(before: string, after: string) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const text = range.toString();
+    const wrapper = document.createTextNode(before + text + after);
+    range.deleteContents();
+    range.insertNode(wrapper);
+  }
+
+  function insertAtCursor(text: string) {
+    editorEl.focus();
+    document.execCommand('insertText', false, text);
+  }
+
+  function moveCursor(offset: number) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.collapse(false);
+    // Move cursor by creating a text node reference
+    const textNode = range.startContainer;
+    if (textNode.nodeType === Node.TEXT_NODE) {
+      const textContent = textNode.textContent || '';
+      const newOffset = Math.min(offset, textContent.length);
+      range.setStart(textNode, newOffset);
+      range.setEnd(textNode, newOffset);
+    }
+  }
 
   // Image paste handler
   async function handlePaste(e: ClipboardEvent) {
@@ -162,7 +272,52 @@
         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
       </svg>
     </button>
+    
+    <!-- List buttons -->
+    <button onclick={commands.unorderedList} title="Bullet list">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+        <circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>
+      </svg>
+    </button>
+    <button onclick={commands.orderedList} title="Numbered list">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/>
+        <text x="3" y="7" font-size="6" fill="currentColor">1</text><text x="3" y="13" font-size="6" fill="currentColor">2</text><text x="3" y="19" font-size="6" fill="currentColor">3</text>
+      </svg>
+    </button>
+    
+    <div class="toolbar-divider"></div>
+    
+    <!-- MathJax buttons -->
+    <button onclick={() => insertMath('inline')} title="Insert inline math (\\(...\\))">
+      <span style="font-family: serif; font-style: italic; font-weight: bold;">x²</span>
+    </button>
+    <button onclick={() => insertMath('display')} title="Insert display math (\\[...\\])">
+      <span style="font-family: serif; font-weight: bold;">∑</span>
+    </button>
+    
+    <div class="toolbar-spacer"></div>
+    
+    <!-- HTML Source toggle -->
+    <button 
+      onclick={toggleHtmlSource} 
+      class={showHtmlSource ? 'active' : ''}
+      title="Toggle HTML source"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+      </svg>
+    </button>
   </div>
+
+  {#if showHtmlSource}
+    <div 
+      bind:this={codeMirrorEl} 
+      class="codemirror-container"
+      style="min-height: {minHeight}"
+    ></div>
+  {:else}
 
   <div
     bind:this={editorEl}
@@ -177,8 +332,9 @@
     onpaste={handlePaste}
     role="textbox"
   ></div>
+  {/if}
 
-  {#if toolbarVisible}
+  {#if toolbarVisible && !showHtmlSource}
     <div 
       class="floating-toolbar"
       style="left: {toolbarX}px; top: {toolbarY}px; transform: translateX(-50%)"
@@ -236,10 +392,27 @@
 
   .editor-toolbar {
     display: flex;
-    gap: 4px;
+    align-items: center;
+    gap: 2px;
     padding: 4px 0 8px 0;
     border-bottom: 1px solid var(--border);
     margin-bottom: 8px;
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
+  .toolbar-spacer {
+    flex: 1;
+  }
+
+  .editor-toolbar button.active {
+    background: var(--accent);
+    color: white;
   }
 
   .editor-toolbar button {
@@ -339,5 +512,21 @@
     height: 16px;
     background: rgba(255,255,255,0.2);
     margin: 0 4px;
+  }
+
+  .codemirror-container {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .codemirror-container :global(.cm-editor) {
+    height: 100%;
+    min-height: 200px;
+  }
+
+  .codemirror-container :global(.cm-scroller) {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 14px;
   }
 </style>

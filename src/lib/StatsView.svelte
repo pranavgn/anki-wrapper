@@ -6,370 +6,652 @@
   import type { ChartData, ChartOptions } from "chart.js";
   import { addToast } from "./toast";
 
+  // Types
+  interface ForecastDay {
+    day: number;
+    new: number;
+    review: number;
+    learning: number;
+  }
+
+  interface DailyReview {
+    date: string;
+    count: number;
+    time_secs: number;
+  }
+
+  interface CardTypeStats {
+    new: number;
+    learning: number;
+    young: number;
+    mature: number;
+  }
+
+  interface RetentionStats {
+    young_retention: number;
+    mature_retention: number;
+    overall: number;
+  }
+
+  interface DailyCount {
+    date: string;
+    count: number;
+  }
+
+  interface ReviewStats {
+    forecast: ForecastDay[];
+    daily_reviews: DailyReview[];
+    hourly_breakdown: number[];
+    card_types: CardTypeStats;
+    retention: RetentionStats;
+    cards_added: DailyCount[];
+    current_streak: number;
+    longest_streak: number;
+    total_reviews: number;
+    total_cards: number;
+    total_notes: number;
+    average_ease: number;
+    average_interval_days: number;
+  }
+
+  interface DeckInfo {
+    id: number;
+    name: string;
+    card_count: number;
+    is_filtered: boolean;
+  }
+
   // State
   let isLoading = $state(true);
-  let todayStats = $state<{ cards_reviewed: number; time_spent_ms: number; streak_days: number } | null>(null);
-  let reviewHistory = $state<Array<{ date: string; count: number; again: number; hard: number; good: number; easy: number }>>([]);
+  let decks = $state<DeckInfo[]>([]);
+  let selectedDeckId = $state<number | null>(null);
+  let stats = $state<ReviewStats | null>(null);
 
-  // Load stats on mount
+  // Load decks and stats on mount
   onMount(async () => {
     const tauriCheck = await isTauri();
     if (!tauriCheck) {
       // Mock data for browser testing
-      todayStats = {
-        cards_reviewed: 47,
-        time_spent_ms: 840000, // 14 minutes
-        streak_days: 7
-      };
-      reviewHistory = generateMockReviewHistory();
+      stats = generateMockStats();
       isLoading = false;
       return;
     }
 
     try {
-      const [todayResult, historyResult] = await Promise.all([
-        invoke<{ cards_reviewed: number; time_spent_ms: number }>("get_today_stats"),
-        invoke<Array<{ timestamp: number; card_id: number; ease: number; interval: number; last_interval: number; ease_factor: number; time_ms: number; review_type: number }>>("get_review_history", { limit: 1000 })
-      ]);
-
-      // Transform today's stats to include streak (we'll calculate this)
-      todayStats = {
-        ...todayResult,
-        streak_days: 7 // TODO: calculate actual streak from review history
-      };
-
-      // Transform review history to daily aggregates
-      reviewHistory = processReviewHistory(historyResult);
+      // Load decks
+      decks = await invoke<DeckInfo[]>("get_decks");
+      
+      // Load stats (all decks by default)
+      await loadStats(null);
     } catch (error) {
       console.error("Error loading stats:", error);
       addToast(error instanceof Error ? error.message : "Failed to load statistics", "error");
       // Fallback to mock data
-      todayStats = {
-        cards_reviewed: 47,
-        time_spent_ms: 840000,
-        streak_days: 7
-      };
-      reviewHistory = generateMockReviewHistory();
+      stats = generateMockStats();
     } finally {
       isLoading = false;
     }
   });
 
-  function processReviewHistory(rawHistory: Array<{ timestamp: number; card_id: number; ease: number; interval: number; last_interval: number; ease_factor: number; time_ms: number; review_type: number }>) {
-    const dailyMap = new Map<string, { count: number; again: number; hard: number; good: number; easy: number }>();
-
-    rawHistory.forEach(entry => {
-      const date = new Date(entry.timestamp * 1000).toISOString().split('T')[0];
-
-      if (!dailyMap.has(date)) {
-        dailyMap.set(date, { count: 0, again: 0, hard: 0, good: 0, easy: 0 });
+  async function loadStats(deckId: number | null) {
+    isLoading = true;
+    try {
+      if (deckId === null) {
+        stats = await invoke<ReviewStats>("get_review_stats", { deckId: null });
+      } else {
+        stats = await invoke<ReviewStats>("get_deck_specific_stats", { deckId });
       }
+      selectedDeckId = deckId;
+    } catch (error) {
+      console.error("Error loading stats:", error);
+      addToast(error instanceof Error ? error.message : "Failed to load statistics", "error");
+    } finally {
+      isLoading = false;
+    }
+  }
 
-      const day = dailyMap.get(date)!;
-      day.count++;
+  function handleDeckChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    const value = target.value;
+    const deckId = value === "all" ? null : parseInt(value, 10);
+    loadStats(deckId);
+  }
 
-      switch (entry.ease) {
-        case 1: day.again++; break;
-        case 2: day.hard++; break;
-        case 3: day.good++; break;
-        case 4: day.easy++; break;
-      }
-    });
-
-    // Get last 7 days
-    const result = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-
-      const data = dailyMap.get(dateStr) || { count: 0, again: 0, hard: 0, good: 0, easy: 0 };
-      result.push({
-        date: dateStr,
-        count: data.count,
-        again: data.again,
-        hard: data.hard,
-        good: data.good,
-        easy: data.easy
+  function generateMockStats(): ReviewStats {
+    const forecast: ForecastDay[] = [];
+    for (let i = 1; i <= 30; i++) {
+      forecast.push({
+        day: i,
+        new: Math.floor(Math.random() * 10),
+        review: Math.floor(Math.random() * 30),
+        learning: Math.floor(Math.random() * 5),
       });
     }
 
-    return result;
-  }
-
-  function generateMockReviewHistory() {
-    const result = [];
-    for (let i = 6; i >= 0; i--) {
+    const dailyReviews: DailyReview[] = [];
+    for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-
-      result.push({
-        date: dateStr,
+      dailyReviews.push({
+        date: date.toISOString().split('T')[0],
         count: Math.floor(Math.random() * 50) + 10,
-        again: Math.floor(Math.random() * 5),
-        hard: Math.floor(Math.random() * 8),
-        good: Math.floor(Math.random() * 30),
-        easy: Math.floor(Math.random() * 15)
+        time_secs: Math.floor(Math.random() * 1800),
       });
     }
-    return result;
+
+    const hourlyBreakdown: number[] = [];
+    for (let i = 0; i < 24; i++) {
+      hourlyBreakdown.push(Math.floor(Math.random() * 20));
+    }
+
+    const cardsAdded: DailyCount[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      cardsAdded.push({
+        date: date.toISOString().split('T')[0],
+        count: Math.floor(Math.random() * 15),
+      });
+    }
+
+    return {
+      forecast,
+      daily_reviews: dailyReviews,
+      hourly_breakdown: hourlyBreakdown,
+      card_types: {
+        new: 100,
+        learning: 15,
+        young: 200,
+        mature: 500,
+      },
+      retention: {
+        young_retention: 0.85,
+        mature_retention: 0.92,
+        overall: 0.90,
+      },
+      cards_added: cardsAdded,
+      current_streak: 7,
+      longest_streak: 14,
+      total_reviews: 5000,
+      total_cards: 815,
+      total_notes: 600,
+      average_ease: 2.65,
+      average_interval_days: 45.5,
+    };
   }
 
-  function formatTime(ms: number): string {
-    const minutes = Math.floor(ms / 60000);
+  function formatTime(secs: number): string {
+    const hours = Math.floor(secs / 3600);
+    const minutes = Math.floor((secs % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
     return `${minutes} min`;
   }
 
-  // Chart configurations
-  let weekChartData = $derived.by(() => {
-    if (!reviewHistory.length) return { labels: [], datasets: [] };
+  function formatPercentage(value: number): string {
+    return `${(value * 100).toFixed(1)}%`;
+  }
 
+  // Chart: Forecast (stacked bar)
+  let forecastChartData = $derived.by(() => {
+    if (!stats?.forecast.length) return { labels: [], datasets: [] };
+
+    const labels = stats.forecast.slice(0, 14).map(d => `Day ${d.day}`);
+    
     return {
-      labels: reviewHistory.map(day => {
-        const date = new Date(day.date);
-        return date.toLocaleDateString('en-US', { weekday: 'short' });
-      }),
-      datasets: [{
-        data: reviewHistory.map(day => day.count),
-        backgroundColor: 'rgba(196, 113, 79, 0.85)',
-        borderRadius: 8,
-        borderSkipped: false,
-      }]
+      labels,
+      datasets: [
+        {
+          label: 'New',
+          data: stats.forecast.slice(0, 14).map(d => d.new),
+          backgroundColor: 'rgba(96, 165, 250, 0.85)',
+          borderRadius: 4,
+        },
+        {
+          label: 'Learning',
+          data: stats.forecast.slice(0, 14).map(d => d.learning),
+          backgroundColor: 'rgba(251, 191, 36, 0.85)',
+          borderRadius: 4,
+        },
+        {
+          label: 'Review',
+          data: stats.forecast.slice(0, 14).map(d => d.review),
+          backgroundColor: 'rgba(167, 139, 250, 0.85)',
+          borderRadius: 4,
+        },
+      ],
     } as ChartData;
   });
 
-  let weekChartOptions: ChartOptions = {
+  let forecastChartOptions: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       x: {
-        grid: {
-          display: false,
-        },
-        ticks: {
-          color: 'var(--text-secondary)',
-          font: {
-            size: 12,
-          },
-        },
+        stacked: true,
+        grid: { display: false },
+        ticks: { color: 'var(--text-secondary)', font: { size: 11 } },
       },
       y: {
-        display: false,
+        stacked: true,
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: 'var(--text-secondary)' },
       },
     },
     plugins: {
       legend: {
-        display: false,
+        position: 'top',
+        labels: { color: 'var(--text-secondary)', boxWidth: 12, padding: 10 },
       },
-      tooltip: {
-        backgroundColor: '#1C1917',
-        titleColor: '#FFFFFF',
-        bodyColor: '#FFFFFF',
-        cornerRadius: 8,
-        padding: 10,
-        callbacks: {
-          title: (context: any) => {
-            const dayIndex = context[0].dataIndex;
-            const fullDate = reviewHistory[dayIndex].date;
-            const date = new Date(fullDate);
-            return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-          },
-          label: (context: any) => `${context.parsed.y} cards reviewed`,
-        },
-      },
-    },
-    animation: {
-      duration: 800,
-      easing: 'easeOutQuart' as any,
     },
   };
 
-  let breakdownChartData = $derived.by(() => {
-    if (!reviewHistory.length) return { labels: [], datasets: [] };
+  // Chart: Daily Reviews (bar)
+  let dailyReviewsChartData = $derived.by(() => {
+    if (!stats?.daily_reviews.length) return { labels: [], datasets: [] };
 
-    const totals = reviewHistory.reduce(
-      (acc, day) => ({
-        again: acc.again + day.again,
-        hard: acc.hard + day.hard,
-        good: acc.good + day.good,
-        easy: acc.easy + day.easy,
+    const last30 = stats.daily_reviews.slice(-30);
+    
+    return {
+      labels: last30.map(d => {
+        const date = new Date(d.date);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }),
-      { again: 0, hard: 0, good: 0, easy: 0 }
+      datasets: [{
+        label: 'Reviews',
+        data: last30.map(d => d.count),
+        backgroundColor: 'rgba(196, 113, 79, 0.85)',
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
+    } as ChartData;
+  });
+
+  let dailyReviewsChartOptions: ChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: 'var(--text-secondary)', font: { size: 10 }, maxRotation: 45 },
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: 'var(--text-secondary)' },
+      },
+    },
+    plugins: {
+      legend: { display: false },
+    },
+  };
+
+  // Chart: Hourly Breakdown (bar)
+  let hourlyChartData = $derived.by(() => {
+    if (!stats?.hourly_breakdown) return { labels: [], datasets: [] };
+
+    const hours = Array.from({ length: 24 }, (_, i) => 
+      i === 0 ? '12am' : i < 12 ? `${i}am` : i === 12 ? '12pm' : `${i-12}pm`
     );
 
     return {
-      labels: ['Again', 'Hard', 'Good', 'Easy'],
+      labels: hours,
       datasets: [{
-        data: [totals.again, totals.hard, totals.good, totals.easy],
-        backgroundColor: ['#FCA5A5', '#FCD34D', '#93C5FD', '#6EE7B7'],
+        label: 'Reviews',
+        data: stats.hourly_breakdown,
+        backgroundColor: 'rgba(52, 211, 153, 0.85)',
+        borderRadius: 4,
+        borderSkipped: false,
+      }],
+    } as ChartData;
+  });
+
+  let hourlyChartOptions: ChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: 'var(--text-secondary)', font: { size: 10 } },
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: 'var(--text-secondary)' },
+      },
+    },
+    plugins: {
+      legend: { display: false },
+    },
+  };
+
+  // Chart: Card Types (doughnut)
+  let cardTypesChartData = $derived.by(() => {
+    if (!stats) return { labels: [], datasets: [] };
+
+    return {
+      labels: ['New', 'Learning', 'Young', 'Mature'],
+      datasets: [{
+        data: [
+          stats.card_types.new,
+          stats.card_types.learning,
+          stats.card_types.young,
+          stats.card_types.mature,
+        ],
+        backgroundColor: ['#60A5FA', '#FBBF24', '#F97316', '#10B981'],
         borderWidth: 0,
       }],
     } as ChartData;
   });
 
-  let breakdownChartOptions: ChartOptions = {
+  let cardTypesChartOptions: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
-      },
-      tooltip: {
-        backgroundColor: '#1C1917',
-        titleColor: '#FFFFFF',
-        bodyColor: '#FFFFFF',
-        cornerRadius: 8,
-        padding: 10,
-        callbacks: {
-          label: (context: any) => `${context.parsed} ${context.label.toLowerCase()}`,
-        },
+        position: 'right',
+        labels: { color: 'var(--text-secondary)', boxWidth: 12, padding: 15 },
       },
     },
-    animation: {
-      duration: 800,
-      easing: 'easeOutQuart' as any,
+  } as ChartOptions;
+
+  // Chart: Cards Added (bar)
+  let cardsAddedChartData = $derived.by(() => {
+    if (!stats?.cards_added.length) return { labels: [], datasets: [] };
+
+    const last30 = stats.cards_added.slice(-30);
+    
+    return {
+      labels: last30.map(d => {
+        const date = new Date(d.date);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }),
+      datasets: [{
+        label: 'Cards Added',
+        data: last30.map(d => d.count),
+        backgroundColor: 'rgba(167, 139, 250, 0.85)',
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
+    } as ChartData;
+  });
+
+  let cardsAddedChartOptions: ChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: 'var(--text-secondary)', font: { size: 10 }, maxRotation: 45 },
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: 'var(--text-secondary)' },
+      },
+    },
+    plugins: {
+      legend: { display: false },
     },
   };
 </script>
 
-<div class="max-w-6xl mx-auto">
-  <!-- Today's Stats -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-    <!-- Reviewed -->
-    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border animate-in fade-in slide-in-from-bottom-2" style="animation-delay: 0ms">
+<div class="max-w-7xl mx-auto">
+  <!-- Header with Deck Filter -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <h1 class="text-2xl font-semibold text-text-primary">Statistics</h1>
+    
+    <!-- Deck Filter -->
+    <div class="flex items-center gap-3">
+      <label for="deck-select" class="text-sm text-text-secondary">Deck:</label>
+      <select
+        id="deck-select"
+        class="px-4 py-2 rounded-lg bg-bg-card border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+        value={selectedDeckId === null ? "all" : selectedDeckId.toString()}
+        onchange={handleDeckChange}
+      >
+        <option value="all">All Decks</option>
+        {#each decks.filter(d => !d.is_filtered) as deck}
+          <option value={deck.id.toString()}>{deck.name}</option>
+        {/each}
+      </select>
+    </div>
+  </div>
+
+  <!-- Summary Stats Row -->
+  <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+    <!-- Total Cards -->
+    <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
       {#if isLoading}
         <div class="animate-pulse">
-          <div class="w-6 h-6 bg-bg-subtle rounded mb-2"></div>
-          <div class="w-16 h-10 bg-bg-subtle rounded mb-2"></div>
-          <div class="w-20 h-4 bg-bg-subtle rounded"></div>
+          <div class="w-16 h-4 bg-bg-subtle rounded mb-2"></div>
+          <div class="w-12 h-8 bg-bg-subtle rounded"></div>
         </div>
       {:else}
-        <div class="flex items-start justify-between mb-4">
-          <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <div class="text-4xl font-semibold text-text-primary mb-1">
-          {todayStats?.cards_reviewed ?? 0}
-        </div>
-        <div class="text-sm text-text-secondary uppercase tracking-wider">
-          Reviewed
-        </div>
+        <div class="text-sm text-text-secondary mb-1">Total Cards</div>
+        <div class="text-2xl font-semibold text-text-primary">{stats?.total_cards ?? 0}</div>
       {/if}
     </div>
 
-    <!-- Time -->
-    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border animate-in fade-in slide-in-from-bottom-2" style="animation-delay: 60ms">
+    <!-- Total Notes -->
+    <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
       {#if isLoading}
         <div class="animate-pulse">
-          <div class="w-6 h-6 bg-bg-subtle rounded mb-2"></div>
-          <div class="w-16 h-10 bg-bg-subtle rounded mb-2"></div>
-          <div class="w-20 h-4 bg-bg-subtle rounded"></div>
+          <div class="w-16 h-4 bg-bg-subtle rounded mb-2"></div>
+          <div class="w-12 h-8 bg-bg-subtle rounded"></div>
         </div>
       {:else}
-        <div class="flex items-start justify-between mb-4">
-          <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" stroke-width="2" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
-          </svg>
-        </div>
-        <div class="text-4xl font-semibold text-text-primary mb-1">
-          {formatTime(todayStats?.time_spent_ms ?? 0)}
-        </div>
-        <div class="text-sm text-text-secondary uppercase tracking-wider">
-          Time
-        </div>
+        <div class="text-sm text-text-secondary mb-1">Total Notes</div>
+        <div class="text-2xl font-semibold text-text-primary">{stats?.total_notes ?? 0}</div>
       {/if}
     </div>
 
-    <!-- Streak -->
-    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border animate-in fade-in slide-in-from-bottom-2" style="animation-delay: 120ms">
+    <!-- Total Reviews -->
+    <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
       {#if isLoading}
         <div class="animate-pulse">
-          <div class="w-6 h-6 bg-bg-subtle rounded mb-2"></div>
-          <div class="w-16 h-10 bg-bg-subtle rounded mb-2"></div>
-          <div class="w-20 h-4 bg-bg-subtle rounded"></div>
+          <div class="w-16 h-4 bg-bg-subtle rounded mb-2"></div>
+          <div class="w-12 h-8 bg-bg-subtle rounded"></div>
         </div>
       {:else}
-        <div class="flex items-start justify-between mb-4">
-          <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="text-sm text-text-secondary mb-1">Total Reviews</div>
+        <div class="text-2xl font-semibold text-text-primary">{stats?.total_reviews ?? 0}</div>
+      {/if}
+    </div>
+
+    <!-- Average Ease -->
+    <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
+      {#if isLoading}
+        <div class="animate-pulse">
+          <div class="w-16 h-4 bg-bg-subtle rounded mb-2"></div>
+          <div class="w-12 h-8 bg-bg-subtle rounded"></div>
+        </div>
+      {:else}
+        <div class="text-sm text-text-secondary mb-1">Avg. Ease</div>
+        <div class="text-2xl font-semibold text-text-primary">{stats?.average_ease.toFixed(2) ?? '0.00'}</div>
+      {/if}
+    </div>
+
+    <!-- Average Interval -->
+    <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
+      {#if isLoading}
+        <div class="animate-pulse">
+          <div class="w-20 h-4 bg-bg-subtle rounded mb-2"></div>
+          <div class="w-16 h-8 bg-bg-subtle rounded"></div>
+        </div>
+      {:else}
+        <div class="text-sm text-text-secondary mb-1">Avg. Interval</div>
+        <div class="text-2xl font-semibold text-text-primary">{stats?.average_interval_days.toFixed(1) ?? '0'}d</div>
+      {/if}
+    </div>
+
+    <!-- Retention -->
+    <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
+      {#if isLoading}
+        <div class="animate-pulse">
+          <div class="w-16 h-4 bg-bg-subtle rounded mb-2"></div>
+          <div class="w-12 h-8 bg-bg-subtle rounded"></div>
+        </div>
+      {:else}
+        <div class="text-sm text-text-secondary mb-1">Retention</div>
+        <div class="text-2xl font-semibold text-text-primary">{formatPercentage(stats?.retention.overall ?? 0)}</div>
+      {/if}
+    </div>
+  </div>
+
+  <!-- Streak Section -->
+  <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border mb-6">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="p-3 bg-accent/10 rounded-xl">
+          <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
           </svg>
         </div>
-        <div class="text-4xl font-semibold text-text-primary mb-1">
-          {todayStats?.streak_days ?? 0}
+        <div>
+          <div class="text-sm text-text-secondary">Current Streak</div>
+          <div class="text-3xl font-semibold text-text-primary">
+            {stats?.current_streak ?? 0} <span class="text-lg font-normal text-text-secondary">days</span>
+          </div>
         </div>
-        <div class="text-sm text-text-secondary uppercase tracking-wider">
-          Streak
+      </div>
+      <div class="text-right">
+        <div class="text-sm text-text-secondary">Longest Streak</div>
+        <div class="text-2xl font-semibold text-text-primary">
+          {stats?.longest_streak ?? 0} <span class="text-sm font-normal text-text-secondary">days</span>
         </div>
-      {/if}
+      </div>
     </div>
   </div>
 
-  <!-- Charts Row -->
+  <!-- Charts Grid -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Reviews This Week -->
-    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border animate-in fade-in slide-in-from-bottom-2" style="animation-delay: 180ms">
-      <h3 class="text-lg font-semibold text-text-primary mb-6">This Week</h3>
+    <!-- Review Forecast -->
+    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border">
+      <h3 class="text-lg font-semibold text-text-primary mb-4">Review Forecast</h3>
       {#if isLoading}
         <div class="skeleton h-64 rounded-lg"></div>
       {:else}
         <div class="h-64">
-          <Chart type="bar" data={weekChartData} options={weekChartOptions} />
+          <Chart type="bar" data={forecastChartData} options={forecastChartOptions} />
         </div>
       {/if}
     </div>
 
-    <!-- Answer Breakdown -->
-    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border animate-in fade-in slide-in-from-bottom-2" style="animation-delay: 240ms">
-      <h3 class="text-lg font-semibold text-text-primary mb-6">Answer Breakdown</h3>
+    <!-- Daily Reviews -->
+    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border">
+      <h3 class="text-lg font-semibold text-text-primary mb-4">Reviews per Day (Last 30 Days)</h3>
       {#if isLoading}
-        <div class="skeleton space-y-4">
-          <div class="h-64 rounded-lg"></div>
-          <div class="flex justify-center gap-6">
-            <div class="w-16 h-4 rounded"></div>
-            <div class="w-16 h-4 rounded"></div>
-            <div class="w-16 h-4 rounded"></div>
-            <div class="w-16 h-4 rounded"></div>
-          </div>
-        </div>
+        <div class="skeleton h-64 rounded-lg"></div>
       {:else}
-        <div class="h-64 relative">
-          <Chart type="doughnut" data={breakdownChartData} options={breakdownChartOptions} />
-          {#if todayStats}
-            <div class="absolute inset-0 flex items-center justify-center">
-              <div class="text-center">
-                <div class="text-3xl font-semibold text-text-primary">
-                  {todayStats.cards_reviewed}
-                </div>
-                <div class="text-sm text-text-secondary">Total</div>
-              </div>
-            </div>
-          {/if}
+        <div class="h-64">
+          <Chart type="bar" data={dailyReviewsChartData} options={dailyReviewsChartOptions} />
         </div>
+      {/if}
+    </div>
 
-        <!-- Custom Legend -->
-        <div class="grid grid-cols-4 gap-4 mt-6">
+    <!-- Hourly Breakdown -->
+    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border">
+      <h3 class="text-lg font-semibold text-text-primary mb-4">Study Time (Hourly)</h3>
+      {#if isLoading}
+        <div class="skeleton h-64 rounded-lg"></div>
+      {:else}
+        <div class="h-64">
+          <Chart type="bar" data={hourlyChartData} options={hourlyChartOptions} />
+        </div>
+      {/if}
+    </div>
+
+    <!-- Card Types -->
+    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border">
+      <h3 class="text-lg font-semibold text-text-primary mb-4">Card Types</h3>
+      {#if isLoading}
+        <div class="skeleton h-64 rounded-lg"></div>
+      {:else}
+        <div class="h-64">
+          <Chart type="doughnut" data={cardTypesChartData} options={cardTypesChartOptions} />
+        </div>
+        
+        <!-- Card Type Legend -->
+        <div class="grid grid-cols-2 gap-4 mt-4">
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-sm bg-[#FCA5A5]"></div>
-            <span class="text-sm text-text-secondary">Again</span>
+            <div class="w-3 h-3 rounded-sm bg-[#60A5FA]"></div>
+            <span class="text-sm text-text-secondary">New: {stats?.card_types.new ?? 0}</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-sm bg-[#FCD34D]"></div>
-            <span class="text-sm text-text-secondary">Hard</span>
+            <div class="w-3 h-3 rounded-sm bg-[#FBBF24]"></div>
+            <span class="text-sm text-text-secondary">Learning: {stats?.card_types.learning ?? 0}</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-sm bg-[#93C5FD]"></div>
-            <span class="text-sm text-text-secondary">Good</span>
+            <div class="w-3 h-3 rounded-sm bg-[#F97316]"></div>
+            <span class="text-sm text-text-secondary">Young: {stats?.card_types.young ?? 0}</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-sm bg-[#6EE7B7]"></div>
-            <span class="text-sm text-text-secondary">Easy</span>
+            <div class="w-3 h-3 rounded-sm bg-[#10B981]"></div>
+            <span class="text-sm text-text-secondary">Mature: {stats?.card_types.mature ?? 0}</span>
           </div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Cards Added -->
+    <div class="bg-bg-card rounded-2xl p-6 shadow-warm border border-border lg:col-span-2">
+      <h3 class="text-lg font-semibold text-text-primary mb-4">Cards Added (Last 30 Days)</h3>
+      {#if isLoading}
+        <div class="skeleton h-48 rounded-lg"></div>
+      {:else}
+        <div class="h-48">
+          <Chart type="bar" data={cardsAddedChartData} options={cardsAddedChartOptions} />
         </div>
       {/if}
     </div>
   </div>
+
+  <!-- Retention Stats -->
+  <div class="mt-6 bg-bg-card rounded-2xl p-6 shadow-warm border border-border">
+    <h3 class="text-lg font-semibold text-text-primary mb-4">Retention Rates</h3>
+    {#if isLoading}
+      <div class="flex gap-8">
+        <div class="skeleton w-24 h-16 rounded"></div>
+        <div class="skeleton w-24 h-16 rounded"></div>
+        <div class="skeleton w-24 h-16 rounded"></div>
+      </div>
+    {:else}
+      <div class="flex flex-wrap gap-8">
+        <div class="text-center">
+          <div class="text-3xl font-semibold text-text-primary">{formatPercentage(stats?.retention.young_retention ?? 0)}</div>
+          <div class="text-sm text-text-secondary">Young Card Retention</div>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl font-semibold text-text-primary">{formatPercentage(stats?.retention.mature_retention ?? 0)}</div>
+          <div class="text-sm text-text-secondary">Mature Card Retention</div>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl font-semibold text-accent">{formatPercentage(stats?.retention.overall ?? 0)}</div>
+          <div class="text-sm text-text-secondary">Overall Retention</div>
+        </div>
+      </div>
+    {/if}
+  </div>
 </div>
+
+<style>
+  /* Custom scrollbar for the container */
+  :global(.overflow-auto) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-subtle) transparent;
+  }
+
+  :global(.overflow-auto::-webkit-scrollbar) {
+    width: 8px;
+    height: 8px;
+  }
+
+  :global(.overflow-auto::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+
+  :global(.overflow-auto::-webkit-scrollbar-thumb) {
+    background-color: var(--bg-subtle);
+    border-radius: 4px;
+  }
+</style>

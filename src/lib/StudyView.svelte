@@ -28,6 +28,10 @@
     back: string;
     note_id: number;
     flag: number;
+    again_interval: string;
+    hard_interval: string;
+    good_interval: string;
+    easy_interval: string;
   } | null = $state(null);
   let currentTags = $state<string[]>([]);
   let isAnswerRevealed = $state(false);
@@ -118,6 +122,10 @@
         back: string;
         note_id: number;
         flag: number;
+        again_interval: string;
+        hard_interval: string;
+        good_interval: string;
+        easy_interval: string;
       }>("get_next_card", { deckId });
       
       currentCard = card;
@@ -568,7 +576,10 @@
                 class="py-3 bg-[#FEE2E2] hover:bg-[#FECACA] disabled:bg-bg-subtle/50 text-[#991B1B] rounded-xl transition-all hover:-translate-y-0.5 text-sm font-medium cursor-pointer active:scale-95"
                 style="animation-delay: 0ms"
               >
-                Again
+                <div>Again</div>
+                {#if currentCard?.again_interval}
+                  <div class="text-xs opacity-75">{currentCard.again_interval}</div>
+                {/if}
               </button>
               <button
                 onclick={() => answerCard(2)}
@@ -576,7 +587,10 @@
                 class="py-3 bg-[#FEF3C7] hover:bg-[#FDE68A] disabled:bg-bg-subtle/50 text-[#92400E] rounded-xl transition-all hover:-translate-y-0.5 text-sm font-medium cursor-pointer active:scale-95"
                 style="animation-delay: 60ms"
               >
-                Hard
+                <div>Hard</div>
+                {#if currentCard?.hard_interval}
+                  <div class="text-xs opacity-75">{currentCard.hard_interval}</div>
+                {/if}
               </button>
               <button
                 onclick={() => answerCard(3)}
@@ -584,7 +598,10 @@
                 class="py-3 bg-[#DBEAFE] hover:bg-[#BFDBFE] disabled:bg-bg-subtle/50 text-[#1E40AF] rounded-xl transition-all hover:-translate-y-0.5 text-sm font-medium cursor-pointer active:scale-95"
                 style="animation-delay: 120ms"
               >
-                Good
+                <div>Good</div>
+                {#if currentCard?.good_interval}
+                  <div class="text-xs opacity-75">{currentCard.good_interval}</div>
+                {/if}
               </button>
               <button
                 onclick={() => answerCard(4)}
@@ -592,7 +609,10 @@
                 class="py-3 bg-[#D1FAE5] hover:bg-[#A7F3D0] disabled:bg-bg-subtle/50 text-[#065F46] rounded-xl transition-all hover:-translate-y-0.5 text-sm font-medium cursor-pointer active:scale-95"
                 style="animation-delay: 180ms"
               >
-                Easy
+                <div>Easy</div>
+                {#if currentCard?.easy_interval}
+                  <div class="text-xs opacity-75">{currentCard.easy_interval}</div>
+                {/if}
               </button>
             </div>
           {/if}

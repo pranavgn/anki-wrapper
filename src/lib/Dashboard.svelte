@@ -113,7 +113,7 @@
 
   // Derived total due cards
   const totalDue = $derived.by(() => {
-    return decks.reduce((sum, deck) => sum + deck.new_cards + deck.learn_cards + deck.review_cards, 0);
+    return decks.reduce((sum, deck) => sum + deck.new_count + deck.learn_count + deck.review_count, 0);
   });
 
   // Load deck stats on mount

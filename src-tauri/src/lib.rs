@@ -2137,7 +2137,13 @@ pub fn run() {
             disable_plugin,
             get_plugin_source,
             get_plugin_css,
-            open_plugins_folder
+            open_plugins_folder,
+            // Notetype commands
+            get_all_notetypes,
+            get_notetype_detail,
+            update_notetype_detail,
+            rename_notetype,
+            delete_notetype
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

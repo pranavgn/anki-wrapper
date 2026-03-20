@@ -14,7 +14,6 @@
   import { prefs } from "./lib/prefs";
   import { addToast } from "./lib/toast";
   import { fly_if_enabled } from "./lib/animate";
-  import { initMathJax } from "./lib/mathjax";
   import CardBrowser from "./lib/CardBrowser.svelte";
   import NotetypeManager from "./lib/NotetypeManager.svelte";
   import Settings from "./lib/Settings.svelte";
@@ -95,9 +94,9 @@
     
     browserCheckComplete = true;
     
-    // Load prefs and MathJax in parallel, but handle collection init separately
+    // Load prefs - MathJax will lazy-load when first card with math is rendered
     try {
-      await Promise.all([prefs.load(), initMathJax()]);
+      await prefs.load();
     } catch (e) {
       console.error("Non-critical init error:", e);
     }

@@ -23,6 +23,7 @@ export interface PluginManifest {
 /**
  * Load all enabled plugins from the plugins directory
  * This scans the directory, validates manifests, loads JS, and injects CSS
+ * Loads plugins in parallel with timeout per plugin
  */
 export async function loadAllPlugins(): Promise<void> {
   let manifests: PluginManifest[];
@@ -36,66 +37,32 @@ export async function loadAllPlugins(): Promise<void> {
 
   console.log(`Found ${manifests.length} plugins`);
 
+  const enabledPlugins = manifests.filter(m => m.enabled && !m.load_error);
+  
+  // Log disabled plugins
   for (const manifest of manifests) {
-    // Skip disabled plugins
     if (!manifest.enabled) {
       console.log(`Plugin "${manifest.name}" is disabled, skipping`);
-      continue;
-    }
-
-    // Skip plugins with load errors
-    if (manifest.load_error) {
+    } else if (manifest.load_error) {
       console.warn(`Plugin "${manifest.id}" has load error: ${manifest.load_error}`);
       pluginEngine.recordError?.(manifest.id, manifest.load_error);
-      continue;
-    }
-
-    try {
-      // Load CSS first if present
-      if (manifest.has_css) {
-        try {
-          const css = await invoke<string>("get_plugin_css", { pluginId: manifest.id });
-          injectPluginCSS(manifest.id, css);
-        } catch (cssError) {
-          console.warn(`Failed to load CSS for plugin "${manifest.id}":`, cssError);
-        }
-      }
-
-      // Get JS source from backend
-      const source = await invoke<string>("get_plugin_source", { pluginId: manifest.id });
-
-      // Register plugin in engine BEFORE evaluating script
-      pluginEngine.registerPlugin(manifest);
-
-      // Set the loading context so hooks auto-associate with this plugin
-      setCurrentLoadingPlugin(manifest.id);
-
-      // Evaluate the plugin JS in a Function constructor (NOT eval)
-      // This gives us a clean scope but still access to window.__ankiPlugins
-      const pluginFn = new Function(
-        "__ankiPlugins", // parameter name the plugin receives
-        source // plugin source code
-      );
-      pluginFn(window.__ankiPlugins);
-
-      // Clear loading context
-      clearCurrentLoadingPlugin();
-
-      console.log(`Plugin loaded: ${manifest.name} v${manifest.version}`);
-
-    } catch (e) {
-      // Clear loading context on error
-      clearCurrentLoadingPlugin();
-      
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error(`Failed to load plugin "${manifest.id}":`, e);
-      
-      // Record the error in the plugin engine if the method exists
-      if (pluginEngine.recordError) {
-        pluginEngine.recordError(manifest.id, `Load failed: ${errorMessage}`);
-      }
     }
   }
+
+  // Load all plugins in parallel with 3-second timeout per plugin
+  await Promise.allSettled(
+    enabledPlugins.map(manifest => 
+      Promise.race([
+        loadSinglePlugin(manifest),
+        new Promise<void>((_, reject) => 
+          setTimeout(() => reject(new Error(`Plugin "${manifest.id}" timed out`)), 3000)
+        )
+      ]).catch(e => {
+        console.error(`Plugin "${manifest.id}" failed:`, e);
+        pluginEngine.recordError?.(manifest.id, String(e));
+      })
+    )
+  );
 }
 
 /**
@@ -147,9 +114,9 @@ export async function reloadPlugin(pluginId: string): Promise<void> {
 }
 
 /**
- * Load a single plugin (internal use)
+ * Load a single plugin (exported for parallel loading)
  */
-async function loadSinglePlugin(manifest: PluginManifest): Promise<void> {
+export async function loadSinglePlugin(manifest: PluginManifest): Promise<void> {
   try {
     // Load CSS first if present
     if (manifest.has_css) {

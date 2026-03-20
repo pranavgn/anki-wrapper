@@ -1,28 +1,45 @@
 // MathJax initialization and rendering utilities
 // Matches Anki's default MathJax configuration
+// Lazy-loads MathJax only when math content is detected
 
 let mjInitialized = false;
+let mjInitializing: Promise<void> | null = null;
 
-export async function initMathJax() {
+// Lightweight check — does the HTML contain math delimiters?
+export function containsMath(html: string): boolean {
+  return /\\\(|\\\[|[latex]|[\$]/.test(html);
+}
+
+export async function initMathJax(): Promise<void> {
   if (mjInitialized) return;
+  if (mjInitializing) return mjInitializing;
   
-  // MathJax configuration matching Anki's defaults
-  (window as any).MathJax = {
-    tex: {
-      inlineMath: [['\\(', '\\)']],
-      displayMath: [['\\[', '\\]']],
-      processEscapes: true,
-    },
-    svg: { fontCache: 'global' },
-    startup: { typeset: false }, // manual control
-  };
+  mjInitializing = (async () => {
+    // MathJax configuration matching Anki's defaults
+    (window as any).MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true,
+      },
+      svg: { fontCache: 'global' },
+      startup: { typeset: false }, // manual control
+    };
+    
+    // Load MathJax components dynamically
+    await import('mathjax/tex-svg.js');
+    mjInitialized = true;
+  })();
   
-  // Load MathJax components dynamically
-  const MathJax = await import('mathjax/tex-svg.js');
-  mjInitialized = true;
+  return mjInitializing;
 }
 
 export async function renderMath(element: HTMLElement) {
+  // Only init+render if the content actually has math
+  const html = element.innerHTML;
+  if (!containsMath(html)) return;
+  
+  await initMathJax();
   if (!(window as any).MathJax?.typesetPromise) return;
   try {
     await (window as any).MathJax.typesetPromise([element]);

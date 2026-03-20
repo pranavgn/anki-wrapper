@@ -28,10 +28,6 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Smooth Transitions */
-  * {
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-  }
   --shadow-warm: 0 4px 24px rgba(0,0,0,0.06);
   --radius-2xl: 1rem;
 }
@@ -50,6 +46,17 @@
   --warning: #FBBF24;
   --border: #44403C;
   --shadow-warm: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+/* Smooth Transitions — scoped to interactive elements only */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+.transition-colors {
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 /* Tailwind v4 Theme Configuration */
@@ -98,6 +105,18 @@ p, li {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.25rem;
   line-height: 1.85;
+  /* Card flip animation optimization */
+  will-change: transform, opacity;
+}
+
+/* Page transition optimization */
+main > div {
+  will-change: transform;
+}
+
+/* Main content area paint isolation */
+main {
+  contain: content;
 }
 
 .text-muted {

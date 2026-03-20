@@ -31,7 +31,4 @@ export function fade_if_enabled(params: FadeParams): FadeParams {
   return params;
 }
 
-// Derived value for components to use
-export const TRANSITION_DURATION = $derived(
-  prefs.animations_enabled ? (prefs.reduce_motion ? 80 : 220) : 0
-);
+

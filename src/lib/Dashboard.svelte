@@ -465,6 +465,7 @@
         {:else}
           <button
             class="w-full px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors text-sm font-medium cursor-pointer"
+            onclick={() => handleDeckClick(deck.id, deck.name)}
           >
             Study Now
           </button>

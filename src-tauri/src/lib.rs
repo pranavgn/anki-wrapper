@@ -2766,12 +2766,17 @@ pub struct CardInfo {
 }
 
 #[command]
-fn get_next_card(_deck_id: i64, state: State<AppState>) -> Result<CardInfo, String> {
+fn get_next_card(deck_id: i64, state: State<AppState>) -> Result<CardInfo, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = collection.as_mut().ok_or("Collection not initialized")?;
     
+    // CRITICAL FIX: Set the current deck before getting queued cards.
+    // Anki's scheduler uses the "current deck" setting to determine which
+    // deck to pull cards from. Without this, it pulls from whatever deck
+    // was last selected (often the Default deck).
+    collection.set_current_deck(DeckId(deck_id)).map_err(|e| e.to_string())?;
+    
     // Get queued cards using Anki's proper scheduling API
-    // This respects new cards/day, reviews/day, learning steps, FSRS, etc.
     let queued_cards = collection.get_queued_cards(1, false)
         .map_err(|e| e.to_string())?;
     
@@ -2779,11 +2784,10 @@ fn get_next_card(_deck_id: i64, state: State<AppState>) -> Result<CardInfo, Stri
     let queued_card = queued_cards.cards.first()
         .ok_or_else(|| "No cards left to study".to_string())?;
     
-    // Use public methods to access card fields
     let card_id = queued_card.card.id().0;
     let note_id = queued_card.card.note_id().0;
     
-    // Render the card HTML using Anki's render_existing_card method
+    // Render the card HTML
     let rendered = collection.render_existing_card(queued_card.card.id(), false, false)
         .map_err(|e| e.to_string())?;
     let front = rendered.question().into_owned();
@@ -2798,15 +2802,9 @@ fn get_next_card(_deck_id: i64, state: State<AppState>) -> Result<CardInfo, Stri
     ).unwrap_or(0);
     let flag = (flags & 0xFF) as u8;
     
-    // Get the interval labels for answer buttons using describe_next_states
+    // Get the interval labels for answer buttons
     let interval_labels = collection.describe_next_states(&queued_card.states)
         .map_err(|e| e.to_string())?;
-    
-    // interval_labels should have 4 elements: [again, hard, good, easy]
-    let again_interval = interval_labels.get(0).cloned().unwrap_or_default();
-    let hard_interval = interval_labels.get(1).cloned().unwrap_or_default();
-    let good_interval = interval_labels.get(2).cloned().unwrap_or_default();
-    let easy_interval = interval_labels.get(3).cloned().unwrap_or_default();
     
     Ok(CardInfo {
         card_id,
@@ -2814,10 +2812,10 @@ fn get_next_card(_deck_id: i64, state: State<AppState>) -> Result<CardInfo, Stri
         front,
         back,
         flag,
-        again_interval,
-        hard_interval,
-        good_interval,
-        easy_interval,
+        again_interval: interval_labels.first().cloned().unwrap_or_default(),
+        hard_interval: interval_labels.get(1).cloned().unwrap_or_default(),
+        good_interval: interval_labels.get(2).cloned().unwrap_or_default(),
+        easy_interval: interval_labels.get(3).cloned().unwrap_or_default(),
     })
 }
 

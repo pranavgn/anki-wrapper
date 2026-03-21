@@ -124,12 +124,51 @@
               { front: "What is interleaving?", back: "A learning strategy where you mix different topics or types of problems during study, rather than focusing on one topic at a time (blocking)." },
               { front: "Who created Anki?", back: "Damien Elmes. Anki was first released in 2006 and is open source." },
               { front: "What is a leech in SRS?", back: "A card that has been failed many times (typically 8+ lapses). Leeches are automatically suspended to prevent wasting time on poorly-formed cards." },
+              { front: "What is the spacing effect?", back: "The phenomenon where learning is more effective when study sessions are spaced out over time rather than concentrated in a single session (massed practice)." },
+              { front: "What is retrieval practice?", back: "A learning strategy that involves recalling information from memory rather than simply re-reading it. Testing yourself strengthens long-term retention more than passive review." },
+              { front: "What does 'desired retention' mean in FSRS?", back: "The target probability (e.g., 0.9 = 90%) that you will remember a card when it comes up for review. Higher retention means shorter intervals and more reviews." },
+              { front: "What is the difference between recognition and recall?", back: "Recognition is identifying previously learned information when presented with it (e.g., multiple choice). Recall is retrieving information from memory without cues (e.g., flashcards). Recall produces stronger learning." },
+              { front: "What is the testing effect?", back: "The finding that taking a test on material produces better long-term retention than spending the same amount of time restudying. Also known as retrieval practice effect." },
             ];
             for (const card of testCards) {
               await invoke("add_basic_card", { deckId: deckId, front: card.front, back: card.back, tags: [] });
             }
             console.log("🧪 Test deck seeded with", testCards.length, "cards");
             window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
+          } else {
+            // Check if existing deck needs cards
+            const testDeck = decks.find(d => d.name === "🧪 Test Deck (Dev)");
+            if (testDeck) {
+              const cards = await invoke<any[]>("search_cards", {
+                query: `deck:"🧪 Test Deck (Dev)"`,
+                order: "cardDue",
+                limit: 1
+              });
+              if (cards.length === 0) {
+                // Re-seed if deck exists but is empty
+                const deckId = testDeck.id;
+                const testCards = [
+                  { front: "What is spaced repetition?", back: "A learning technique that incorporates increasing intervals of time between subsequent review of previously learned material." },
+                  { front: "What does FSRS stand for?", back: "Free Spaced Repetition Scheduler — an open-source, modern algorithm for scheduling flashcard reviews." },
+                  { front: "What is the forgetting curve?", back: "A mathematical model showing how information is lost over time when there is no attempt to retain it. First described by Hermann Ebbinghaus in 1885." },
+                  { front: "What is active recall?", back: "A principle of efficient learning that involves actively stimulating memory during the learning process, rather than passively reviewing material." },
+                  { front: "What is the minimum information principle?", back: "The idea that flashcards should be as simple and atomic as possible — each card should test exactly one piece of knowledge." },
+                  { front: "What is interleaving?", back: "A learning strategy where you mix different topics or types of problems during study, rather than focusing on one topic at a time (blocking)." },
+                  { front: "Who created Anki?", back: "Damien Elmes. Anki was first released in 2006 and is open source." },
+                  { front: "What is a leech in SRS?", back: "A card that has been failed many times (typically 8+ lapses). Leeches are automatically suspended to prevent wasting time on poorly-formed cards." },
+                  { front: "What is the spacing effect?", back: "The phenomenon where learning is more effective when study sessions are spaced out over time rather than concentrated in a single session (massed practice)." },
+                  { front: "What is retrieval practice?", back: "A learning strategy that involves recalling information from memory rather than simply re-reading it. Testing yourself strengthens long-term retention more than passive review." },
+                  { front: "What does 'desired retention' mean in FSRS?", back: "The target probability (e.g., 0.9 = 90%) that you will remember a card when it comes up for review. Higher retention means shorter intervals and more reviews." },
+                  { front: "What is the difference between recognition and recall?", back: "Recognition is identifying previously learned information when presented with it (e.g., multiple choice). Recall is retrieving information from memory without cues (e.g., flashcards). Recall produces stronger learning." },
+                  { front: "What is the testing effect?", back: "The finding that taking a test on material produces better long-term retention than spending the same amount of time restudying. Also known as retrieval practice effect." },
+                ];
+                for (const card of testCards) {
+                  await invoke("add_basic_card", { deckId: deckId, front: card.front, back: card.back, tags: [] });
+                }
+                console.log("🧪 Test deck re-seeded with", testCards.length, "cards (deck was empty)");
+                window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
+              }
+            }
           }
         } catch (e) {
           console.warn("Test deck seeding failed (non-critical):", e);

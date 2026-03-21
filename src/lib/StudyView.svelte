@@ -81,10 +81,10 @@
 
   async function checkUndoStatus() {
     try {
-      const status = await invoke<{ canUndo: boolean; undoLabel: string | null; canRedo: boolean; redoLabel: string | null }>(
+      const status = await invoke<{ can_undo: boolean; undo_label: string | null; can_redo: boolean; redo_label: string | null }>(
         "get_undo_status"
       );
-      canUndo = status.canUndo;
+      canUndo = status.can_undo;
     } catch (e: unknown) {
       console.error("Error checking undo status:", e);
       canUndo = false;
@@ -93,10 +93,10 @@
 
   async function undoLastAction() {
     try {
-      const result = await invoke<{ actionName: string; cardId: number | null }>(
+      const result = await invoke<{ action_name: string; card_id: number | null }>(
         "undo_last_action"
       );
-      addToast(result.actionName + " undone", "success");
+      addToast(result.action_name + " undone", "success");
       // Reload the current card state
       await loadDeckStats();
       await loadNextCard();

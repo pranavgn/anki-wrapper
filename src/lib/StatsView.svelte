@@ -97,9 +97,9 @@
     isLoading = true;
     try {
       if (deckId === null) {
-        stats = await invoke<ReviewStats>("get_review_stats", { deckId: null });
+        stats = await invoke<ReviewStats>("get_review_stats", { deck_id: null });
       } else {
-        stats = await invoke<ReviewStats>("get_deck_specific_stats", { deckId });
+        stats = await invoke<ReviewStats>("get_deck_specific_stats", { deck_id: deckId });
       }
       selectedDeckId = deckId;
     } catch (error) {

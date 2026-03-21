@@ -294,7 +294,7 @@
     try {
       await invoke("create_filtered_deck", {
         name: customStudyName.trim(),
-        searchQuery: customStudyQuery.trim(),
+        search_query: customStudyQuery.trim(),
         limit: customStudyLimit,
         order: customStudyOrder
       });

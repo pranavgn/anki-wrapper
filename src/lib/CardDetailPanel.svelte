@@ -43,7 +43,7 @@
   async function loadDetail(cid: number) {
     loading = true;
     try {
-      detail = await invoke('get_card_detail', { cardId: cid });
+      detail = await invoke('get_card_detail', { card_id: cid });
     } catch (e) {
       addToast('Failed to load card details', 'error');
     } finally {
@@ -54,7 +54,7 @@
   async function handleFlagChange(flag: number) {
     if (!detail) return;
     try {
-      await invoke('set_card_flag', { cardId: detail.card_id, flag });
+      await invoke('set_card_flag', { card_id: detail.card_id, flag });
       detail = { ...detail, flag };
       onFlagChange(detail.card_id, flag);
     } catch (e) {
@@ -65,7 +65,7 @@
   async function handleSuspend() {
     if (!detail) return;
     try {
-      await invoke('suspend_cards', { cardIds: [detail.card_id] });
+      await invoke('suspend_cards', { card_ids: [detail.card_id] });
       addToast('Card suspended', 'success');
       onClose();
     } catch (e) {
@@ -76,7 +76,7 @@
   async function handleDelete() {
     if (!detail) return;
     try {
-      await invoke('delete_notes', { noteIds: [detail.note_id] });
+      await invoke('delete_notes', { note_ids: [detail.note_id] });
       addToast('Note deleted', 'success');
       onClose();
     } catch (e) {

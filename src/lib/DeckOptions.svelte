@@ -79,8 +79,8 @@
         review_count: number;
         success: boolean;
       }>("optimize_fsrs_weights", {
-        deckId: deckId,
-        desiredRetention: opts.desired_retention,
+        deck_id: deckId,
+        desired_retention: opts.desired_retention,
       });
       
       optimizationResult = result;
@@ -99,7 +99,7 @@
 
   onMount(async () => {
     try {
-      const result = await invoke<DeckOptions>("get_deck_options", { deckId });
+      const result = await invoke<DeckOptions>("get_deck_options", { deck_id: deckId });
       opts = result;
     } catch (e) {
       console.error("Error loading deck options:", e);
@@ -139,7 +139,7 @@
 
   async function rebuildFilteredDeck() {
     try {
-      const count = await invoke<number>("rebuild_filtered_deck", { deckId });
+      const count = await invoke<number>("rebuild_filtered_deck", { deck_id: deckId });
       addToast(`Rebuilt with ${count} cards`, "success");
     } catch (e) {
       console.error("Error rebuilding filtered deck:", e);
@@ -149,7 +149,7 @@
 
   async function emptyFilteredDeck() {
     try {
-      await invoke("empty_filtered_deck", { deckId });
+      await invoke("empty_filtered_deck", { deck_id: deckId });
       addToast("Deck emptied - cards returned to original decks", "success");
     } catch (e) {
       console.error("Error emptying filtered deck:", e);
@@ -194,7 +194,7 @@
     }
     
     try {
-      await invoke("save_deck_options", { deckId, opts });
+      await invoke("save_deck_options", { deck_id: deckId, opts });
       addToast("Options saved successfully", "success");
       onClose();
     } catch (e) {

@@ -75,7 +75,8 @@
 
   async function loadDecks() {
     try {
-      availableDecks = await invoke<DeckStat[]>("get_deck_stats");
+      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>("get_all_decks");
+      availableDecks = result;
       if (availableDecks.length > 0) {
         selectedDeckId = availableDecks[0].id;
       }

@@ -82,7 +82,7 @@ export async function unloadPlugin(pluginId: string): Promise<void> {
  * Enable a plugin (removes from disabled list)
  */
 export async function enablePlugin(pluginId: string): Promise<void> {
-  await invoke("enable_plugin", { pluginId });
+  await invoke("enable_plugin", { plugin_id: pluginId });
   console.log(`Plugin enabled: ${pluginId}`);
 }
 
@@ -94,7 +94,7 @@ export async function disablePlugin(pluginId: string): Promise<void> {
   await unloadPlugin(pluginId);
   
   // Then disable it in the backend
-  await invoke("disable_plugin", { pluginId });
+  await invoke("disable_plugin", { plugin_id: pluginId });
   console.log(`Plugin disabled: ${pluginId}`);
 }
 

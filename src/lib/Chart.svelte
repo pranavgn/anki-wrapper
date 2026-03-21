@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { Chart as ChartJS } from "chart.js";
+  import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, PointElement, LineElement, ArcElement } from "chart.js";
   import type { ChartType, ChartData, ChartOptions } from "chart.js";
+
+  // Register Chart.js components
+  ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, PointElement, LineElement, ArcElement);
 
   // Props using Svelte 5 runes
   interface Props {

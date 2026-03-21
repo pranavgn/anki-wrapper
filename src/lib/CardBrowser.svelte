@@ -143,7 +143,7 @@
     
     try {
       if (mode === 'cards') {
-        rows = await invoke('search_cards', { query: q || 'deck:*', limit: 100 });
+        rows = await invoke('search_cards', { query: q || 'deck:*', order: sortOrder || '', limit: 100 });
       } else {
         noteRows = await invoke('search_notes', { query: q || 'deck:*', limit: 100 });
       }
@@ -182,7 +182,7 @@
     cardDetail = null;
     
     try {
-      cardDetail = await invoke('get_card_detail', { cardId });
+      cardDetail = await invoke('get_card_detail', { card_id: cardId });
     } catch (e) {
       addToast('Failed to load card details', 'error');
     }
@@ -194,7 +194,7 @@
     cardDetail = null;
     
     try {
-      cardDetail = await invoke('get_card_detail', { cardId: firstCardId });
+      cardDetail = await invoke('get_card_detail', { card_id: firstCardId });
     } catch (e) {
       addToast('Failed to load note details', 'error');
     }
@@ -226,7 +226,7 @@
     const noteIds = Array.from(selectedNoteIds);
     if (noteIds.length === 0) return [];
     try {
-      return await invoke<number[]>('get_card_ids_for_notes', { noteIds });
+      return await invoke<number[]>('get_card_ids_for_notes', { note_ids: noteIds });
     } catch (e) {
       console.error('Failed to get card IDs for notes:', e);
       return [];
@@ -318,7 +318,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('suspend_cards', { cardIds });
+      await invoke('suspend_cards', { card_ids: Array.from(cardIds) });
       addToast(`${cardIds.length} cards suspended`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -335,7 +335,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('unsuspend_cards', { cardIds });
+      await invoke('unsuspend_cards', { card_ids: Array.from(cardIds) });
       addToast(`${cardIds.length} cards unsuspended`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -352,7 +352,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('bury_cards', { cardIds });
+      await invoke('bury_cards', { card_ids: Array.from(cardIds) });
       addToast(`${cardIds.length} cards buried`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -372,7 +372,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('move_cards_to_deck', { cardIds, deckId });
+      await invoke('move_cards_to_deck', { card_ids: Array.from(cardIds), deck_id: deckId });
       addToast(`${cardIds.length} cards moved to ${deckName}`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -386,7 +386,7 @@
     if (!newTag.trim()) return;
     const noteIds = getUniqueNoteIds();
     try {
-      await invoke('add_tags_to_notes', { noteIds, tag: newTag.trim() });
+      await invoke('add_tags_to_notes', { note_ids: Array.from(noteIds), tag: newTag.trim() });
       addToast(`Tag added to ${noteIds.length} notes`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -399,7 +399,7 @@
   async function handleBulkDelete() {
     const noteIds = getUniqueNoteIds();
     try {
-      await invoke('delete_notes', { noteIds });
+      await invoke('delete_notes', { note_ids: Array.from(noteIds) });
       addToast(`${noteIds.length} notes deleted`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -412,8 +412,8 @@
   // Load decks for move dropdown
   async function loadDecks() {
     try {
-      const deckStats = await invoke<Array<{ id: number; name: string }>>('get_deck_stats');
-      availableDecks = deckStats.map(d => ({ id: d.id, name: d.name }));
+      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>('get_all_decks');
+      availableDecks = result.map(d => ({ id: d.id, name: d.name }));
     } catch (e) {
       console.error('Failed to load decks:', e);
     }

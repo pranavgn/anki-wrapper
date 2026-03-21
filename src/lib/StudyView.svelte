@@ -66,11 +66,11 @@
 
   async function loadDeckStats() {
     try {
-      const stats = await invoke<{ new_cards: number; learn_cards: number; review_cards: number }>(
+      const stats = await invoke<{ new: number; learning: number; review: number }>(
         "get_deck_stats_for_review",
-        { deckId }
+        { deck_id: deckId }
       );
-      totalDueToday = stats.new_cards + stats.learn_cards + stats.review_cards;
+      totalDueToday = stats.new + stats.learning + stats.review;
       remainingCards = totalDueToday;
     } catch (e: unknown) {
       console.error("Error loading deck stats:", e);
@@ -126,7 +126,7 @@
         hard_interval: string;
         good_interval: string;
         easy_interval: string;
-      }>("get_next_card", { deckId });
+      }>("get_next_card", { deck_id: deckId });
       
       currentCard = card;
       isAnswerRevealed = false;
@@ -135,7 +135,7 @@
       
       // Load note tags
       try {
-        currentTags = await invoke<string[]>("get_note_tags", { noteId: card.note_id });
+        currentTags = await invoke<string[]>("get_note_tags", { note_id: card.note_id });
       } catch (e) {
         console.error("Error loading note tags:", e);
         currentTags = [];
@@ -183,7 +183,7 @@
     
     try {
       const result = await invoke<{ card_id: number; leech: boolean; suspended: boolean }>("answer_card", { 
-        cardId: currentCard.card_id, 
+        card_id: currentCard.card_id, 
         ease 
       });
       
@@ -332,7 +332,7 @@
     
     try {
       await invoke("set_card_flag", {
-        cardId: currentCard.card_id,
+        card_id: currentCard.card_id,
         flag: flag
       });
     } catch (e) {

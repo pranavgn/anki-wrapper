@@ -74,8 +74,8 @@
       }
       
       // Load decks
-      const deckStats = await invoke<Array<{ id: number; name: string; new_cards: number; learn_cards: number; review_cards: number }>>("get_deck_stats");
-      decks = deckStats.map(deck => ({ id: deck.id, name: deck.name }));
+      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>("get_all_decks");
+      decks = result.map(deck => ({ id: deck.id, name: deck.name }));
       if (decks.length > 0) {
         selectedDeckId = decks[0].id;
       }
@@ -101,7 +101,7 @@
 
   async function loadNotetypeDetail(ntid: number) {
     try {
-      const detail = await invoke<NotetypeDetail>("get_notetype_detail", { notetypeId: ntid });
+      const detail = await invoke<NotetypeDetail>("get_notetype_detail", { notetype_id: ntid });
       notetypeDetail = detail;
       
       // Reset field values to empty strings for each field
@@ -197,8 +197,8 @@
     try {
       // Use the new generic add_note command
       const noteId = await invoke<number>("add_note", {
-        deckId: selectedDeckId,
-        notetypeId: selectedNotetypeId,
+        deck_id: selectedDeckId,
+        notetype_id: selectedNotetypeId,
         fields: fieldValues,
         tags: currentTags
       });
@@ -207,7 +207,7 @@
       if (currentTags.length > 0) {
         try {
           await invoke("set_note_tags", {
-            noteId: noteId,
+            note_id: noteId,
             tags: currentTags
           });
         } catch (tagError) {

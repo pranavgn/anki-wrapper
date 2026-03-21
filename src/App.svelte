@@ -126,7 +126,7 @@
               { front: "What is a leech in SRS?", back: "A card that has been failed many times (typically 8+ lapses). Leeches are automatically suspended to prevent wasting time on poorly-formed cards." },
             ];
             for (const card of testCards) {
-              await invoke("add_basic_card", { deckId, front: card.front, back: card.back });
+              await invoke("add_basic_card", { deck_id: deckId, front: card.front, back: card.back, tags: [] });
             }
             console.log("🧪 Test deck seeded with", testCards.length, "cards");
             window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard

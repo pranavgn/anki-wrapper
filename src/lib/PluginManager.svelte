@@ -44,11 +44,11 @@
   async function togglePlugin(pluginId: string, currentlyEnabled: boolean) {
     try {
       if (currentlyEnabled) {
-        await invoke("disable_plugin", { pluginId });
+        await invoke("disable_plugin", { plugin_id: pluginId });
         await unloadPlugin(pluginId);
         addToast(`${pluginId} disabled. Changes take effect immediately.`, "warning");
       } else {
-        await invoke("enable_plugin", { pluginId });
+        await invoke("enable_plugin", { plugin_id: pluginId });
         addToast(`${pluginId} enabled. Restart the app to load it.`, "success");
       }
       // Refresh the list

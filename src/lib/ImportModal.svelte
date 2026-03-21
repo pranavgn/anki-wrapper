@@ -30,9 +30,13 @@
   type DeckStat = {
     id: number;
     name: string;
-    new_cards: number;
-    learn_cards: number;
-    review_cards: number;
+    short_name: string;
+    level: number;
+    new_count: number;
+    learn_count: number;
+    review_count: number;
+    card_count: number;
+    is_filtered: boolean;
   };
 
   type ImportLog = {
@@ -75,7 +79,7 @@
 
   async function loadDecks() {
     try {
-      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>("get_all_decks");
+      const result = await invoke<DeckStat[]>("get_all_decks");
       availableDecks = result;
       if (availableDecks.length > 0) {
         selectedDeckId = availableDecks[0].id;
@@ -155,11 +159,11 @@
     errorMessage = "";
     try {
       const options: TextImportOptions = {
-        deck_id: selectedDeckId,
-        notetype_name: notetypeName,
+        deckId: selectedDeckId,
+        notetypeName: notetypeName,
         delimiter: delimiter === "tab" ? "\t" : delimiter === "comma" ? "," : ";",
-        html_enabled: htmlEnabled,
-        duplicate_policy: duplicatePolicy,
+        htmlEnabled: htmlEnabled,
+        duplicatePolicy: duplicatePolicy,
       };
       importResult = await pickAndImportText(options);
       currentStep = "result";

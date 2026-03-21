@@ -9,11 +9,11 @@ export type ImportLog = {
 };
 
 export type TextImportOptions = {
-  deck_id: number;
-  notetype_name: string;
+  deckId: number;
+  notetypeName: string;
   delimiter: string;
-  html_enabled: boolean;
-  duplicate_policy: "update" | "preserve" | "ignore";
+  htmlEnabled: boolean;
+  duplicatePolicy: "update" | "preserve" | "ignore";
 };
 
 export class ImportError extends Error {

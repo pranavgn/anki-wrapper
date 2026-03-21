@@ -212,12 +212,6 @@ pub struct DeckStats {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct CardData {
-    pub front: String,
-    pub back: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct SchedulerInfo {
     pub fsrs_enabled: bool,
     pub scheduler_version: i32,
@@ -1719,37 +1713,6 @@ fn move_cards_to_deck(card_ids: Vec<i64>, deck_id: i64, state: State<AppState>) 
 }
 
 #[command]
-fn get_cards_for_study(deck_id: i64, limit: usize, state: State<AppState>) -> Result<Vec<CardData>, String> {
-    let collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
-    let collection = match collection.as_ref() {
-        Some(c) => c,
-        None => return Ok(vec![]),
-    };
-
-    let conn = collection.storage.db();
-
-    let mut stmt = conn.prepare("SELECT n.flds FROM cards c JOIN notes n ON c.nid = n.id WHERE c.did = ? LIMIT ?").map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![deck_id, limit as i64], |row| {
-        let flds: String = row.get(0)?;
-        Ok(flds)
-    }).map_err(|e| e.to_string())?;
-
-    let mut cards_data = Vec::new();
-    for flds_result in rows {
-        let flds = flds_result.map_err(|e| e.to_string())?;
-        let fields: Vec<String> = serde_json::from_str(&flds).map_err(|e| e.to_string())?;
-        if fields.len() >= 2 {
-            cards_data.push(CardData {
-                front: fields[0].clone(),
-                back: fields[1].clone(),
-            });
-        }
-    }
-
-    Ok(cards_data)
-}
-
-#[command]
 fn answer_card(card_id: i64, ease: i32, state: State<AppState>) -> Result<AnswerResult, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = collection.as_mut().ok_or("Collection not initialized")?;
@@ -2122,7 +2085,6 @@ pub fn run() {
             create_deck,
             add_basic_card,
             add_note,
-            get_cards_for_study,
             answer_card,
             undo_last_action,
             get_undo_status,
@@ -3295,7 +3257,7 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
         "SELECT AVG(CAST(c.factor AS REAL)/10) FROM cards c WHERE c.queue = 2",
         [],
         |row| row.get(0)
-    ).unwrap_or(2500.0) / 100.0;
+    ).unwrap_or(250.0) / 100.0;
 
     let average_interval_days: f64 = conn.query_row(
         &format!(

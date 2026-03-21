@@ -72,7 +72,7 @@
     isEditing = false;
     isAddingNew = false;
     try {
-      detail = await invoke<NotetypeDetail>('get_notetype_detail', { notetype_id: id });
+      detail = await invoke<NotetypeDetail>('get_notetype_detail', { notetypeId: id });
     } catch (e) {
       error = String(e);
       toast.error('Failed to load notetype detail');
@@ -124,7 +124,7 @@
     const newName = prompt('Enter new name:', detail.name);
     if (!newName || newName === detail.name) return;
     try {
-      await invoke('rename_notetype', { notetype_id: selectedNotetypeId, new_name: newName });
+      await invoke('rename_notetype', { notetypeId: selectedNotetypeId, newName });
       toast.success('Notetype renamed');
       await loadNotetypes();
       await selectNotetype(selectedNotetypeId);
@@ -138,7 +138,7 @@
     if (!selectedNotetypeId) return;
     if (!confirm('Are you sure you want to delete this notetype? All cards using it will be deleted!')) return;
     try {
-      await invoke('delete_notetype', { notetype_id: selectedNotetypeId });
+      await invoke('delete_notetype', { notetypeId: selectedNotetypeId });
       toast.success('Notetype deleted');
       selectedNotetypeId = null;
       detail = null;

@@ -68,7 +68,7 @@
     try {
       const stats = await invoke<{ new: number; learning: number; review: number }>(
         "get_deck_stats_for_review",
-        { deck_id: deckId }
+        { deckId }
       );
       totalDueToday = stats.new + stats.learning + stats.review;
       remainingCards = totalDueToday;
@@ -81,10 +81,10 @@
 
   async function checkUndoStatus() {
     try {
-      const status = await invoke<{ can_undo: boolean; undo_label: string | null; can_redo: boolean; redo_label: string | null }>(
+      const status = await invoke<{ canUndo: boolean; undoLabel: string | null; canRedo: boolean; redoLabel: string | null }>(
         "get_undo_status"
       );
-      canUndo = status.can_undo;
+      canUndo = status.canUndo;
     } catch (e: unknown) {
       console.error("Error checking undo status:", e);
       canUndo = false;
@@ -93,10 +93,10 @@
 
   async function undoLastAction() {
     try {
-      const result = await invoke<{ action_name: string; card_id: number | null }>(
+      const result = await invoke<{ actionName: string; cardId: number | null }>(
         "undo_last_action"
       );
-      addToast(result.action_name + " undone", "success");
+      addToast(result.actionName + " undone", "success");
       // Reload the current card state
       await loadDeckStats();
       await loadNextCard();
@@ -126,7 +126,7 @@
         hard_interval: string;
         good_interval: string;
         easy_interval: string;
-      }>("get_next_card", { deck_id: deckId });
+      }>("get_next_card", { deckId });
       
       currentCard = card;
       isAnswerRevealed = false;
@@ -135,7 +135,7 @@
       
       // Load note tags
       try {
-        currentTags = await invoke<string[]>("get_note_tags", { note_id: card.note_id });
+        currentTags = await invoke<string[]>("get_note_tags", { noteId: card.note_id });
       } catch (e) {
         console.error("Error loading note tags:", e);
         currentTags = [];
@@ -182,9 +182,9 @@
     }
     
     try {
-      const result = await invoke<{ card_id: number; leech: boolean; suspended: boolean }>("answer_card", { 
-        card_id: currentCard.card_id, 
-        ease 
+      const result = await invoke<{ card_id: number; leech: boolean; suspended: boolean }>("answer_card", {
+        cardId: currentCard.card_id,
+        ease
       });
       
       // Show warning toast if card was marked as leech
@@ -332,7 +332,7 @@
     
     try {
       await invoke("set_card_flag", {
-        card_id: currentCard.card_id,
+        cardId: currentCard.card_id,
         flag: flag
       });
     } catch (e) {

@@ -115,7 +115,7 @@
 
   // ── TEST 11: search_cards works with empty query ──
   try {
-    const cards = await invoke<any[]>('search_cards', { query: '', sortOrder: 'cardDue' });
+    const cards = await invoke<any[]>('search_cards', { query: '', order: 'cardDue', limit: 100 });
     assert('search_cards works', Array.isArray(cards));
   } catch (e) {
     assert('search_cards works', false, String(e));

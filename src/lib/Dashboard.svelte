@@ -13,7 +13,13 @@
 
   // Collection status prop
   type CollectionStatus = "loading" | "ready" | "error";
-  let { collectionStatus = "loading" }: { collectionStatus?: CollectionStatus } = $props();
+  let { 
+    collectionStatus = "loading",
+    onStudy = (deckId: number, deckName: string) => {} 
+  }: { 
+    collectionStatus?: CollectionStatus;
+    onStudy?: (deckId: number, deckName: string) => void;
+  } = $props();
 
   // Deck stats type
   type DeckStat = {
@@ -204,11 +210,11 @@
     showImportMenu = false;
     try {
       const result = await pickAndImportText({
-        deck_id: 1,
-        notetype_name: "Basic",
+        deckId: 1,
+        notetypeName: "Basic",
         delimiter: ",",
-        html_enabled: false,
-        duplicate_policy: "ignore",
+        htmlEnabled: false,
+        duplicatePolicy: "ignore",
       });
       await loadDeckStats();
       addToast(`Imported ${result.notes_added} new cards, ${result.notes_updated} updated`, "success");
@@ -294,7 +300,7 @@
     try {
       await invoke("create_filtered_deck", {
         name: customStudyName.trim(),
-        search_query: customStudyQuery.trim(),
+        searchQuery: customStudyQuery.trim(),
         limit: customStudyLimit,
         order: customStudyOrder
       });
@@ -318,16 +324,7 @@
   }
 
   async function handleDeckClick(deckId: number, deckName: string) {
-    // Add tactile feedback
-    const deckElement = document.querySelector(`[data-deck-id="${deckId}"]`);
-    if (deckElement) {
-      deckElement.classList.add('pressed');
-      await new Promise(resolve => setTimeout(resolve, 80));
-      deckElement.classList.remove('pressed');
-    }
-    // Navigate to study mode
-    // This would typically be handled by the parent component
-    console.log(`Starting review for deck: ${deckName}`);
+    onStudy(deckId, deckName);
   }
 </script>
 

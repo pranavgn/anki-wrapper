@@ -36,7 +36,8 @@
     log('🔍 Searching for card...');
     const cards = await invoke<any[]>('search_cards', { 
       query: `deck:"${TEST_DECK_NAME}"`, 
-      sortOrder: 'cardDue' 
+      order: 'cardDue', 
+      limit: 100 
     });
     if (cards.length === 0) throw new Error('No cards found in test deck');
     log(`  ✅ Found ${cards.length} card(s)`);

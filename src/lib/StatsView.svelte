@@ -63,6 +63,7 @@
 
   // State
   let isLoading = $state(true);
+  let hasError = $state(false);
   let decks = $state<DeckInfo[]>([]);
   let selectedDeckId = $state<number | null>(null);
   let stats = $state<ReviewStats | null>(null);
@@ -79,15 +80,20 @@
 
     try {
       // Load decks
-      decks = await invoke<DeckInfo[]>("get_decks");
+      const allDecks = await invoke<any[]>("get_all_decks");
+      decks = allDecks.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        card_count: d.card_count,
+        is_filtered: d.is_filtered
+      }));
       
       // Load stats (all decks by default)
       await loadStats(null);
     } catch (error) {
       console.error("Error loading stats:", error);
       addToast(error instanceof Error ? error.message : "Failed to load statistics", "error");
-      // Fallback to mock data
-      stats = generateMockStats();
+      hasError = true;
     } finally {
       isLoading = false;
     }
@@ -97,9 +103,9 @@
     isLoading = true;
     try {
       if (deckId === null) {
-        stats = await invoke<ReviewStats>("get_review_stats", { deck_id: null });
+        stats = await invoke<ReviewStats>("get_review_stats", { deckId: null });
       } else {
-        stats = await invoke<ReviewStats>("get_deck_specific_stats", { deck_id: deckId });
+        stats = await invoke<ReviewStats>("get_deck_specific_stats", { deckId });
       }
       selectedDeckId = deckId;
     } catch (error) {
@@ -115,6 +121,27 @@
     const value = target.value;
     const deckId = value === "all" ? null : parseInt(value, 10);
     loadStats(deckId);
+  }
+
+  async function handleRetry() {
+    hasError = false;
+    isLoading = true;
+    try {
+      const allDecks = await invoke<any[]>("get_all_decks");
+      decks = allDecks.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        card_count: d.card_count,
+        is_filtered: d.is_filtered
+      }));
+      await loadStats(null);
+    } catch (error) {
+      console.error("Error loading stats:", error);
+      addToast(error instanceof Error ? error.message : "Failed to load statistics", "error");
+      hasError = true;
+    } finally {
+      isLoading = false;
+    }
   }
 
   function generateMockStats(): ReviewStats {
@@ -197,7 +224,11 @@
   let forecastChartData = $derived.by(() => {
     if (!stats?.forecast.length) return { labels: [], datasets: [] };
 
-    const labels = stats.forecast.slice(0, 14).map(d => `Day ${d.day}`);
+    const labels = stats.forecast.slice(0, 14).map(d => {
+      const date = new Date();
+      date.setDate(date.getDate() + d.day);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
     
     return {
       labels,
@@ -399,7 +430,8 @@
   <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
     <h1 class="text-2xl font-semibold text-text-primary">Statistics</h1>
     
-    <!-- Deck Filter -->
+    <!-- Deck Filter (hidden on error) -->
+    {#if !hasError}
     <div class="flex items-center gap-3">
       <label for="deck-select" class="text-sm text-text-secondary">Deck:</label>
       <select
@@ -414,9 +446,30 @@
         {/each}
       </select>
     </div>
+    {/if}
   </div>
 
-  <!-- Summary Stats Row -->
+  <!-- Error State -->
+  {#if hasError && !isLoading}
+    <div class="bg-bg-card rounded-xl p-8 shadow-warm border border-border text-center mb-8">
+      <div class="text-text-secondary mb-4">
+        <svg class="w-12 h-12 mx-auto mb-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <p class="text-lg">Failed to load statistics</p>
+        <p class="text-sm">There was a problem retrieving your study data.</p>
+      </div>
+      <button
+        onclick={handleRetry}
+        class="px-6 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  {/if}
+
+  <!-- Stats Content (hidden on error) -->
+  {#if !hasError}
   <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
     <!-- Total Cards -->
     <div class="bg-bg-card rounded-xl p-4 shadow-warm border border-border">
@@ -632,6 +685,7 @@
       </div>
     {/if}
   </div>
+  {/if}
 </div>
 
 <style>

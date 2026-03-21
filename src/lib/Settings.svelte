@@ -79,7 +79,7 @@
   async function loadBackups() {
     isLoadingBackups = true;
     try {
-      backups = await invoke<Array<{name: string; path: string; created: string; size_bytes: number}>>("list_backups");
+      backups = await invoke<Array<{name: string; path: string; created: string; sizeBytes: number}>>("list_backups");
     } catch (e) {
       addToast(`Failed to load backups: ${e}`, "error");
     } finally {
@@ -105,7 +105,7 @@
   async function handleRestore() {
     if (!backupToRestore) return;
     try {
-      await invoke("restore_backup", { backup_name: backupToRestore });
+      await invoke("restore_backup", { backupName: backupToRestore });
       addToast("Backup restored. Reloading...", "success");
       showRestoreConfirm = false;
       // Reload the page after a short delay
@@ -120,7 +120,7 @@
   async function handleDeleteBackup(backupName: string) {
     if (!confirm(`Delete backup "${backupName}"?`)) return;
     try {
-      await invoke("delete_backup", { backup_name: backupName });
+      await invoke("delete_backup", { backupName });
       addToast("Backup deleted", "success");
       await loadBackups();
     } catch (e) {

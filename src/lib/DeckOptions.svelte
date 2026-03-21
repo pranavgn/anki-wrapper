@@ -14,43 +14,43 @@
   let { deckId, deckName, isFiltered = false, onClose }: Props = $props();
 
   interface DeckOptions {
-    config_id: number;
+    configId: number;
     name: string;
-    new_cards_per_day: number;
-    learning_steps: number[];
-    graduating_interval: number;
-    easy_interval: number;
-    max_reviews_per_day: number;
-    easy_bonus: number;
-    interval_modifier: number;
-    maximum_interval: number;
-    fsrs_enabled: boolean;
-    fsrs_weights: number[];
-    desired_retention: number;
-    lapse_steps: number[];
-    lapse_minimum_interval: number;
-    leech_threshold: number;
+    newCardsPerDay: number;
+    learningSteps: number[];
+    graduatingInterval: number;
+    easyInterval: number;
+    maxReviewsPerDay: number;
+    easyBonus: number;
+    intervalModifier: number;
+    maximumInterval: number;
+    fsrsEnabled: boolean;
+    fsrsWeights: number[];
+    desiredRetention: number;
+    lapseSteps: number[];
+    lapseMinimumInterval: number;
+    leechThreshold: number;
   }
 
   let isLoading = $state(true);
   let leechAction = $state<"suspend" | "tag">("suspend");
   let opts: DeckOptions = $state({
-    config_id: 0,
+    configId: 0,
     name: "",
-    new_cards_per_day: 20,
-    learning_steps: [1, 10],
-    graduating_interval: 1,
-    easy_interval: 4,
-    max_reviews_per_day: 200,
-    easy_bonus: 1.3,
-    interval_modifier: 1.0,
-    maximum_interval: 36500,
-    fsrs_enabled: true,
-    fsrs_weights: [],
-    desired_retention: 0.9,
-    lapse_steps: [10],
-    lapse_minimum_interval: 1,
-    leech_threshold: 8,
+    newCardsPerDay: 20,
+    learningSteps: [1, 10],
+    graduatingInterval: 1,
+    easyInterval: 4,
+    maxReviewsPerDay: 200,
+    easyBonus: 1.3,
+    intervalModifier: 1.0,
+    maximumInterval: 36500,
+    fsrsEnabled: true,
+    fsrsWeights: [],
+    desiredRetention: 0.9,
+    lapseSteps: [10],
+    lapseMinimumInterval: 1,
+    leechThreshold: 8,
   });
 
   let newLearningStep = $state("");
@@ -79,15 +79,15 @@
         review_count: number;
         success: boolean;
       }>("optimize_fsrs_weights", {
-        deck_id: deckId,
-        desired_retention: opts.desired_retention,
+        deckId: deckId,
+        desiredRetention: opts.desiredRetention,
       });
       
       optimizationResult = result;
       
       if (result.success && result.weights.length > 0) {
         // Apply the optimized weights
-        opts.fsrs_weights = result.weights;
+        opts.fsrsWeights = result.weights;
         addToast("FSRS weights optimized successfully", "success");
       }
     } catch (e) {
@@ -99,7 +99,7 @@
 
   onMount(async () => {
     try {
-      const result = await invoke<DeckOptions>("get_deck_options", { deck_id: deckId });
+      const result = await invoke<DeckOptions>("get_deck_options", { deckId });
       opts = result;
     } catch (e) {
       console.error("Error loading deck options:", e);
@@ -112,34 +112,34 @@
   function addLearningStep() {
     const step = parseFloat(newLearningStep);
     if (!isNaN(step) && step > 0) {
-      opts.learning_steps = [...opts.learning_steps, step].sort((a, b) => a - b);
+      opts.learningSteps = [...opts.learningSteps, step].sort((a, b) => a - b);
       newLearningStep = "";
     }
   }
 
   function removeLearningStep(index: number) {
-    opts.learning_steps = opts.learning_steps.filter((_, i) => i !== index);
+    opts.learningSteps = opts.learningSteps.filter((_, i) => i !== index);
   }
 
   function addLapseStep() {
     const step = parseFloat(newLapseStep);
     if (!isNaN(step) && step > 0) {
-      opts.lapse_steps = [...opts.lapse_steps, step].sort((a, b) => a - b);
+      opts.lapseSteps = [...opts.lapseSteps, step].sort((a, b) => a - b);
       newLapseStep = "";
     }
   }
 
   function removeLapseStep(index: number) {
-    opts.lapse_steps = opts.lapse_steps.filter((_, i) => i !== index);
+    opts.lapseSteps = opts.lapseSteps.filter((_, i) => i !== index);
   }
 
   function resetFsrsWeights() {
-    opts.fsrs_weights = [];
+    opts.fsrsWeights = [];
   }
 
   async function rebuildFilteredDeck() {
     try {
-      const count = await invoke<number>("rebuild_filtered_deck", { deck_id: deckId });
+      const count = await invoke<number>("rebuild_filtered_deck", { deckId });
       addToast(`Rebuilt with ${count} cards`, "success");
     } catch (e) {
       console.error("Error rebuilding filtered deck:", e);
@@ -149,7 +149,7 @@
 
   async function emptyFilteredDeck() {
     try {
-      await invoke("empty_filtered_deck", { deck_id: deckId });
+      await invoke("empty_filtered_deck", { deckId });
       addToast("Deck emptied - cards returned to original decks", "success");
     } catch (e) {
       console.error("Error emptying filtered deck:", e);
@@ -160,27 +160,27 @@
   function validateOptions(): boolean {
     validationErrors = [];
     
-    if (opts.new_cards_per_day < 0) {
+    if (opts.newCardsPerDay < 0) {
       validationErrors.push("New cards per day must be >= 0");
     }
     
-    if (opts.learning_steps.length === 0 || opts.learning_steps.some(s => s <= 0)) {
+    if (opts.learningSteps.length === 0 || opts.learningSteps.some(s => s <= 0)) {
       validationErrors.push("Learning steps must contain positive numbers");
     }
     
-    if (opts.graduating_interval < 0) {
+    if (opts.graduatingInterval < 0) {
       validationErrors.push("Graduating interval must be >= 0");
     }
     
-    if (opts.desired_retention < 0.70 || opts.desired_retention > 0.97) {
+    if (opts.desiredRetention < 0.70 || opts.desiredRetention > 0.97) {
       validationErrors.push("Desired retention must be between 70% and 97%");
     }
     
-    if (opts.max_reviews_per_day < 0) {
+    if (opts.maxReviewsPerDay < 0) {
       validationErrors.push("Max reviews per day must be >= 0");
     }
     
-    if (opts.lapse_steps.some(s => s <= 0)) {
+    if (opts.lapseSteps.some(s => s <= 0)) {
       validationErrors.push("Relearning steps must contain positive numbers");
     }
     
@@ -194,7 +194,7 @@
     }
     
     try {
-      await invoke("save_deck_options", { deck_id: deckId, opts });
+      await invoke("save_deck_options", { deckId, opts });
       addToast("Options saved successfully", "success");
       onClose();
     } catch (e) {
@@ -282,7 +282,7 @@
               <label class="block text-sm text-text-secondary mb-1">Cards per day</label>
               <input
                 type="number"
-                bind:value={opts.new_cards_per_day}
+                bind:value={opts.newCardsPerDay}
                 min="0"
                 max="9999"
                 class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
@@ -291,7 +291,7 @@
             <div>
               <label class="block text-sm text-text-secondary mb-1">Learning steps (minutes)</label>
               <div class="flex flex-wrap gap-2 mb-2">
-                {#each opts.learning_steps as step, i}
+                {#each opts.learningSteps as step, i}
                   <span class="inline-flex items-center gap-1 px-2 py-1 bg-bg-subtle rounded text-sm">
                     {step}
                     <button onclick={() => removeLearningStep(i)} class="text-text-secondary hover:text-danger">
@@ -318,7 +318,7 @@
                 <label class="block text-sm text-text-secondary mb-1">Graduating interval (days)</label>
                 <input
                   type="number"
-                  bind:value={opts.graduating_interval}
+                  bind:value={opts.graduatingInterval}
                   min="0"
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
                 />
@@ -327,7 +327,7 @@
                 <label class="block text-sm text-text-secondary mb-1">Easy interval (days)</label>
                 <input
                   type="number"
-                  bind:value={opts.easy_interval}
+                  bind:value={opts.easyInterval}
                   min="0"
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
                 />
@@ -349,7 +349,7 @@
               <label class="block text-sm text-text-secondary mb-1">Max reviews per day</label>
               <input
                 type="number"
-                bind:value={opts.max_reviews_per_day}
+                bind:value={opts.maxReviewsPerDay}
                 min="0"
                 class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
               />
@@ -359,7 +359,7 @@
                 <label class="block text-sm text-text-secondary mb-1">Easy bonus</label>
                 <input
                   type="number"
-                  bind:value={opts.easy_bonus}
+                  bind:value={opts.easyBonus}
                   min="0"
                   step="0.01"
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
@@ -369,7 +369,7 @@
                 <label class="block text-sm text-text-secondary mb-1">Interval modifier</label>
                 <input
                   type="number"
-                  bind:value={opts.interval_modifier}
+                  bind:value={opts.intervalModifier}
                   min="0"
                   step="0.01"
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
@@ -380,7 +380,7 @@
               <label class="block text-sm text-text-secondary mb-1">Maximum interval (days)</label>
               <input
                 type="number"
-                bind:value={opts.maximum_interval}
+                bind:value={opts.maximumInterval}
                 min="0"
                 class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
               />
@@ -400,17 +400,17 @@
             <div class="flex items-center justify-between">
               <label class="text-sm text-text-secondary">Enable FSRS</label>
               <button
-                onclick={() => opts.fsrs_enabled = !opts.fsrs_enabled}
-                class="relative w-11 h-6 rounded-full transition-colors {opts.fsrs_enabled ? 'bg-accent' : 'bg-bg-subtle'}"
+                onclick={() => opts.fsrsEnabled = !opts.fsrsEnabled}
+                class="relative w-11 h-6 rounded-full transition-colors {opts.fsrsEnabled ? 'bg-accent' : 'bg-bg-subtle'}"
               >
-                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {opts.fsrs_enabled ? 'translate-x-5' : ''}"></span>
+                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {opts.fsrsEnabled ? 'translate-x-5' : ''}"></span>
               </button>
             </div>
             <div>
-              <label class="block text-sm text-text-secondary mb-1">Desired retention: {Math.round(opts.desired_retention * 100)}%</label>
+              <label class="block text-sm text-text-secondary mb-1">Desired retention: {Math.round(opts.desiredRetention * 100)}%</label>
               <input
                 type="range"
-                bind:value={opts.desired_retention}
+                bind:value={opts.desiredRetention}
                 min="0.70"
                 max="0.97"
                 step="0.01"
@@ -425,7 +425,7 @@
               <label class="block text-sm text-text-secondary mb-1">FSRS Weights</label>
               <div class="p-3 bg-bg-subtle rounded-lg">
                 <p class="text-xs font-mono text-text-secondary break-all">
-                  {opts.fsrs_weights.length > 0 ? opts.fsrs_weights.join(", ") : "Using default weights"}
+                  {opts.fsrsWeights.length > 0 ? opts.fsrsWeights.join(", ") : "Using default weights"}
                 </p>
                 {#if isOptimizing}
                   <p class="text-xs text-accent mt-2">Analyzing review history...</p>
@@ -452,7 +452,7 @@
                   >
                     {isOptimizing ? 'Optimizing...' : 'Optimize'}
                   </button>
-                  {#if opts.fsrs_weights.length > 0}
+                  {#if opts.fsrsWeights.length > 0}
                     <button
                       onclick={resetFsrsWeights}
                       class="px-3 py-1.5 bg-bg-card border border-border rounded-lg text-xs hover:bg-bg-subtle transition-colors"
@@ -478,7 +478,7 @@
             <div>
               <label class="block text-sm text-text-secondary mb-1">Relearning steps (minutes)</label>
               <div class="flex flex-wrap gap-2 mb-2">
-                {#each opts.lapse_steps as step, i}
+                {#each opts.lapseSteps as step, i}
                   <span class="inline-flex items-center gap-1 px-2 py-1 bg-bg-subtle rounded text-sm">
                     {step}
                     <button onclick={() => removeLapseStep(i)} class="text-text-secondary hover:text-danger">
@@ -505,7 +505,7 @@
                 <label class="block text-sm text-text-secondary mb-1">Minimum interval (days)</label>
                 <input
                   type="number"
-                  bind:value={opts.lapse_minimum_interval}
+                  bind:value={opts.lapseMinimumInterval}
                   min="0"
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
                 />
@@ -514,7 +514,7 @@
                 <label class="block text-sm text-text-secondary mb-1">Leech threshold (lapses)</label>
                 <input
                   type="number"
-                  bind:value={opts.leech_threshold}
+                  bind:value={opts.leechThreshold}
                   min="0"
                   class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
                 />

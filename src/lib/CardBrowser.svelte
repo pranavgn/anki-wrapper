@@ -182,7 +182,7 @@
     cardDetail = null;
     
     try {
-      cardDetail = await invoke('get_card_detail', { card_id: cardId });
+      cardDetail = await invoke('get_card_detail', { cardId });
     } catch (e) {
       addToast('Failed to load card details', 'error');
     }
@@ -194,7 +194,7 @@
     cardDetail = null;
     
     try {
-      cardDetail = await invoke('get_card_detail', { card_id: firstCardId });
+      cardDetail = await invoke('get_card_detail', { cardId: firstCardId });
     } catch (e) {
       addToast('Failed to load note details', 'error');
     }
@@ -226,7 +226,7 @@
     const noteIds = Array.from(selectedNoteIds);
     if (noteIds.length === 0) return [];
     try {
-      return await invoke<number[]>('get_card_ids_for_notes', { note_ids: noteIds });
+      return await invoke<number[]>('get_card_ids_for_notes', { noteIds });
     } catch (e) {
       console.error('Failed to get card IDs for notes:', e);
       return [];
@@ -318,7 +318,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('suspend_cards', { card_ids: Array.from(cardIds) });
+      await invoke('suspend_cards', { cardIds: Array.from(cardIds) });
       addToast(`${cardIds.length} cards suspended`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -335,7 +335,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('unsuspend_cards', { card_ids: Array.from(cardIds) });
+      await invoke('unsuspend_cards', { cardIds: Array.from(cardIds) });
       addToast(`${cardIds.length} cards unsuspended`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -352,7 +352,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('bury_cards', { card_ids: Array.from(cardIds) });
+      await invoke('bury_cards', { cardIds: Array.from(cardIds) });
       addToast(`${cardIds.length} cards buried`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -372,7 +372,7 @@
       cardIds = Array.from(selectedIds);
     }
     try {
-      await invoke('move_cards_to_deck', { card_ids: Array.from(cardIds), deck_id: deckId });
+      await invoke('move_cards_to_deck', { cardIds: Array.from(cardIds), deckId });
       addToast(`${cardIds.length} cards moved to ${deckName}`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -386,7 +386,7 @@
     if (!newTag.trim()) return;
     const noteIds = getUniqueNoteIds();
     try {
-      await invoke('add_tags_to_notes', { note_ids: Array.from(noteIds), tag: newTag.trim() });
+      await invoke('add_tags_to_notes', { noteIds: Array.from(noteIds), tag: newTag.trim() });
       addToast(`Tag added to ${noteIds.length} notes`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -399,7 +399,7 @@
   async function handleBulkDelete() {
     const noteIds = getUniqueNoteIds();
     try {
-      await invoke('delete_notes', { note_ids: Array.from(noteIds) });
+      await invoke('delete_notes', { noteIds: Array.from(noteIds) });
       addToast(`${noteIds.length} notes deleted`, 'success');
       clearSelection();
       performSearch(debouncedQuery);
@@ -412,7 +412,7 @@
   // Load decks for move dropdown
   async function loadDecks() {
     try {
-      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>('get_all_decks');
+      const result = await invoke<Array<{ id: number; name: string; shortName: string; level: number; newCount: number; learnCount: number; reviewCount: number; cardCount: number; isFiltered: boolean }>>('get_all_decks');
       availableDecks = result.map(d => ({ id: d.id, name: d.name }));
     } catch (e) {
       console.error('Failed to load decks:', e);
@@ -529,7 +529,7 @@
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
-        <span>Invalid search query. Try deck:name or tag:x syntax.</span>
+        <span>{typeof searchError === 'string' ? searchError : 'Search failed. Try deck:name or tag:x syntax.'}</span>
       </div>
     </div>
   {/if}
@@ -562,8 +562,8 @@
           <svg class="h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p>Invalid search query</p>
-          <p class="text-sm mt-1">Try deck:name or tag:x syntax</p>
+          <p>Search error</p>
+          <p class="text-sm mt-1">{typeof searchError === 'string' ? searchError : 'Try deck:name or tag:x syntax.'}</p>
         </div>
       {:else if mode === 'cards'}
         {#if rows.length === 0}

@@ -78,7 +78,7 @@ fn save_preferences(prefs: AppPreferences, _state: State<AppState>) -> Result<()
     
     Ok(())
 }
-use tauri::{command, State, AppHandle, Emitter};
+use tauri::{command, State, AppHandle};
 use serde::{Deserialize, Serialize};
 use rusqlite::params;
 use serde_json;
@@ -615,7 +615,7 @@ async fn optimize_fsrs_weights(
 }
 
 #[command]
-async fn init_standalone_collection(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+async fn init_standalone_collection(_app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     // Check if already initialized
     {
         let col = state.collection.lock().map_err(|_| "Failed to lock collection")?;

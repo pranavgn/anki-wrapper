@@ -134,7 +134,7 @@
   async function loadDeckStats() {
     isLoading = true;
     try {
-      const result = await invoke<DeckStat[]>("get_all_decks");
+      const result = await invoke<DeckStat[]>("get_deck_stats");
       decks = result;
     } catch (error) {
       console.error("Error loading deck stats:", error);

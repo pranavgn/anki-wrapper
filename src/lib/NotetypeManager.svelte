@@ -177,427 +177,126 @@
   }
 </script>
 
-<div class="notetype-manager">
-  <div class="header">
-    <h2>Note Types</h2>
-    <button class="btn-close" onclick={() => window.dispatchEvent(new CustomEvent('close-modal'))}>✕</button>
+<div class="flex flex-col h-full bg-bg-base text-text-primary">
+  <div class="flex justify-between items-center p-4 border-b border-border">
+    <h2 class="text-lg font-semibold m-0">Note Types</h2>
+    <button class="bg-transparent border-none text-2xl cursor-pointer text-text-secondary hover:text-text-primary" onclick={() => window.dispatchEvent(new CustomEvent('close-modal'))}>✕</button>
   </div>
 
-  <div class="content">
-    <div class="notetype-list">
-      <h3>Note Types</h3>
+  <div class="flex flex-1 overflow-hidden">
+    <div class="w-72 border-r border-border overflow-y-auto p-4">
+      <h3 class="mt-0 mb-4">Note Types</h3>
       {#if isLoading}
-        <p class="loading">Loading...</p>
+        <p class="text-text-secondary text-center p-8">Loading...</p>
       {:else if error && notetypes.length === 0}
-        <p class="error">{error}</p>
+        <p class="text-danger text-center p-8">{error}</p>
       {:else}
-        <ul>
+        <ul class="list-none p-0 m-0">
           {#each notetypes as nt}
             <li 
-              class:selected={selectedNotetypeId === nt.id}
+              class="p-3 cursor-pointer rounded-md mb-1 flex flex-col gap-1 hover:bg-bg-subtle {selectedNotetypeId === nt.id ? 'bg-accent-soft' : ''}"
               onclick={() => selectNotetype(nt.id)}
             >
-              <span class="name">{nt.name}</span>
-              <span class="kind">{nt.kind}</span>
-              <span class="count">{nt.card_count} cards</span>
+              <span class="font-medium">{nt.name}</span>
+              <span class="text-xs text-text-secondary capitalize">{nt.kind}</span>
+              <span class="text-xs text-text-secondary">{nt.card_count} cards</span>
             </li>
           {/each}
         </ul>
       {/if}
     </div>
 
-    <div class="notetype-detail">
+    <div class="flex-1 overflow-y-auto p-4">
       {#if detail && !isEditing}
-        <div class="detail-header">
-          <h3>{detail.name}</h3>
-          <div class="detail-actions">
-            <button class="btn" onclick={startEdit}>Edit</button>
-            <button class="btn" onclick={renameNotetype}>Rename</button>
-            <button class="btn btn-danger" onclick={deleteNotetype}>Delete</button>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="m-0">{detail.name}</h3>
+          <div class="flex gap-2">
+            <button class="px-4 py-2 border border-border rounded-md bg-bg-subtle text-text-primary cursor-pointer text-sm hover:bg-bg-subtle" onclick={startEdit}>Edit</button>
+            <button class="px-4 py-2 border border-border rounded-md bg-bg-subtle text-text-primary cursor-pointer text-sm hover:bg-bg-subtle" onclick={renameNotetype}>Rename</button>
+            <button class="px-4 py-2 border border-border rounded-md bg-bg-subtle text-danger cursor-pointer text-sm hover:bg-bg-subtle" onclick={deleteNotetype}>Delete</button>
           </div>
         </div>
         
-        <div class="detail-info">
-          <p><strong>Type:</strong> {detail.kind}</p>
-          <p><strong>Fields:</strong> {detail.fields.map(f => f.name).join(', ')}</p>
-          <p><strong>Templates:</strong> {detail.templates.length}</p>
+        <div class="mb-4 p-4 bg-bg-subtle rounded-md">
+          <p class="m-1"><strong>Type:</strong> {detail.kind}</p>
+          <p class="m-1"><strong>Fields:</strong> {detail.fields.map(f => f.name).join(', ')}</p>
+          <p class="m-1"><strong>Templates:</strong> {detail.templates.length}</p>
         </div>
 
-        <div class="detail-section">
-          <h4>CSS</h4>
-          <pre class="css-preview">{detail.css}</pre>
+        <div class="mb-4">
+          <h4 class="m-0 mb-2">CSS</h4>
+          <pre class="bg-bg-subtle p-4 rounded-md overflow-x-auto text-sm max-h-48 overflow-y-auto">{detail.css}</pre>
         </div>
 
         {#each detail.templates as tmpl}
-          <div class="detail-section">
-            <h4>Card {tmpl.ord + 1}: {tmpl.name}</h4>
-            <div class="template-preview">
-              <div class="front">
-                <strong>Front:</strong>
-                <pre>{tmpl.front_html}</pre>
+          <div class="mb-4">
+            <h4 class="m-0 mb-2">Card {tmpl.ord + 1}: {tmpl.name}</h4>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-bg-subtle p-4 rounded-md">
+                <strong class="block mb-2">Front:</strong>
+                <pre class="m-0 text-xs whitespace-pre-wrap break-all">{tmpl.front_html}</pre>
               </div>
-              <div class="back">
-                <strong>Back:</strong>
-                <pre>{tmpl.back_html}</pre>
+              <div class="bg-bg-subtle p-4 rounded-md">
+                <strong class="block mb-2">Back:</strong>
+                <pre class="m-0 text-xs whitespace-pre-wrap break-all">{tmpl.back_html}</pre>
               </div>
             </div>
           </div>
         {/each}
       {:else if isEditing}
-        <div class="edit-form">
-          <h3>Edit {detail?.name}</h3>
+        <div class="max-w-4xl">
+          <h3 class="mt-0 mb-4">Edit {detail?.name}</h3>
           
-          <div class="form-group">
-            <label for="name">Name</label>
-            <input type="text" id="name" bind:value={editName} />
+          <div class="mb-4">
+            <label for="name" class="block mb-2 font-medium">Name</label>
+            <input type="text" id="name" bind:value={editName} class="w-full p-2 border border-border rounded-md bg-bg-subtle text-text-primary font-inherit text-sm" />
           </div>
 
-          <div class="form-group">
-            <label>Fields</label>
-            <div class="fields-list">
+          <div class="mb-4">
+            <label class="block mb-2 font-medium">Fields</label>
+            <div class="flex flex-col gap-2">
               {#each editFields as field, i}
-                <div class="field-item">
-                  <input type="text" bind:value={field.name} placeholder="Field name" />
-                  <button class="btn-icon" onclick={() => removeField(i)}>✕</button>
+                <div class="flex gap-2 items-start">
+                  <input type="text" bind:value={field.name} placeholder="Field name" class="flex-1 p-2 border border-border rounded-md bg-bg-subtle text-text-primary font-inherit text-sm" />
+                  <button class="bg-transparent border-none text-text-secondary cursor-pointer p-1 text-lg hover:text-danger" onclick={() => removeField(i)}>✕</button>
                 </div>
               {/each}
-              <button class="btn" onclick={addField}>Add Field</button>
+              <button class="px-4 py-2 border border-border rounded-md bg-bg-subtle text-text-primary cursor-pointer text-sm hover:bg-bg-subtle" onclick={addField}>Add Field</button>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Templates</label>
-            <div class="templates-list">
+          <div class="mb-4">
+            <label class="block mb-2 font-medium">Templates</label>
+            <div class="flex flex-col gap-2">
               {#each editTemplates as tmpl, i}
-                <div class="template-item">
-                  <input type="text" bind:value={tmpl.name} placeholder="Template name" />
-                  <div class="template-editor">
-                    <textarea bind:value={tmpl.front_html} placeholder="Front template"></textarea>
-                    <textarea bind:value={tmpl.back_html} placeholder="Back template"></textarea>
+                <div class="flex flex-col gap-2 bg-bg-subtle p-2 rounded-md">
+                  <input type="text" bind:value={tmpl.name} placeholder="Template name" class="w-full p-2 border border-border rounded-md bg-bg-subtle text-text-primary font-inherit text-sm mb-2" />
+                  <div class="grid grid-cols-2 gap-2 w-full">
+                    <textarea bind:value={tmpl.front_html} placeholder="Front template" class="min-h-20 font-mono text-xs p-2 border border-border rounded-md bg-bg-subtle text-text-primary"></textarea>
+                    <textarea bind:value={tmpl.back_html} placeholder="Back template" class="min-h-20 font-mono text-xs p-2 border border-border rounded-md bg-bg-subtle text-text-primary"></textarea>
                   </div>
-                  <button class="btn-icon" onclick={() => removeTemplate(i)}>✕</button>
+                  <button class="bg-transparent border-none text-text-secondary cursor-pointer p-1 text-lg hover:text-danger self-end" onclick={() => removeTemplate(i)}>✕</button>
                 </div>
               {/each}
-              <button class="btn" onclick={addTemplate}>Add Template</button>
+              <button class="px-4 py-2 border border-border rounded-md bg-bg-subtle text-text-primary cursor-pointer text-sm hover:bg-bg-subtle" onclick={addTemplate}>Add Template</button>
             </div>
           </div>
 
-          <div class="form-group">
-            <label for="css">CSS</label>
-            <textarea id="css" bind:value={editCss} rows="10"></textarea>
+          <div class="mb-4">
+            <label for="css" class="block mb-2 font-medium">CSS</label>
+            <textarea id="css" bind:value={editCss} rows="10" class="w-full p-2 border border-border rounded-md bg-bg-subtle text-text-primary font-inherit text-sm resize-y"></textarea>
           </div>
 
-          <div class="form-actions">
-            <button class="btn btn-primary" onclick={saveEdit}>Save</button>
-            <button class="btn" onclick={cancelEdit}>Cancel</button>
+          <div class="flex gap-2 mt-4">
+            <button class="px-4 py-2 border border-accent rounded-md bg-accent text-white cursor-pointer text-sm hover:bg-accent" onclick={saveEdit}>Save</button>
+            <button class="px-4 py-2 border border-border rounded-md bg-bg-subtle text-text-primary cursor-pointer text-sm hover:bg-bg-subtle" onclick={cancelEdit}>Cancel</button>
           </div>
         </div>
       {:else}
-        <p class="placeholder">Select a notetype to view details</p>
+        <p class="text-text-secondary text-center p-8">Select a notetype to view details</p>
       {/if}
     </div>
   </div>
 </div>
 
 <Toast />
-
-<style>
-  .notetype-manager {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .header h2 {
-    margin: 0;
-  }
-
-  .btn-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-  }
-
-  .content {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .notetype-list {
-    width: 280px;
-    border-right: 1px solid var(--border-color);
-    overflow-y: auto;
-    padding: 1rem;
-  }
-
-  .notetype-list h3 {
-    margin-top: 0;
-  }
-
-  .notetype-list ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .notetype-list li {
-    padding: 0.75rem;
-    cursor: pointer;
-    border-radius: 4px;
-    margin-bottom: 0.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .notetype-list li:hover {
-    background: var(--bg-hover);
-  }
-
-  .notetype-list li.selected {
-    background: var(--bg-active);
-  }
-
-  .notetype-list .name {
-    font-weight: 500;
-  }
-
-  .notetype-list .kind {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: capitalize;
-  }
-
-  .notetype-list .count {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-
-  .notetype-detail {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-  }
-
-  .detail-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .detail-header h3 {
-    margin: 0;
-  }
-
-  .detail-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .detail-info {
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-  }
-
-  .detail-info p {
-    margin: 0.25rem 0;
-  }
-
-  .detail-section {
-    margin-bottom: 1rem;
-  }
-
-  .detail-section h4 {
-    margin: 0 0 0.5rem 0;
-  }
-
-  .css-preview {
-    background: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: 4px;
-    overflow-x: auto;
-    font-size: 0.875rem;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .template-preview {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-
-  .template-preview .front,
-  .template-preview .back {
-    background: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: 4px;
-  }
-
-  .template-preview strong {
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-
-  .template-preview pre {
-    margin: 0;
-    font-size: 0.75rem;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-
-  .edit-form {
-    max-width: 800px;
-  }
-
-  .edit-form h3 {
-    margin-top: 0;
-  }
-
-  .form-group {
-    margin-bottom: 1rem;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
-
-  .form-group input,
-  .form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 0.875rem;
-  }
-
-  .form-group textarea {
-    resize: vertical;
-  }
-
-  .fields-list,
-  .templates-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .field-item,
-  .template-item {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-  }
-
-  .field-item input {
-    flex: 1;
-  }
-
-  .template-item {
-    flex-direction: column;
-    background: var(--bg-secondary);
-    padding: 0.5rem;
-    border-radius: 4px;
-  }
-
-  .template-item input {
-    margin-bottom: 0.5rem;
-  }
-
-  .template-editor {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    width: 100%;
-  }
-
-  .template-editor textarea {
-    min-height: 80px;
-    font-family: monospace;
-    font-size: 0.75rem;
-  }
-
-  .btn-icon {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.25rem;
-    font-size: 1rem;
-  }
-
-  .btn-icon:hover {
-    color: var(--text-danger);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
-  }
-
-  .btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-  }
-
-  .btn:hover {
-    background: var(--bg-hover);
-  }
-
-  .btn-primary {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-  }
-
-  .btn-primary:hover {
-    background: var(--color-primary-dark);
-  }
-
-  .btn-danger {
-    color: var(--text-danger);
-  }
-
-  .btn-danger:hover {
-    background: var(--bg-danger);
-  }
-
-  .loading,
-  .error,
-  .placeholder {
-    color: var(--text-secondary);
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .error {
-    color: var(--text-danger);
-  }
-</style>

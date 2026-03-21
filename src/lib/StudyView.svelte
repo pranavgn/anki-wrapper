@@ -145,12 +145,20 @@
       currentFlag = card.flag || 0;
       showFlagPicker = false;
       
-      // Animate card entrance
+      // Animate card entrance with safety fallback
       setTimeout(() => {
         if (cardState === 'entering') {
           cardState = 'idle';
         }
       }, 240);
+      
+      // Global safety timeout - force idle if stuck in entering state
+      setTimeout(() => {
+        if (cardState === 'entering') {
+          console.warn('Card stuck in entering state, forcing to idle');
+          cardState = 'idle';
+        }
+      }, 500);
     } catch (e: unknown) {
       error = String(e);
       if (error.includes("No cards left")) {
@@ -164,12 +172,16 @@
   }
 
   function revealAnswer() {
+    // Force-finish entering animation if still in that state
+    if (cardState === 'entering') {
+      cardState = 'idle';
+    }
     isAnswerRevealed = true;
     cardState = 'flipped';
   }
 
   async function answerCard(ease: number) {
-    if (!currentCard || isAnswering || cardState !== 'flipped') return;
+    if (!currentCard || isAnswering || !isAnswerRevealed) return;
     
     isAnswering = true;
     

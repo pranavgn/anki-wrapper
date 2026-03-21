@@ -733,7 +733,7 @@ fn get_scheduler_info(state: State<AppState>) -> Result<SchedulerInfo, String> {
 }
 
 #[command]
-fn get_decks(state: State<AppState>) -> Result<Vec<DeckInfo>, String> {
+fn get_deck_stats(state: State<AppState>) -> Result<Vec<DeckInfo>, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = match collection.as_mut() {
         Some(c) => c,
@@ -845,7 +845,7 @@ fn flatten_deck_tree_list(node: DeckTreeNode) -> Vec<DeckListItem> {
 }
 
 #[command]
-fn get_deck_stats(deck_id: i64, state: State<AppState>) -> Result<DeckStats, String> {
+fn get_deck_stats_for_single_deck(deck_id: i64, state: State<AppState>) -> Result<DeckStats, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = match collection.as_mut() {
         Some(c) => c,
@@ -888,7 +888,7 @@ fn find_deck_in_tree(node: DeckTreeNode, deck_id: i64) -> Option<DeckTreeNode> {
 
 #[command]
 fn get_deck_stats_for_review(deck_id: i64, state: State<AppState>) -> Result<DeckStats, String> {
-    get_deck_stats(deck_id, state)
+    get_deck_stats_for_single_deck(deck_id, state)
 }
 
 #[command]
@@ -2078,9 +2078,9 @@ pub fn run() {
             optimize_fsrs_weights,
             init_standalone_collection,
             get_scheduler_info,
-            get_decks,
-            get_all_decks,
             get_deck_stats,
+            get_all_decks,
+            get_deck_stats_for_single_deck,
             get_deck_stats_for_review,
             create_deck,
             add_basic_card,

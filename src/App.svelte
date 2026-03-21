@@ -187,9 +187,11 @@
   });
 
   function startReview(deckId: number, deckName: string) {
+    console.log("startReview called with deckId:", deckId, "deckName:", deckName);
     currentDeckId = deckId;
     currentDeckName = deckName;
     currentPage = 'study';
+    console.log("State after startReview: currentPage=", currentPage, ", currentDeckId=", currentDeckId);
   }
 
   function exitReviewMode() {
@@ -351,7 +353,7 @@
     {/if}
 
     <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-6">
+    <main class="flex-1 p-6 h-full">
       <!-- Loading State - show skeleton in Dashboard -->
       {#if collectionStatus === 'loading'}
         <div class="max-w-6xl mx-auto">
@@ -380,11 +382,8 @@
             <Dashboard collectionStatus={collectionStatus} onStudy={startReview} />
           </div>
         {:else if currentPage === 'study' && currentDeckId}
-          <div
-            in:fly={fly_if_enabled({ x: 30 })}
-            out:fly={fly_if_enabled({ x: -30 })}
-            class="h-full"
-          >
+          <div class="h-full">
+            {console.log("Rendering StudyView with deckId:", currentDeckId)}
             <StudyView 
               deckId={currentDeckId} 
               deckName={currentDeckName}

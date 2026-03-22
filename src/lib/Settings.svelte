@@ -4,6 +4,7 @@
   import { prefs } from "./prefs.svelte";
   import NeuDialog from "./ui/NeuDialog.svelte";
   import NeuToggle from "./ui/NeuToggle.svelte";
+  import { DESIGN_PRESETS, ACCENT_PRESETS } from './themes';
 
   interface Props {
     isOpen: boolean;
@@ -48,6 +49,18 @@
   function handleThemeChange(newTheme: 'light' | 'dark' | 'system') {
     prefs.theme = newTheme;
     prefs.applyTheme();
+  }
+
+  function handleDesignPresetChange(presetId: string) {
+    prefs.design_preset = presetId;
+    prefs.applyTheme();
+    prefs.save();
+  }
+
+  function handleAccentColorChange(color: string) {
+    prefs.accent_color = color;
+    prefs.applyTheme();
+    prefs.save();
   }
 
   // Auto-save on toggle change
@@ -220,6 +233,58 @@
           bind:checked={prefs.reduce_motion}
           onchange={handleToggleChange}
         />
+      </div>
+
+      <!-- Design Style -->
+      <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+        <span class="setting-label">Design Style</span>
+        <div style="display: flex; gap: 8px;">
+          {#each DESIGN_PRESETS as preset}
+            <button
+              onclick={() => handleDesignPresetChange(preset.id)}
+              class="neu-subtle neu-btn"
+              style="
+                flex: 1;
+                padding: 10px 8px;
+                text-align: center;
+                border: none;
+                cursor: pointer;
+                {prefs.design_preset === preset.id ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
+              "
+            >
+              <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text-primary); display: block;">
+                {preset.name}
+              </span>
+              <span style="font-family: var(--sans); font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">
+                {preset.description}
+              </span>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Accent Color -->
+      <div class="setting-row">
+        <span class="setting-label">Accent Color</span>
+        <div style="display: flex; gap: 8px;">
+          {#each ACCENT_PRESETS as preset}
+            <button
+              onclick={() => handleAccentColorChange(preset.color)}
+              class="neu-btn"
+              title={preset.name}
+              style="
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                background: {preset.color};
+                border: 2px solid {prefs.accent_color === preset.color ? 'var(--text-primary)' : 'transparent'};
+                cursor: pointer;
+                box-shadow: {prefs.accent_color === preset.color ? '0 0 0 2px var(--bg-card), 0 0 0 4px ' + preset.color : 'none'};
+                transition: transform 0.1s ease, box-shadow 0.1s ease;
+              "
+            ></button>
+          {/each}
+        </div>
       </div>
     </div>
 

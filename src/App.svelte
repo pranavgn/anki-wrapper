@@ -21,6 +21,7 @@
   import ImageOcclusion from "./lib/ImageOcclusion.svelte";
   import { pluginEngine, setCurrentLoadingPlugin, clearCurrentLoadingPlugin } from "./lib/pluginEngine";
   import { loadAllPlugins } from "./lib/pluginLoader";
+  import { studyNav } from "./lib/studyNav.svelte.ts";
 
   import PluginManager from "./lib/PluginManager.svelte";
 
@@ -246,7 +247,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleGlobalKeydown} />
+<svelte:window on:keydown={handleGlobalKeydown} onclick={() => { if (studyNav.showFlagPicker) studyNav.showFlagPicker = false; }} />
 
 <!-- Browser Error Message -->
 {#if browserCheckComplete && isRunningInBrowser}
@@ -281,61 +282,192 @@
   <!-- App Shell -->
   <div class="min-h-screen bg-bg-base flex flex-col">
     <!-- Top Navigation -->
-    <nav class="h-14 bg-bg-base border-b border-border flex items-center px-6 justify-between sticky top-0 z-50" style="height: 56px;">
-      <!-- Left Section -->
-      <div class="flex items-center min-w-[180px]">
-        {#if currentPage === 'deckOverview' || currentPage === 'study' || currentPage === 'browser' || currentPage === 'editor' || currentPage === 'stats'}
-          <!-- Back button when in deck context -->
+    <nav class="flex items-center justify-between px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30;">
+
+      <!-- ═══ LEFT SECTION ═══ -->
+      <div class="flex items-center gap-2 min-w-[180px]">
+        {#if currentPage === 'dashboard'}
+          <!-- Logo -->
+          <svg class="h-7 w-7" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+            <rect width="100" height="100" rx="22" fill="var(--accent)" />
+            <path d="M30 70V32l20 24 20-24v38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span style="font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em;">Mnemora</span>
+
+        {:else if studyNav.active}
+          <!-- Study mode: Back + Undo -->
           <button
-            onclick={goToDashboard}
-            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
-            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+            onclick={() => studyNav.exit?.()}
+            class="neu-subtle neu-btn flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Decks</span>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Back</span>
           </button>
+          {#if studyNav.canUndo}
+            <button
+              onclick={() => studyNav.undo?.()}
+              class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+              style="background: var(--bg-card);"
+              title="Undo (Ctrl+Z)"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+            </button>
+          {/if}
+
         {:else}
-          <!-- App name when on dashboard -->
-          <span style="font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em;">Mnemora</span>
+          <!-- All other pages: Back to dashboard -->
+          <button
+            onclick={goToDashboard}
+            class="flex items-center gap-2 cursor-pointer"
+            style="background: none; border: none; padding: 0;"
+          >
+            <svg class="h-7 w-7" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+              <rect width="100" height="100" rx="22" fill="var(--accent)" />
+              <path d="M30 70V32l20 24 20-24v38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            <span style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em;">Mnemora</span>
+          </button>
         {/if}
       </div>
 
-      <!-- Center Section (only visible when deck is active) -->
-      {#if currentDeckId && (currentPage === 'deckOverview' || currentPage === 'study')}
-        <div class="flex items-center gap-2" style="animation: fadeIn 0.3s ease-out;">
-          <span style="font-family: var(--serif); font-size: 18px; font-weight: 500; color: var(--text-primary);">
-            {currentDeckName}
+      <!-- ═══ CENTER SECTION ═══ -->
+      <div class="flex items-center gap-2">
+        {#if currentPage === 'deckOverview' && activeDeck}
+          <!-- Breadcrumb: Decks > DeckName -->
+          <button onclick={goToDashboard} class="cursor-pointer" style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); background: none; border: none;">
+            Decks
+          </button>
+          <svg class="h-3 w-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+          <span style="font-family: var(--sans); font-size: 13px; color: var(--text-primary); font-weight: 500;">
+            {activeDeck.name}
           </span>
-        </div>
-      {/if}
 
-      <!-- Right Section -->
+        {:else if studyNav.active}
+          <!-- Study mode: Deck name + progress -->
+          <span style="font-family: var(--serif); font-size: 17px; font-weight: 500; color: var(--text-primary);">
+            {studyNav.deckName}
+          </span>
+          {#if studyNav.progress > 0}
+            <div style="width: 60px; height: 4px; border-radius: 2px; background: var(--bg-subtle); margin-left: 8px; overflow: hidden;">
+              <div style="width: {studyNav.progress}%; height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease;"></div>
+            </div>
+          {/if}
+
+        {:else if currentPage === 'editor'}
+          <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
+            {editingCard ? 'Edit Card' : 'Add Card'}
+          </span>
+
+        {:else if currentPage === 'stats'}
+          <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
+            Statistics
+          </span>
+
+        {:else if currentPage === 'browser'}
+          <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
+            Browse
+          </span>
+        {/if}
+      </div>
+
+      <!-- ═══ RIGHT SECTION ═══ -->
       <div class="flex items-center justify-end gap-2.5 min-w-[180px]">
-        {#if currentDeckId && (currentPage === 'deckOverview' || currentPage === 'study')}
-          <!-- Add button when deck is active -->
+        {#if studyNav.active}
+          <!-- Study mode: Flag + Counts -->
+          <div class="relative">
+            <button
+              onclick={() => { studyNav.showFlagPicker = !studyNav.showFlagPicker; }}
+              class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+              style="background: var(--bg-card);"
+              title="Set flag (Ctrl+0-7)"
+            >
+              <svg class="h-4 w-4" fill="{studyNav.currentFlag > 0 ? studyNav.FLAG_COLORS[studyNav.currentFlag] : 'none'}" stroke="{studyNav.currentFlag > 0 ? studyNav.FLAG_COLORS[studyNav.currentFlag] : 'var(--text-muted)'}" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              </svg>
+            </button>
+
+            <!-- Flag picker popover -->
+            {#if studyNav.showFlagPicker}
+              <div
+                class="absolute right-0 top-full mt-2 p-2 rounded-xl z-50 flex gap-1"
+                style="background: var(--bg-card); box-shadow: 0 8px 24px rgba(0,0,0,0.12); border: 1px solid var(--border);"
+              >
+                {#each [0,1,2,3,4,5,6,7] as flagIdx}
+                  <button
+                    onclick={() => { studyNav.setFlag?.(flagIdx); studyNav.showFlagPicker = false; }}
+                    class="w-7 h-7 rounded-full cursor-pointer flex items-center justify-center"
+                    style="background: {studyNav.FLAG_COLORS[flagIdx]}; {flagIdx === 0 ? 'border: 2px solid var(--border);' : ''}"
+                    title="Flag {flagIdx}"
+                  >
+                    {#if flagIdx === 0}
+                      <svg class="h-3.5 w-3.5" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Remaining/Reviewed counts -->
+          <div class="flex items-center gap-3">
+            <span style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">
+              {studyNav.remainingCards} left
+            </span>
+            <span style="font-family: var(--sans); font-size: 12px; color: var(--accent);">
+              {studyNav.reviewedCount} done
+            </span>
+          </div>
+
+        {:else}
+          <!-- Non-study pages -->
+
+          {#if currentPage === 'deckOverview'}
+            <!-- Add card button -->
+            <button
+              onclick={() => navigate('editor')}
+              class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+              style="background: var(--bg-card);"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Add</span>
+            </button>
+          {/if}
+
+          <!-- Plugins button (always visible outside study) -->
           <button
-            onclick={() => navigate('editor')}
-            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
-            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+            onclick={() => showPluginManager = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Plugins"
+            aria-label="Plugins"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Add</span>
           </button>
         {/if}
-        <!-- Settings gear button (always visible) -->
+
+        <!-- Settings gear (ALWAYS visible on every page) -->
         <button
           onclick={() => showSettings = true}
           class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+          style="background: var(--bg-card);"
           title="Settings"
           aria-label="Settings"
         >
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>
@@ -355,7 +487,7 @@
     {/if}
 
     <!-- Main Content -->
-    <main class="flex-1 p-6 h-full">
+    <main class="{studyNav.active ? 'flex-1 overflow-hidden' : 'flex-1 overflow-y-auto p-6 lg:p-10'}">
       <!-- Loading State - show skeleton in Dashboard -->
       {#if collectionStatus === 'loading'}
         <div class="max-w-6xl mx-auto">
@@ -376,60 +508,58 @@
         </div>
       {:else}
         <!-- Page Router -->
-        {#if currentPage === 'dashboard'}
-          <div
-            in:fly={fly_if_enabled({ x: -30 })}
-            out:fly={fly_if_enabled({ x: 30 })}
-          >
-            <Dashboard collectionStatus={collectionStatus} onStudy={openDeckOverview} />
-          </div>
-        {:else if currentPage === 'deckOverview' && activeDeck}
-          <div
-            in:fly={fly_if_enabled({ x: 30 })}
-            out:fly={fly_if_enabled({ x: -30 })}
-          >
-            <DeckOverview
-              deck={activeDeck}
-              onStudy={startReview}
-              onBrowse={() => navigate('browser')}
-              onStats={() => navigate('stats')}
-            />
-          </div>
-        {:else if currentPage === 'study' && currentDeckId}
-          <div class="h-full">
-            {console.log("Rendering StudyView with deckId:", currentDeckId)}
-            <StudyView
-              deckId={currentDeckId}
-              deckName={currentDeckName}
-              onExit={exitReviewMode}
-            />
-          </div>
-        {:else if currentPage === 'editor'}
-          <div
-            in:fly={fly_if_enabled({ x: 30 })}
-            out:fly={fly_if_enabled({ x: -30 })}
-            class="max-w-2xl mx-auto"
-          >
-            <CardEditor
-              onBack={() => { navigate(previousPage); editingCard = null; }}
-              editCard={editingCard}
-            />
-          </div>
-        {:else if currentPage === 'stats'}
-          <div
-            in:fly={fly_if_enabled({ x: 30 })}
-            out:fly={fly_if_enabled({ x: -30 })}
-          >
-            <StatsView />
-          </div>
-        {:else if currentPage === 'browser'}
-          <div class="h-full">
-            <CardBrowser
-              initialQuery={browserQuery}
-              onClose={() => { navigate(previousPage); browserQuery = ''; }}
-            />
-          </div>
-        {/if}
+        {#key currentPage}
+          {#if currentPage === 'dashboard'}
+            <div
+              in:fly={fly_if_enabled({ x: -20, duration: 150 })}
+            >
+              <Dashboard collectionStatus={collectionStatus} onStudy={openDeckOverview} />
+            </div>
+          {:else if currentPage === 'deckOverview' && activeDeck}
+            <div
+              in:fly={fly_if_enabled({ x: 20, duration: 150 })}
+            >
+              <DeckOverview
+                deck={activeDeck}
+                onStudy={startReview}
+                onBrowse={() => navigate('browser')}
+                onStats={() => navigate('stats')}
+              />
+            </div>
+          {:else if currentPage === 'study' && currentDeckId}
+            <div class="h-full">
+              {console.log("Rendering StudyView with deckId:", currentDeckId)}
+              <StudyView
+                deckId={currentDeckId}
+                deckName={currentDeckName}
+                onExit={exitReviewMode}
+              />
+            </div>
+          {:else if currentPage === 'editor'}
+            <div
+              in:fly={fly_if_enabled({ x: 20, duration: 150 })}
+              class="max-w-2xl mx-auto"
+            >
+              <CardEditor
+                onBack={() => { navigate(previousPage); editingCard = null; }}
+                editCard={editingCard}
+              />
+            </div>
+          {:else if currentPage === 'stats'}
+            <div
+              in:fly={fly_if_enabled({ x: 20, duration: 150 })}
+            >
+              <StatsView />
+            </div>
+          {:else if currentPage === 'browser'}
+            <div class="h-full">
+              <CardBrowser
+                initialQuery={browserQuery}
+                onClose={() => { navigate(previousPage); browserQuery = ''; }}
+              />
+            </div>
+          {/if}
+        {/key}
       {/if}
     </main>
 
@@ -472,14 +602,10 @@
     {/if}
 
     <!-- Settings Panel -->
-    {#if showSettings}
-      <Settings onClose={() => showSettings = false} />
-    {/if}
+    <Settings isOpen={showSettings} onClose={() => showSettings = false} />
     
     <!-- Plugin Manager Modal -->
-    {#if showPluginManager}
-      <PluginManager onClose={() => showPluginManager = false} />
-    {/if}
+    <PluginManager isOpen={showPluginManager} onClose={() => showPluginManager = false} />
     
     <!-- Image Occlusion Modal -->
     {#if showImageOcclusion}

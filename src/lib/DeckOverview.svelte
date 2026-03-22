@@ -74,11 +74,9 @@
 
   <!-- Stat Pills -->
   <div class="flex justify-center gap-4 mb-10">
-    <div 
+    <div
       class="neu-raised text-center"
       style="
-        background: var(--bg-card);
-        box-shadow: var(--neu-up);
         border-radius: var(--radius-md);
         padding: 16px 24px;
       "
@@ -90,11 +88,9 @@
         New
       </div>
     </div>
-    <div 
+    <div
       class="neu-raised text-center"
       style="
-        background: var(--bg-card);
-        box-shadow: var(--neu-up);
         border-radius: var(--radius-md);
         padding: 16px 24px;
       "
@@ -106,11 +102,9 @@
         Learning
       </div>
     </div>
-    <div 
+    <div
       class="neu-raised text-center"
       style="
-        background: var(--bg-card);
-        box-shadow: var(--neu-up);
         border-radius: var(--radius-md);
         padding: 16px 24px;
       "
@@ -319,8 +313,7 @@
       onclick={handleStudy}
       class="w-full neu-raised neu-btn cursor-pointer"
       style="
-        background: linear-gradient(135deg, var(--accent), var(--accent) 80%, transparent);
-        box-shadow: var(--neu-up);
+        background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 85%, #000));
         border-radius: var(--radius-md);
         padding: 18px 24px;
         border: none;
@@ -335,11 +328,8 @@
       onclick={handleBrowse}
       class="w-full neu-subtle neu-btn flex items-center justify-center gap-2 cursor-pointer"
       style="
-        background: var(--bg-card);
-        box-shadow: var(--neu-subtle);
         border-radius: var(--radius-md);
         padding: 14px 24px;
-        border: none;
       "
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
@@ -354,11 +344,8 @@
       onclick={handleStats}
       class="w-full neu-subtle neu-btn flex items-center justify-center gap-2 cursor-pointer"
       style="
-        background: var(--bg-card);
-        box-shadow: var(--neu-subtle);
         border-radius: var(--radius-md);
         padding: 14px 24px;
-        border: none;
       "
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">

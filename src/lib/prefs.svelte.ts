@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { applyDesignPreset } from './themes';
 
 export interface AppPreferences {
   // Display
@@ -6,6 +7,8 @@ export interface AppPreferences {
   reduce_motion: boolean;
   theme: 'light' | 'dark' | 'system';
   font_size: number;
+  design_preset: string;
+  accent_color: string;
   
   // Study
   daily_cutoff_hour: number;
@@ -28,6 +31,8 @@ class PreferencesState {
   reduce_motion = $state(false);
   theme = $state<'light' | 'dark' | 'system'>('system');
   font_size = $state(16);
+  design_preset = $state('neumorphic');
+  accent_color = $state('#C4714F');
   
   daily_cutoff_hour = $state(4);
   show_remaining_count = $state(true);
@@ -47,6 +52,8 @@ class PreferencesState {
       this.reduce_motion = p.reduce_motion;
       this.theme = p.theme as 'light' | 'dark' | 'system';
       this.font_size = p.font_size;
+      if (p.design_preset) this.design_preset = p.design_preset;
+      if (p.accent_color) this.accent_color = p.accent_color;
       this.daily_cutoff_hour = p.daily_cutoff_hour;
       this.show_remaining_count = p.show_remaining_count;
       this.show_elapsed_time = p.show_elapsed_time;
@@ -66,12 +73,14 @@ class PreferencesState {
   
   async save() {
     try {
-      await invoke('save_preferences', { 
+      await invoke('save_preferences', {
         prefs: {
           animations_enabled: this.animations_enabled,
           reduce_motion: this.reduce_motion,
           theme: this.theme,
           font_size: this.font_size,
+          design_preset: this.design_preset,
+          accent_color: this.accent_color,
           daily_cutoff_hour: this.daily_cutoff_hour,
           show_remaining_count: this.show_remaining_count,
           show_elapsed_time: this.show_elapsed_time,
@@ -96,6 +105,10 @@ class PreferencesState {
     } else {
       root.classList.toggle('dark', this.theme === 'dark');
     }
+    
+    // Apply design preset + accent color
+    const isDark = root.classList.contains('dark');
+    applyDesignPreset(this.design_preset, this.accent_color, isDark);
   }
   
   applyFontSize() {

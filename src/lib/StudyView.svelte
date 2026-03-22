@@ -7,6 +7,7 @@
   import { addToast } from "./toast";
   import { rewriteMediaUrls } from "./media";
   import { renderMath, clearMathJaxCache, preprocessAnkiMath } from "./mathjax";
+  import { studyNav } from "./studyNav.svelte.ts";
 
   // Props using Svelte 5 runes
   interface Props {
@@ -163,6 +164,7 @@
       await invoke("set_card_flag", { cardId: currentCard.card_id, flag });
       currentFlag = flag;
       showFlagPicker = false;
+      studyNav.showFlagPicker = false;
       addToast(flag === 0 ? "Flag removed" : `Flag ${flag} set`, "success");
     } catch (e) {
       console.error("Error setting flag:", e);
@@ -263,6 +265,20 @@
   // Progress percentage
   const progressPercent = $derived(totalCards > 0 ? Math.round((reviewedCount / totalCards) * 100) : 0);
 
+  // Sync study state → global nav store
+  $effect(() => {
+    if (!studyNav.active) return;
+    studyNav.remainingCards = remainingCards;
+    studyNav.reviewedCount = reviewedCount;
+    studyNav.currentFlag = currentFlag;
+    studyNav.canUndo = canUndo;
+  });
+
+  $effect(() => {
+    if (!studyNav.active) return;
+    studyNav.progress = progressPercent;
+  });
+
   // Flag colors
   const flagColors = [
     'transparent',
@@ -287,102 +303,22 @@
     await loadNextCard();
     await checkUndoStatus();
     window.addEventListener('keydown', handleKeydown);
+
+    // Wire study state to global navbar
+    studyNav.activate(deckName, onExit);
+    studyNav.setFlag = setFlag;
+    studyNav.undo = undoLastAction;
   });
 
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeydown);
+    studyNav.deactivate();
   });
 </script>
 
-<div class="h-full flex flex-col" style="background: var(--bg-base);">
-  <!-- HEADER -->
-  <header class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid var(--border);">
-    <!-- Left: Back button -->
-    <button
-      onclick={onExit}
-      class="neu-subtle neu-btn flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
-      style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-    >
-      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Back</span>
-    </button>
-
-    <!-- Center: Deck name -->
-    <span style="font-family: var(--serif); font-size: 18px; font-weight: 500; color: var(--text-primary);">
-      {deckName}
-    </span>
-
-    <!-- Right: Flag, Undo, Counts -->
-    <div class="flex items-center gap-3">
-      <!-- Flag indicator -->
-      <div class="relative">
-        <button
-          onclick={() => showFlagPicker = !showFlagPicker}
-          class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-          title="Set flag (Ctrl+0-7)"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: {currentFlag > 0 ? flagColors[currentFlag] : 'var(--text-muted)'};">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-          </svg>
-        </button>
-
-        <!-- Flag picker popover -->
-        {#if showFlagPicker}
-          <div 
-            class="absolute right-0 top-full mt-2 p-2 rounded-lg z-50"
-            style="background: var(--bg-card); box-shadow: var(--neu-up); border: 1px solid var(--border);"
-          >
-            <div class="flex gap-1">
-              {#each flagColors as color, i}
-                <button
-                  onclick={() => setFlag(i)}
-                  class="w-7 h-7 rounded-full cursor-pointer flex items-center justify-center"
-                  style="background: {color}; {i === 0 ? 'border: 2px solid var(--border);' : ''}"
-                  title="Flag {i}"
-                >
-                  {#if i === 0}
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted);">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  {/if}
-                </button>
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Undo button -->
-      {#if canUndo}
-        <button
-          onclick={undoLastAction}
-          class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-          title="Undo (Ctrl+Z)"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-          </svg>
-        </button>
-      {/if}
-
-      <!-- Counts -->
-      <div class="flex items-center gap-4">
-        <span style="font-family: var(--sans); font-size: 13px; color: var(--text-muted);">
-          {remainingCards} remaining
-        </span>
-        <span style="font-family: var(--sans); font-size: 13px; color: var(--text-muted);">
-          {reviewedCount} reviewed
-        </span>
-      </div>
-    </div>
-  </header>
-
+<div class="h-full flex flex-col overflow-hidden" style="background: var(--bg-base);">
   <!-- Progress Bar -->
-  <div class="px-6 pt-4">
+  <div class="px-6 pt-4 pb-2">
     <div 
       class="neu-pressed"
       style="
@@ -727,7 +663,7 @@
   }
 
   .card-flip-inner {
-    transition: transform 0.55s cubic-bezier(0.4, 0, 0.15, 1);
+    transition: transform 0.38s cubic-bezier(0.4, 0, 0.12, 1);
     transform-style: preserve-3d;
     position: relative;
   }
@@ -747,11 +683,11 @@
   }
 
   .card-fly-out {
-    animation: cardFlyToDeck 0.7s cubic-bezier(0.4,0,0.2,1) forwards;
+    animation: cardFlyToDeck 0.5s cubic-bezier(0.4,0,0.2,1) forwards;
   }
 
   .card-return {
-    animation: cardReturnShuffle 0.65s cubic-bezier(0.4,0,0.2,1);
+    animation: cardReturnShuffle 0.45s cubic-bezier(0.4,0,0.2,1);
   }
 
   @keyframes cardFlyToDeck {

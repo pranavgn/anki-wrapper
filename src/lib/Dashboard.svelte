@@ -57,6 +57,11 @@
   let selectedDecks: Set<number> = $state(new Set());
   let optionsDeckId: number | null = $state(null);
   let selectionMode = $state(false);
+  let selectMode = $state(false);
+  
+  // Deck stats cache
+  let lastDeckStatsTime = 0;
+  const DECK_STATS_TTL = 3000; // 3 seconds
   
   // Custom Study modal state
   let showCustomStudy = $state(false);
@@ -83,6 +88,13 @@
   function clearSelection() {
     selectedDecks = new Set();
     selectionMode = false;
+  }
+
+  function toggleSelectMode() {
+    if (selectMode) {
+      clearSelection();
+    }
+    selectMode = !selectMode;
   }
 
   async function exportSelectedDecks(includeScheduling: boolean) {
@@ -120,17 +132,21 @@
   // Load deck stats on mount
   onMount(async () => {
     await loadDeckStats();
-    window.addEventListener('refresh-decks', loadDeckStats);
+    window.addEventListener('refresh-decks', () => loadDeckStats(true));
     return () => {
-      window.removeEventListener('refresh-decks', loadDeckStats);
+      window.removeEventListener('refresh-decks', () => loadDeckStats(true));
     };
   });
 
-  async function loadDeckStats() {
+  async function loadDeckStats(force = false) {
+    const now = Date.now();
+    if (!force && now - lastDeckStatsTime < DECK_STATS_TTL && decks.length > 0) return;
+    
     isLoading = true;
     try {
       const result = await invoke<DeckStat[]>("get_deck_stats");
       decks = result;
+      lastDeckStatsTime = Date.now();
     } catch (error) {
       console.error("Error loading deck stats:", error);
       addToast(error instanceof Error ? error.message : "Failed to load decks", "error");
@@ -347,50 +363,40 @@
 
 <div class="max-w-[860px] mx-auto px-9 pt-13 pb-13" style="animation: fadeUp 0.4s ease-out;">
   <!-- Header Row -->
-  <div class="flex justify-between items-start gap-4 mb-12">
+  <div class="flex items-center justify-between mb-12">
     <div>
       <h1 style="font-family: var(--serif); font-size: 36px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; margin-bottom: 4px;">Your Decks</h1>
-      <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">{totalDue} cards due today</p>
+      <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">{totalDue} cards due today across {decks.length} {decks.length === 1 ? 'deck' : 'decks'}</p>
     </div>
     <div class="flex items-center gap-2">
-      {#if selectionMode && selectedDecks.size > 0}
+      <NeuDropdown items={importDropdownItems}>
         <button
-          onclick={() => exportSelectedDecks(false)}
           class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
           style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
-          <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Export {selectedDecks.size}</span>
+          <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Import</span>
         </button>
-        <button
-          onclick={clearSelection}
-          class="neu-subtle neu-btn px-3.5 py-1.5 rounded-lg cursor-pointer"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle); font-family: var(--sans); font-size: 12px; color: var(--text-secondary);"
-        >
-          Clear
-        </button>
-      {:else}
-        <NeuDropdown items={importDropdownItems}>
-          <button
-            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
-            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Import</span>
-          </button>
-        </NeuDropdown>
-        <button
-          onclick={() => selectionMode = !selectionMode}
-          class="neu-subtle neu-btn px-3.5 py-1.5 rounded-lg cursor-pointer"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle); font-family: var(--sans); font-size: 12px; color: var(--text-secondary);"
-        >
-          Select
-        </button>
-      {/if}
+      </NeuDropdown>
+      <button
+        onclick={toggleSelectMode}
+        class="neu-subtle neu-btn px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2"
+        style="background: {selectMode ? 'var(--accent)' : 'var(--bg-card)'}; color: {selectMode ? 'white' : 'var(--text-secondary)'};"
+      >
+        {#if selectMode}
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span style="font-family: var(--sans); font-size: 13px; font-weight: 500;">Done</span>
+        {:else}
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span style="font-family: var(--sans); font-size: 13px; font-weight: 500;">Select</span>
+        {/if}
+      </button>
     </div>
   </div>
 
@@ -399,24 +405,27 @@
     {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
       <div
         data-deck-id={deck.id}
-        class="neu-raised neu-btn relative cursor-pointer"
+        class="deck-card bg-bg-card rounded-2xl p-6 cursor-pointer relative"
         style="
-          background: var(--bg-card);
-          box-shadow: var(--neu-up);
-          border-radius: var(--radius-md);
-          padding: 30px 32px;
-          animation: fadeUp 0.4s ease-out backwards;
-          animation-delay: {index * 40}ms;
+          box-shadow: var(--neu-subtle);
+          border: 1px solid var(--border);
+          animation-delay: {index * 30}ms;
           {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
           {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
         "
         role="button"
         tabindex="0"
-        onclick={() => handleDeckClick(deck.id, deck.name)}
+        onclick={() => {
+          if (selectMode) {
+            toggleDeckSelection(deck.id);
+          } else {
+            handleDeckClick(deck.id, deck.name);
+          }
+        }}
         onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
       >
         <!-- Selection checkbox -->
-        {#if selectionMode}
+        {#if selectMode}
           <div
             class="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
             style="
@@ -697,7 +706,63 @@
       </div>
     </div>
   {/if}
+
+  <!-- Floating Export Bar -->
+  {#if selectMode && selectedDecks.size > 0}
+    <div
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl"
+      style="
+        background: var(--bg-card);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.15), var(--neu-up);
+        border: 1px solid var(--border);
+        animation: slideUp 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+      "
+    >
+      <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary);">
+        {selectedDecks.size} selected
+      </span>
+
+      <div style="width: 1px; height: 20px; background: var(--border);"></div>
+
+      <button
+        onclick={() => exportSelectedDecks(false)}
+        class="neu-btn px-3 py-1.5 rounded-lg cursor-pointer"
+        style="background: var(--accent); color: white; font-family: var(--sans); font-size: 13px; font-weight: 500; border: none;"
+      >
+        Export .apkg
+      </button>
+
+      <button
+        onclick={() => exportSelectedDecks(true)}
+        class="neu-btn px-3 py-1.5 rounded-lg cursor-pointer"
+        style="background: var(--bg-subtle); color: var(--text-primary); font-family: var(--sans); font-size: 13px; font-weight: 500; border: none;"
+      >
+        Export .colpkg
+      </button>
+
+      <button
+        onclick={() => { clearSelection(); selectMode = false; }}
+        class="neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+        style="background: var(--bg-subtle); border: none;"
+        title="Clear selection"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  {/if}
 </div>
 
 <style>
+  .deck-card {
+    opacity: 0;
+    animation: deckFadeIn 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .deck-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--neu-up);
+  }
 </style>

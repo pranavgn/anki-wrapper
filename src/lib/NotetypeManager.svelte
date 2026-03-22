@@ -207,9 +207,9 @@
         <div class="detail-header">
           <h3 class="detail-title">{detail.name}</h3>
           <div class="detail-actions">
-            <button class="action-btn neu-subtle" onclick={startEdit}>Edit</button>
-            <button class="action-btn neu-subtle" onclick={renameNotetype}>Rename</button>
-            <button class="action-btn danger-btn neu-subtle" onclick={deleteNotetype}>Delete</button>
+            <button class="action-btn neu-subtle neu-btn" onclick={startEdit}>Edit</button>
+            <button class="action-btn neu-subtle neu-btn" onclick={renameNotetype}>Rename</button>
+            <button class="action-btn danger-btn neu-subtle neu-btn" onclick={deleteNotetype}>Delete</button>
           </div>
         </div>
         
@@ -254,10 +254,10 @@
               {#each editFields as field, i}
                 <div class="field-row">
                   <input type="text" bind:value={field.name} placeholder="Field name" class="form-input neu-pressed" />
-                  <button class="remove-btn neu-subtle" onclick={() => removeField(i)}>✕</button>
+                  <button class="remove-btn neu-subtle neu-btn" onclick={() => removeField(i)}>✕</button>
                 </div>
               {/each}
-              <button class="add-btn neu-subtle" onclick={addField}>Add Field</button>
+              <button class="add-btn neu-subtle neu-btn" onclick={addField}>Add Field</button>
             </div>
           </div>
 
@@ -271,10 +271,10 @@
                     <textarea bind:value={tmpl.front_html} placeholder="Front template" class="form-textarea neu-pressed"></textarea>
                     <textarea bind:value={tmpl.back_html} placeholder="Back template" class="form-textarea neu-pressed"></textarea>
                   </div>
-                  <button class="remove-btn neu-subtle" onclick={() => removeTemplate(i)}>✕</button>
+                  <button class="remove-btn neu-subtle neu-btn" onclick={() => removeTemplate(i)}>✕</button>
                 </div>
               {/each}
-              <button class="add-btn neu-subtle" onclick={addTemplate}>Add Template</button>
+              <button class="add-btn neu-subtle neu-btn" onclick={addTemplate}>Add Template</button>
             </div>
           </div>
 
@@ -285,7 +285,7 @@
 
           <div class="edit-actions">
             <button class="save-btn" onclick={saveEdit}>Save</button>
-            <button class="cancel-btn neu-subtle" onclick={cancelEdit}>Cancel</button>
+            <button class="cancel-btn neu-subtle neu-btn" onclick={cancelEdit}>Cancel</button>
           </div>
         </div>
       {:else}

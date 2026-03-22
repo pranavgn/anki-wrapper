@@ -27,12 +27,30 @@
   let canvas: HTMLCanvasElement;
   let chart: ChartJS | null = null;
 
+  function resolveCSS(value: any): any {
+    if (typeof value === 'string' && value.startsWith('var(')) {
+      const varName = value.match(/var\(([^)]+)\)/)?.[1];
+      if (varName) {
+        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || value;
+      }
+    }
+    if (Array.isArray(value)) return value.map(resolveCSS);
+    if (value && typeof value === 'object') {
+      const resolved: any = {};
+      for (const [k, v] of Object.entries(value)) {
+        resolved[k] = resolveCSS(v);
+      }
+      return resolved;
+    }
+    return value;
+  }
+
   function cloneData(d: ChartData): ChartData {
     return JSON.parse(JSON.stringify(d));
   }
 
-  function cloneOptions(o: ChartOptions): ChartOptions {
-    return JSON.parse(JSON.stringify(o));
+  function prepareOptions(o: ChartOptions): ChartOptions {
+    return resolveCSS(JSON.parse(JSON.stringify(o)));
   }
 
   onMount(() => {
@@ -40,7 +58,7 @@
       chart = new ChartJS(canvas, {
         type,
         data: cloneData(data),
-        options: cloneOptions(options),
+        options: prepareOptions(options),
       });
     }
   });
@@ -56,7 +74,7 @@
     if (chart && data) {
       chart.data = cloneData(data);
       if (options) {
-        chart.options = cloneOptions(options);
+        chart.options = prepareOptions(options);
       }
       chart.update();
     }

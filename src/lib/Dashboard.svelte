@@ -356,7 +356,7 @@
       {#if selectionMode && selectedDecks.size > 0}
         <button
           onclick={() => exportSelectedDecks(false)}
-          class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+          class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
           style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
@@ -366,7 +366,7 @@
         </button>
         <button
           onclick={clearSelection}
-          class="neu-subtle px-3.5 py-1.5 rounded-lg cursor-pointer"
+          class="neu-subtle neu-btn px-3.5 py-1.5 rounded-lg cursor-pointer"
           style="background: var(--bg-card); box-shadow: var(--neu-subtle); font-family: var(--sans); font-size: 12px; color: var(--text-secondary);"
         >
           Clear
@@ -374,7 +374,7 @@
       {:else}
         <NeuDropdown items={importDropdownItems}>
           <button
-            class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
             style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
@@ -385,7 +385,7 @@
         </NeuDropdown>
         <button
           onclick={() => selectionMode = !selectionMode}
-          class="neu-subtle px-3.5 py-1.5 rounded-lg cursor-pointer"
+          class="neu-subtle neu-btn px-3.5 py-1.5 rounded-lg cursor-pointer"
           style="background: var(--bg-card); box-shadow: var(--neu-subtle); font-family: var(--sans); font-size: 12px; color: var(--text-secondary);"
         >
           Select

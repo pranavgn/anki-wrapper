@@ -230,7 +230,7 @@
           </button>
           <button
             onclick={emptyFilteredDeck}
-            class="action-btn neu-subtle"
+            class="action-btn neu-subtle neu-btn"
           >
             Empty
           </button>
@@ -274,7 +274,7 @@
               class="step-input neu-pressed"
               onkeydown={(e) => e.key === "Enter" && addLearningStep()}
             />
-            <button onclick={addLearningStep} class="add-step-btn neu-subtle">Add</button>
+            <button onclick={addLearningStep} class="add-step-btn neu-subtle neu-btn">Add</button>
           </div>
         </div>
 
@@ -405,14 +405,14 @@
               <button
                 onclick={handleOptimizeFsrs}
                 disabled={isOptimizing}
-                class="optimize-btn neu-subtle"
+                class="optimize-btn neu-subtle neu-btn"
               >
                 {isOptimizing ? 'Optimizing...' : 'Optimize'}
               </button>
               {#if opts.fsrsWeights.length > 0}
                 <button
                   onclick={resetFsrsWeights}
-                  class="reset-btn neu-subtle"
+                  class="reset-btn neu-subtle neu-btn"
                 >
                   Reset
                 </button>
@@ -448,7 +448,7 @@
               class="step-input neu-pressed"
               onkeydown={(e) => e.key === "Enter" && addLapseStep()}
             />
-            <button onclick={addLapseStep} class="add-step-btn neu-subtle">Add</button>
+            <button onclick={addLapseStep} class="add-step-btn neu-subtle neu-btn">Add</button>
           </div>
         </div>
 
@@ -490,7 +490,7 @@
   <div class="dialog-footer">
     <button
       onclick={onClose}
-      class="footer-btn cancel-btn neu-subtle"
+      class="footer-btn cancel-btn neu-subtle neu-btn"
     >
       Cancel
     </button>

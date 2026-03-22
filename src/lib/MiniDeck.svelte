@@ -19,7 +19,7 @@
 
 <button
   onclick={onNavigateToBrowser}
-  class="fixed bottom-6 right-6 z-40 neu-raised cursor-pointer"
+  class="fixed bottom-6 right-6 z-40 neu-raised neu-btn cursor-pointer"
   style="
     background: var(--bg-card);
     box-shadow: var(--neu-up);

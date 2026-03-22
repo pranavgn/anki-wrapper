@@ -65,19 +65,19 @@ else
 fi
 
 # ───────────────────────────────────────────
-# TEST 5: prefs.ts has all required fields
+# TEST 5: prefs.svelte.ts has all required fields
 # ───────────────────────────────────────────
-echo "TEST 5: prefs.ts has full preference fields..."
+echo "TEST 5: prefs.svelte.ts has full preference fields..."
 MISSING_FIELDS=""
 for field in theme font_size daily_cutoff_hour show_remaining_count show_elapsed_time autoplay_audio show_intervals_on_buttons confirm_delete auto_backup backup_count; do
-  if ! grep -q "$field" src/lib/prefs.ts 2>/dev/null; then
+  if ! grep -q "$field" src/lib/prefs.svelte.ts 2>/dev/null; then
     MISSING_FIELDS="$MISSING_FIELDS $field"
   fi
 done
 if [ -z "$MISSING_FIELDS" ]; then
-  log_pass "prefs.ts contains all required preference fields"
+  log_pass "prefs.svelte.ts contains all required preference fields"
 else
-  log_fail "prefs.ts missing fields" "$MISSING_FIELDS"
+  log_fail "prefs.svelte.ts missing fields" "$MISSING_FIELDS"
 fi
 
 # ───────────────────────────────────────────

@@ -194,7 +194,7 @@
                 {/if}
                 
                 <button
-                  class="uninstall-btn neu-subtle"
+                  class="uninstall-btn neu-subtle neu-btn"
                   onclick={() => uninstallPlugin(plugin.id)}
                   title="Uninstall plugin"
                 >
@@ -218,7 +218,7 @@
         </p>
       </div>
       <button
-        class="install-btn neu-subtle"
+        class="install-btn neu-subtle neu-btn"
         onclick={openPluginsFolder}
       >
         Open Plugins Folder

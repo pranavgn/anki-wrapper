@@ -239,13 +239,13 @@
         <div class="draw-toolbar">
           <button
             onclick={undoLastRect}
-            class="tool-btn neu-subtle"
+            class="tool-btn neu-subtle neu-btn"
           >
             Undo
           </button>
           <button
             onclick={clearAll}
-            class="tool-btn neu-subtle"
+            class="tool-btn neu-subtle neu-btn"
           >
             Clear All
           </button>
@@ -266,7 +266,7 @@
         <div class="draw-actions">
           <button
             onclick={() => currentStep = "upload"}
-            class="action-btn neu-subtle"
+            class="action-btn neu-subtle neu-btn"
           >
             Back
           </button>
@@ -298,7 +298,7 @@
         <div class="details-actions">
           <button
             onclick={() => currentStep = "draw"}
-            class="action-btn neu-subtle"
+            class="action-btn neu-subtle neu-btn"
           >
             Back
           </button>

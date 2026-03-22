@@ -156,7 +156,7 @@
         <div class="theme-buttons">
           <button
             onclick={() => handleThemeChange('light')}
-            class="theme-btn neu-subtle {prefs.theme === 'light' ? 'active' : ''}"
+            class="theme-btn neu-subtle neu-btn {prefs.theme === 'light' ? 'active' : ''}"
             title="Light"
           >
             <svg class="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,7 +165,7 @@
           </button>
           <button
             onclick={() => handleThemeChange('dark')}
-            class="theme-btn neu-subtle {prefs.theme === 'dark' ? 'active' : ''}"
+            class="theme-btn neu-subtle neu-btn {prefs.theme === 'dark' ? 'active' : ''}"
             title="Dark"
           >
             <svg class="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,7 +174,7 @@
           </button>
           <button
             onclick={() => handleThemeChange('system')}
-            class="theme-btn neu-subtle {prefs.theme === 'system' ? 'active' : ''}"
+            class="theme-btn neu-subtle neu-btn {prefs.theme === 'system' ? 'active' : ''}"
             title="System"
           >
             <svg class="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +286,7 @@
       <!-- Manual Backup Button -->
       <button
         onclick={handleCreateBackup}
-        class="backup-btn neu-subtle"
+        class="backup-btn neu-subtle neu-btn"
       >
         Create Backup Now
       </button>
@@ -345,7 +345,7 @@
   <div class="settings-footer">
     <button
       onclick={onClose}
-      class="cancel-btn neu-subtle"
+      class="cancel-btn neu-subtle neu-btn"
     >
       Cancel
     </button>
@@ -373,7 +373,7 @@
     <div class="restore-actions">
       <button
         onclick={() => showRestoreConfirm = false}
-        class="cancel-btn neu-subtle"
+        class="cancel-btn neu-subtle neu-btn"
       >
         Cancel
       </button>

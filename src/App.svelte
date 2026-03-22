@@ -288,7 +288,7 @@
           <!-- Back button when in deck context -->
           <button
             onclick={goToDashboard}
-            class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
             style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
@@ -317,7 +317,7 @@
           <!-- Add button when deck is active -->
           <button
             onclick={() => navigate('editor')}
-            class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
             style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
@@ -329,7 +329,7 @@
         <!-- Settings gear button (always visible) -->
         <button
           onclick={() => showSettings = true}
-          class="neu-subtle flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
+          class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
           style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
           title="Settings"
           aria-label="Settings"

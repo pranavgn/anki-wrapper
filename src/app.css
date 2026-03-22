@@ -182,8 +182,8 @@ p, li { line-height: 1.7; }
   position: relative;
 }
 .card-flip-inner.flipped { transform: rotateY(180deg); }
-.card-face { backface-visibility: hidden; position: absolute; inset: 0; }
-.card-back-face { transform: rotateY(180deg); }
+.card-face { backface-visibility: hidden; }
+.card-back-face { position: absolute; inset: 0; transform: rotateY(180deg); }
 
 /* Mini card flip (browse grid) */
 .mini-flip-container { perspective: 800px; }

@@ -456,13 +456,13 @@
     <div class="flex bg-bg-subtle rounded-xl p-1">
       <button
         onclick={() => switchMode('cards')}
-        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'cards' ? 'neu-raised text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'cards' ? 'neu-raised neu-btn text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
       >
         Cards
       </button>
       <button
         onclick={() => switchMode('notes')}
-        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'notes' ? 'neu-raised text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'notes' ? 'neu-raised neu-btn text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
       >
         Notes
       </button>

@@ -16,13 +16,47 @@
   // State
   let isLoading = $state(true);
   let error = $state("");
-  let currentCard = $state<any>(null);
+  let currentCard = $state<{ card_id: number; note_id: number; front: string; back: string; flag: number; again_interval: string; hard_interval: string; good_interval: string; easy_interval: string } | null>(null);
   let isFlipped = $state(false);
   let cardAnimation = $state<'idle' | 'fly-out' | 'return'>('idle');
   let reviewedCount = $state(0);
   let totalCards = $state(0);
   let remainingCards = $state(0);
   let miniDeckRef: MiniDeck;
+
+  // Load deck stats
+  async function loadDeckStats() {
+    try {
+      const stats = await invoke<any>("get_deck_stats_for_review", { deckId });
+      // Rust returns: new_cards, learn_cards, review_cards
+      totalCards = (stats.new_cards ?? 0) + (stats.learn_cards ?? 0) + (stats.review_cards ?? 0);
+      remainingCards = totalCards;
+    } catch (e) {
+      console.error("Error loading deck stats:", e);
+    }
+  }
+
+  // Load next card
+  async function loadNextCard() {
+    isLoading = true;
+    error = "";
+    try {
+      const card = await invoke<any>("get_next_card", { deckId });
+      currentCard = card;
+      isFlipped = false;
+      cardAnimation = 'idle';
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("No cards left")) {
+        currentCard = null;
+        remainingCards = 0;
+      } else {
+        error = msg;
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
 
   // Load first card on mount
   onMount(async () => {
@@ -32,26 +66,15 @@
       isLoading = false;
       return;
     }
+    await loadDeckStats();
+    await loadNextCard();
     
-    console.log("Loading card for deckId:", deckId);
-    try {
-      const card = await invoke<any>("get_next_card", { deckId });
-      console.log("Card received:", card);
-      currentCard = card;
-      
-      // Get deck stats for progress
-      const stats = await invoke<any>("get_deck_stats_for_review", { deckId });
-      totalCards = stats.new_count + stats.learn_count + stats.review_count;
-      remainingCards = totalCards;
-    } catch (err) {
-      console.error("Error loading card:", err);
-      error = String(err);
-    } finally {
-      isLoading = false;
-    }
+    // Add keyboard listener
+    window.addEventListener('keydown', handleKeydown);
   });
 
   onDestroy(() => {
+    window.removeEventListener('keydown', handleKeydown);
   });
 
   function toggleFlip() {
@@ -63,32 +86,24 @@
     if (!currentCard || cardAnimation !== 'idle') return;
 
     const isAgain = ease === 1;
-    
-    // Set animation
     cardAnimation = isAgain ? 'return' : 'fly-out';
     
-    // Wait for animation
     await new Promise(resolve => setTimeout(resolve, isAgain ? 650 : 700));
 
     try {
-      await invoke("answer_card", { 
-        cardId: currentCard.id, 
-        ease: ease 
+      await invoke("answer_card", {
+        cardId: currentCard.card_id,  // CORRECT: card_id not id
+        ease: ease
       });
       
       reviewedCount++;
       remainingCards = Math.max(0, remainingCards - 1);
       
-      // Trigger mini deck animation for non-Again answers
       if (!isAgain && miniDeckRef) {
         miniDeckRef.triggerReceiveAnimation();
       }
-
-      // Load next card
-      const nextCard = await invoke<any>("get_next_card", { deckId });
-      currentCard = nextCard;
-      isFlipped = false;
-      cardAnimation = 'idle';
+      
+      await loadNextCard();
     } catch (err) {
       console.error("Error answering card:", err);
       error = String(err);
@@ -96,8 +111,28 @@
     }
   }
 
+  function handleKeydown(event: KeyboardEvent) {
+    if (isLoading) return;
+    
+    if (event.code === "Space" && !isFlipped && currentCard) {
+      event.preventDefault();
+      toggleFlip();
+      return;
+    }
+    
+    if (isFlipped && cardAnimation === 'idle') {
+      if (["1","2","3","4"].includes(event.key)) {
+        event.preventDefault();
+        answerCard(parseInt(event.key));
+      }
+    }
+    
+    if (event.code === "Escape") {
+      onExit();
+    }
+  }
+
   function navigateToBrowser() {
-    // This will be handled by the parent component
     window.dispatchEvent(new CustomEvent('navigate-to-browser'));
   }
 
@@ -106,12 +141,11 @@
 
   // Get interval text for buttons
   function getIntervalText(ease: number): string {
-    if (!currentCard?.intervals) return '';
-    const intervals = currentCard.intervals;
-    if (ease === 1) return intervals.again || '1m';
-    if (ease === 2) return intervals.hard || '10m';
-    if (ease === 3) return intervals.good || '1d';
-    if (ease === 4) return intervals.easy || '4d';
+    if (!currentCard) return '';
+    if (ease === 1) return currentCard.again_interval || '';
+    if (ease === 2) return currentCard.hard_interval || '';
+    if (ease === 3) return currentCard.good_interval || '';
+    if (ease === 4) return currentCard.easy_interval || '';
     return '';
   }
 </script>
@@ -195,7 +229,7 @@
           <p style="font-family: var(--sans); color: var(--text-secondary); margin-bottom: 24px;">{error}</p>
           <button
             onclick={onExit}
-            class="neu-raised cursor-pointer"
+            class="neu-raised neu-btn cursor-pointer"
             style="
               background: var(--accent);
               color: white;
@@ -225,7 +259,7 @@
           </p>
           <button
             onclick={onExit}
-            class="neu-raised cursor-pointer"
+            class="neu-raised neu-btn cursor-pointer"
             style="
               background: var(--accent);
               color: white;
@@ -354,7 +388,7 @@
           >
             <button
               onclick={() => answerCard(1)}
-              class="flex-1 neu-raised cursor-pointer"
+              class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
                 box-shadow: var(--neu-up);
@@ -376,7 +410,7 @@
 
             <button
               onclick={() => answerCard(2)}
-              class="flex-1 neu-raised cursor-pointer"
+              class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
                 box-shadow: var(--neu-up);
@@ -398,7 +432,7 @@
 
             <button
               onclick={() => answerCard(3)}
-              class="flex-1 neu-raised cursor-pointer"
+              class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
                 box-shadow: var(--neu-up);
@@ -420,7 +454,7 @@
 
             <button
               onclick={() => answerCard(4)}
-              class="flex-1 neu-raised cursor-pointer"
+              class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
                 box-shadow: var(--neu-up);
@@ -473,11 +507,11 @@
 
   .card-face {
     backface-visibility: hidden;
-    position: absolute;
-    inset: 0;
   }
 
   .card-back-face {
+    position: absolute;
+    inset: 0;
     transform: rotateY(180deg);
   }
 

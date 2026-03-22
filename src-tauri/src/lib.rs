@@ -1401,11 +1401,14 @@ fn search_cards(
     
     for cid in card_ids.iter().take(limit) {
         let sql = "
-            SELECT 
+            SELECT
                 c.id as card_id,
                 c.nid as note_id,
                 d.name as deck_name,
-                SUBSTR(n.flds, 1, INSTR(n.flds, CHAR(0)) - 1) as front_preview,
+                CASE WHEN INSTR(n.flds, CHAR(0)) > 0
+                     THEN SUBSTR(n.flds, 1, INSTR(n.flds, CHAR(0)) - 1)
+                     ELSE n.flds
+                END as front_preview,
                 c.due,
                 c.ivl,
                 c.factor,

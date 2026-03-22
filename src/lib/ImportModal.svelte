@@ -214,7 +214,7 @@
   {#if currentStep === "format"}
     <div class="format-grid">
       <button
-        class="format-card neu-raised"
+        class="format-card neu-raised neu-btn"
         onclick={() => selectFormat("apkg")}
       >
         <div class="format-header">
@@ -227,7 +227,7 @@
       </button>
 
       <button
-        class="format-card neu-raised"
+        class="format-card neu-raised neu-btn"
         onclick={() => selectFormat("colpkg")}
       >
         <div class="format-header">
@@ -240,7 +240,7 @@
       </button>
 
       <button
-        class="format-card neu-raised"
+        class="format-card neu-raised neu-btn"
         onclick={() => selectFormat("text")}
       >
         <div class="format-info">

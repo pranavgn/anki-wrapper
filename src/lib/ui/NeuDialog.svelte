@@ -60,7 +60,7 @@
           </h2>
           <button
             on:click={onClose}
-            class="neu-subtle flex items-center justify-center w-8 h-8 rounded-lg"
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg"
             style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
             aria-label="Close dialog"
           >

@@ -317,7 +317,7 @@
   <div class="space-y-3">
     <button
       onclick={handleStudy}
-      class="w-full neu-raised cursor-pointer"
+      class="w-full neu-raised neu-btn cursor-pointer"
       style="
         background: linear-gradient(135deg, var(--accent), var(--accent) 80%, transparent);
         box-shadow: var(--neu-up);
@@ -333,7 +333,7 @@
 
     <button
       onclick={handleBrowse}
-      class="w-full neu-subtle flex items-center justify-center gap-2 cursor-pointer"
+      class="w-full neu-subtle neu-btn flex items-center justify-center gap-2 cursor-pointer"
       style="
         background: var(--bg-card);
         box-shadow: var(--neu-subtle);
@@ -352,7 +352,7 @@
 
     <button
       onclick={handleStats}
-      class="w-full neu-subtle flex items-center justify-center gap-2 cursor-pointer"
+      class="w-full neu-subtle neu-btn flex items-center justify-center gap-2 cursor-pointer"
       style="
         background: var(--bg-card);
         box-shadow: var(--neu-subtle);

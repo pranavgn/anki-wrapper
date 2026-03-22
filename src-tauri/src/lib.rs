@@ -1780,7 +1780,7 @@ fn answer_card(card_id: i64, ease: i32, state: State<AppState>) -> Result<Answer
         answered_at: now,
         milliseconds_taken: 0,
         custom_data: Default::default(),
-        from_queue: false,
+        from_queue: true,
     };
     
     // Use the collection's answer_card method

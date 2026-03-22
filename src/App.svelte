@@ -212,10 +212,10 @@
     console.log("State after startReview: currentPage=", currentPage, ", currentDeckId=", currentDeckId);
   }
 
-  function openDeckOverview(deck: any) {
-    activeDeck = deck;
-    currentDeckId = deck.id;
-    currentDeckName = deck.name;
+  function openDeckOverview(deckId: number, deckName: string) {
+    activeDeck = { id: deckId, name: deckName };
+    currentDeckId = deckId;
+    currentDeckName = deckName;
     navigate('deckOverview');
   }
 

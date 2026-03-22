@@ -1,21 +1,25 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { fly, fade } from "svelte/transition";
   import { addToast } from "./toast";
-  import { prefs } from "./prefs.svelte.ts";
+  import { prefs } from "./prefs.svelte";
+  import NeuDialog from "./ui/NeuDialog.svelte";
+  import NeuToggle from "./ui/NeuToggle.svelte";
 
   interface Props {
+    isOpen: boolean;
     onClose: () => void;
   }
 
-  let { onClose }: Props = $props();
+  let { isOpen, onClose }: Props = $props();
 
   let isLoading = $state(false);
   let appVersion = $state("1.0.0");
 
   // Load app version on mount
   $effect(() => {
-    loadVersion();
+    if (isOpen) {
+      loadVersion();
+    }
   });
 
   async function loadVersion() {
@@ -41,15 +45,18 @@
     }
   }
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
-
   function handleThemeChange(newTheme: 'light' | 'dark' | 'system') {
     prefs.theme = newTheme;
     prefs.applyTheme();
+  }
+
+  // Auto-save on toggle change
+  async function handleToggleChange() {
+    try {
+      await prefs.save();
+    } catch (e) {
+      console.error("Failed to auto-save preferences:", e);
+    }
   }
 
   // Backup state
@@ -79,7 +86,7 @@
   async function loadBackups() {
     isLoadingBackups = true;
     try {
-      backups = await invoke<Array<{name: string; path: string; created: string; sizeBytes: number}>>("list_backups");
+      backups = await invoke<Array<{name: string; path: string; created: string; size_bytes: number}>>("list_backups");
     } catch (e) {
       addToast(`Failed to load backups: ${e}`, "error");
     } finally {
@@ -137,362 +144,588 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div 
-  class="fixed inset-0 bg-black/15 z-50 flex justify-end"
-  onclick={handleBackdropClick}
-  transition:fade={{ duration: 150 }}
->
-  <div 
-    class="w-[480px] bg-white dark:bg-[#292524] h-full border-l border-border flex flex-col"
-    transition:fly={{ x: 480, duration: 240 }}
-  >
-    <!-- Header -->
-    <div class="px-6 py-4 border-b border-border flex items-center justify-between">
-      <div>
-        <h2 class="text-lg font-semibold text-text-primary">Settings</h2>
-      </div>
-      <button
-        onclick={onClose}
-        class="p-2 hover:bg-bg-subtle rounded-lg transition-colors"
-      >
-        <svg class="h-5 w-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto px-6 py-4">
-      <!-- Appearance Section -->
-      <details class="group mb-6" open>
-        <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-          <span>Appearance</span>
-          <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
-        <div class="space-y-4 pt-2">
-          <!-- Theme -->
-          <div>
-            <label class="block text-sm text-text-secondary mb-2">Theme</label>
-            <div class="flex gap-2">
-              <button
-                onclick={() => handleThemeChange('light')}
-                class="flex-1 px-4 py-2 rounded-lg border transition-colors {prefs.theme === 'light' ? 'border-accent bg-accent-soft text-text-primary' : 'border-border hover:bg-bg-subtle text-text-secondary'}"
-              >
-                <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-                <span class="text-xs">Light</span>
-              </button>
-              <button
-                onclick={() => handleThemeChange('dark')}
-                class="flex-1 px-4 py-2 rounded-lg border transition-colors {prefs.theme === 'dark' ? 'border-accent bg-accent-soft text-text-primary' : 'border-border hover:bg-bg-subtle text-text-secondary'}"
-              >
-                <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-                <span class="text-xs">Dark</span>
-              </button>
-              <button
-                onclick={() => handleThemeChange('system')}
-                class="flex-1 px-4 py-2 rounded-lg border transition-colors {prefs.theme === 'system' ? 'border-accent bg-accent-soft text-text-primary' : 'border-border hover:bg-bg-subtle text-text-secondary'}"
-              >
-                <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span class="text-xs">System</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Font Size -->
-          <div>
-            <label class="block text-sm text-text-secondary mb-1">Font Size: {prefs.font_size}px</label>
-            <input
-              type="range"
-              bind:value={prefs.font_size}
-              min="12"
-              max="20"
-              step="2"
-              class="w-full"
-              onchange={() => prefs.applyFontSize()}
-            />
-            <div class="flex justify-between text-xs text-text-secondary mt-1">
-              <span>12px</span>
-              <span>20px</span>
-            </div>
-          </div>
-
-          <!-- Animations -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Animations</label>
-            <button
-              onclick={() => prefs.animations_enabled = !prefs.animations_enabled}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.animations_enabled ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.animations_enabled ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-
-          <!-- Reduce Motion -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Reduce Motion</label>
-            <button
-              onclick={() => prefs.reduce_motion = !prefs.reduce_motion}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.reduce_motion ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.reduce_motion ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-        </div>
-      </details>
-
-      <!-- Study Section -->
-      <details class="group mb-6">
-        <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-          <span>Study</span>
-          <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
-        <div class="space-y-4 pt-2">
-          <!-- Daily Cutoff Hour -->
-          <div>
-            <label class="block text-sm text-text-secondary mb-1">Daily Cutoff Hour</label>
-            <select
-              bind:value={prefs.daily_cutoff_hour}
-              class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-            >
-              {#each Array(24) as _, i}
-                <option value={i}>{i}:00</option>
-              {/each}
-            </select>
-            <p class="text-xs text-text-secondary mt-1">Hour when "today's" reviews reset</p>
-          </div>
-
-          <!-- Show Remaining Count -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Show Remaining Count</label>
-            <button
-              onclick={() => prefs.show_remaining_count = !prefs.show_remaining_count}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.show_remaining_count ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.show_remaining_count ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-
-          <!-- Show Elapsed Time -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Show Elapsed Time</label>
-            <button
-              onclick={() => prefs.show_elapsed_time = !prefs.show_elapsed_time}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.show_elapsed_time ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.show_elapsed_time ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-
-          <!-- Autoplay Audio -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Autoplay Audio</label>
-            <button
-              onclick={() => prefs.autoplay_audio = !prefs.autoplay_audio}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.autoplay_audio ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.autoplay_audio ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-        </div>
-      </details>
-
-      <!-- Review Section -->
-      <details class="group mb-6">
-        <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-          <span>Review</span>
-          <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
-        <div class="space-y-4 pt-2">
-          <!-- Show Intervals on Buttons -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Show Intervals on Buttons</label>
-            <button
-              onclick={() => prefs.show_intervals_on_buttons = !prefs.show_intervals_on_buttons}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.show_intervals_on_buttons ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.show_intervals_on_buttons ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-
-          <!-- Confirm Delete -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Confirm Before Delete</label>
-            <button
-              onclick={() => prefs.confirm_delete = !prefs.confirm_delete}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.confirm_delete ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.confirm_delete ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-        </div>
-      </details>
-
-      <!-- Data Section -->
-      <details class="group mb-6" open={isLoadingBackups}>
-        <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-          <span>Data</span>
-          <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
-        <div class="space-y-4 pt-2">
-          <!-- Auto Backup -->
-          <div class="flex items-center justify-between">
-            <label class="text-sm text-text-secondary">Auto Backup</label>
-            <button
-              onclick={() => prefs.auto_backup = !prefs.auto_backup}
-              class="relative w-11 h-6 rounded-full transition-colors {prefs.auto_backup ? 'bg-accent' : 'bg-bg-subtle'}"
-            >
-              <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {prefs.auto_backup ? 'translate-x-5' : ''}"></span>
-            </button>
-          </div>
-
-          <!-- Backup Count -->
-          <div>
-            <label class="block text-sm text-text-secondary mb-1">Backup Count: {prefs.backup_count}</label>
-            <input
-              type="range"
-              bind:value={prefs.backup_count}
-              min="1"
-              max="20"
-              step="1"
-              class="w-full"
-              disabled={!prefs.auto_backup}
-            />
-            <div class="flex justify-between text-xs text-text-secondary mt-1">
-              <span>1</span>
-              <span>20</span>
-            </div>
-          </div>
-
-          <!-- Manual Backup Button -->
+<NeuDialog {isOpen} {onClose} title="Settings" size="md">
+  <div class="settings-content">
+    <!-- Appearance Section -->
+    <div class="settings-section">
+      <h3 class="section-header">Appearance</h3>
+      
+      <!-- Theme -->
+      <div class="setting-row">
+        <span class="setting-label">Theme</span>
+        <div class="theme-buttons">
           <button
-            onclick={handleCreateBackup}
-            class="w-full px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors"
+            onclick={() => handleThemeChange('light')}
+            class="theme-btn neu-subtle {prefs.theme === 'light' ? 'active' : ''}"
+            title="Light"
           >
-            Create Backup Now
+            <svg class="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
           </button>
-
-          <!-- Backup List -->
-          <div>
-            <button
-              onclick={loadBackups}
-              class="text-sm text-accent hover:underline mb-2"
-            >
-              {isLoadingBackups ? 'Loading...' : 'Show Backups'}
-            </button>
-            {#if backups.length > 0}
-              <div class="space-y-2 max-h-48 overflow-y-auto">
-                {#each backups as backup}
-                  <div class="flex items-center justify-between p-2 bg-bg-subtle rounded-lg text-sm">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-text-primary truncate">{backup.name.replace('.anki2', '')}</p>
-                      <p class="text-xs text-text-secondary">{backup.created} • {formatBytes(backup.size_bytes)}</p>
-                    </div>
-                    <div class="flex gap-1 ml-2">
-                      <button
-                        onclick={() => confirmRestore(backup.name)}
-                        class="px-2 py-1 text-xs text-accent hover:bg-accent/10 rounded"
-                      >
-                        Restore
-                      </button>
-                      <button
-                        onclick={() => handleDeleteBackup(backup.name)}
-                        class="px-2 py-1 text-xs text-danger hover:bg-danger/10 rounded"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {:else if !isLoadingBackups}
-              <p class="text-sm text-text-secondary">No backups found</p>
-            {/if}
-          </div>
-        </div>
-      </details>
-
-      <!-- Restore Confirmation Modal -->
-      {#if showRestoreConfirm}
-        <div 
-          class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-          onclick={() => showRestoreConfirm = false}
-          transition:fade={{ duration: 150 }}
-        >
-          <div 
-            class="bg-bg-card border border-border rounded-2xl p-6 max-w-sm mx-4 shadow-xl"
-            onclick={(e) => e.stopPropagation()}
+          <button
+            onclick={() => handleThemeChange('dark')}
+            class="theme-btn neu-subtle {prefs.theme === 'dark' ? 'active' : ''}"
+            title="Dark"
           >
-            <h3 class="text-lg font-semibold text-text-primary mb-2">Restore Backup?</h3>
-            <p class="text-sm text-text-secondary mb-4">
-              This will replace your current collection with the backup. This action cannot be undone.
-            </p>
-            <div class="flex gap-3">
-              <button
-                onclick={() => showRestoreConfirm = false}
-                class="flex-1 px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-bg-subtle"
-              >
-                Cancel
-              </button>
-              <button
-                onclick={handleRestore}
-                class="flex-1 px-4 py-2 bg-danger text-white rounded-lg hover:bg-danger/90"
-              >
-                Restore
-              </button>
-            </div>
-          </div>
+            <svg class="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          </button>
+          <button
+            onclick={() => handleThemeChange('system')}
+            class="theme-btn neu-subtle {prefs.theme === 'system' ? 'active' : ''}"
+            title="System"
+          >
+            <svg class="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </button>
         </div>
-      {/if}
+      </div>
 
-      <!-- About Section -->
-      <details class="group mb-6">
-        <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-          <span>About</span>
-          <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
-        <div class="space-y-4 pt-2">
-          <div class="text-sm text-text-secondary">
-            <p><strong>Anki Wrapper</strong></p>
-            <p>Version: {appVersion}</p>
-            <p class="mt-2">A custom desktop UI for Anki</p>
+      <!-- Font Size -->
+      <div class="setting-row">
+        <span class="setting-label">Font Size: {prefs.font_size}px</span>
+        <div class="slider-container">
+          <input
+            type="range"
+            bind:value={prefs.font_size}
+            min="12"
+            max="20"
+            step="2"
+            class="range-slider"
+            onchange={() => prefs.applyFontSize()}
+          />
+          <div class="slider-labels">
+            <span>12px</span>
+            <span>20px</span>
           </div>
         </div>
-      </details>
+      </div>
+
+      <!-- Animations -->
+      <div class="setting-row">
+        <span class="setting-label">Animations</span>
+        <NeuToggle
+          bind:checked={prefs.animations_enabled}
+          onchange={handleToggleChange}
+        />
+      </div>
+
+      <!-- Reduce Motion -->
+      <div class="setting-row">
+        <span class="setting-label">Reduce Motion</span>
+        <NeuToggle
+          bind:checked={prefs.reduce_motion}
+          onchange={handleToggleChange}
+        />
+      </div>
     </div>
 
-    <!-- Footer -->
-    <div class="sticky bottom-0 px-6 py-4 bg-white dark:bg-[#292524] border-t border-border flex gap-3">
+    <!-- Study Section -->
+    <div class="settings-section">
+      <h3 class="section-header">Study</h3>
+      
+      <!-- Show Remaining Count -->
+      <div class="setting-row">
+        <span class="setting-label">Show Remaining Count</span>
+        <NeuToggle
+          bind:checked={prefs.show_remaining_count}
+          onchange={handleToggleChange}
+        />
+      </div>
+
+      <!-- Show Elapsed Time -->
+      <div class="setting-row">
+        <span class="setting-label">Show Elapsed Time</span>
+        <NeuToggle
+          bind:checked={prefs.show_elapsed_time}
+          onchange={handleToggleChange}
+        />
+      </div>
+
+      <!-- Show Intervals on Buttons -->
+      <div class="setting-row">
+        <span class="setting-label">Show Intervals on Buttons</span>
+        <NeuToggle
+          bind:checked={prefs.show_intervals_on_buttons}
+          onchange={handleToggleChange}
+        />
+      </div>
+
+      <!-- Autoplay Audio -->
+      <div class="setting-row">
+        <span class="setting-label">Autoplay Audio</span>
+        <NeuToggle
+          bind:checked={prefs.autoplay_audio}
+          onchange={handleToggleChange}
+        />
+      </div>
+    </div>
+
+    <!-- Backup Section -->
+    <div class="settings-section">
+      <h3 class="section-header">Backup</h3>
+      
+      <!-- Auto Backup -->
+      <div class="setting-row">
+        <span class="setting-label">Auto Backup</span>
+        <NeuToggle
+          bind:checked={prefs.auto_backup}
+          onchange={handleToggleChange}
+        />
+      </div>
+
+      <!-- Backups to Keep -->
+      <div class="setting-row">
+        <span class="setting-label">Backups to Keep</span>
+        <span class="setting-value">{prefs.backup_count}</span>
+      </div>
+
+      <!-- Manual Backup Button -->
       <button
-        onclick={onClose}
-        class="flex-1 px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-bg-subtle transition-colors"
+        onclick={handleCreateBackup}
+        class="backup-btn neu-subtle"
+      >
+        Create Backup Now
+      </button>
+
+      <!-- Backup List -->
+      <div class="backup-list">
+        <button
+          onclick={loadBackups}
+          class="show-backups-btn"
+        >
+          {isLoadingBackups ? 'Loading...' : 'Show Backups'}
+        </button>
+        {#if backups.length > 0}
+          <div class="backups-container">
+            {#each backups as backup}
+              <div class="backup-item">
+                <div class="backup-info">
+                  <p class="backup-name">{backup.name.replace('.anki2', '')}</p>
+                  <p class="backup-meta">{backup.created} • {formatBytes(backup.size_bytes)}</p>
+                </div>
+                <div class="backup-actions">
+                  <button
+                    onclick={() => confirmRestore(backup.name)}
+                    class="backup-action-btn restore-btn"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    onclick={() => handleDeleteBackup(backup.name)}
+                    class="backup-action-btn delete-btn"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else if !isLoadingBackups}
+          <p class="no-backups">No backups found</p>
+        {/if}
+      </div>
+    </div>
+
+    <!-- About Section -->
+    <div class="settings-section">
+      <h3 class="section-header">About</h3>
+      <div class="about-content">
+        <p class="about-title">Anki Wrapper</p>
+        <p class="about-version">Version: {appVersion}</p>
+        <p class="about-description">A custom desktop UI for Anki</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="settings-footer">
+    <button
+      onclick={onClose}
+      class="cancel-btn neu-subtle"
+    >
+      Cancel
+    </button>
+    <button
+      onclick={handleSave}
+      disabled={isLoading}
+      class="save-btn"
+    >
+      {isLoading ? 'Saving...' : 'Save Settings'}
+    </button>
+  </div>
+</NeuDialog>
+
+<!-- Restore Confirmation Modal -->
+<NeuDialog
+  isOpen={showRestoreConfirm}
+  onClose={() => showRestoreConfirm = false}
+  title="Restore Backup?"
+  size="sm"
+>
+  <div class="restore-dialog-content">
+    <p class="restore-message">
+      This will replace your current collection with the backup. This action cannot be undone.
+    </p>
+    <div class="restore-actions">
+      <button
+        onclick={() => showRestoreConfirm = false}
+        class="cancel-btn neu-subtle"
       >
         Cancel
       </button>
       <button
-        onclick={handleSave}
-        disabled={isLoading}
-        class="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50"
+        onclick={handleRestore}
+        class="restore-confirm-btn"
       >
-        {isLoading ? 'Saving...' : 'Save Settings'}
+        Restore
       </button>
     </div>
   </div>
-</div>
+</NeuDialog>
+
+<style>
+  .settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .section-header {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin: 0 0 8px 0;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+
+  .setting-row:last-child {
+    border-bottom: none;
+  }
+
+  .setting-label {
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .setting-value {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .theme-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .theme-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 36px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .theme-btn.active {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .theme-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--text-secondary);
+  }
+
+  .theme-btn.active .theme-icon {
+    color: var(--accent);
+  }
+
+  .slider-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 140px;
+  }
+
+  .range-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-deep);
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .range-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .backup-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    border: none;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  .backup-list {
+    margin-top: 12px;
+  }
+
+  .show-backups-btn {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+  }
+
+  .show-backups-btn:hover {
+    opacity: 0.8;
+  }
+
+  .backups-container {
+    margin-top: 12px;
+    max-height: 192px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .backup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+  }
+
+  .backup-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .backup-name {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-primary);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .backup-meta {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 2px 0 0 0;
+  }
+
+  .backup-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+  }
+
+  .backup-action-btn {
+    padding: 4px 8px;
+    font-family: var(--sans);
+    font-size: 11px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .restore-btn {
+    color: var(--accent);
+    background: transparent;
+  }
+
+  .restore-btn:hover {
+    background: var(--accent-soft);
+  }
+
+  .delete-btn {
+    color: var(--danger);
+    background: transparent;
+  }
+
+  .delete-btn:hover {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+  }
+
+  .no-backups {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 8px 0 0 0;
+  }
+
+  .about-content {
+    padding: 8px 0;
+  }
+
+  .about-title {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+  }
+
+  .about-version {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+  }
+
+  .about-description {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .settings-footer {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+
+  .cancel-btn {
+    flex: 1;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+  }
+
+  .save-btn {
+    flex: 1;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .save-btn:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  .save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .restore-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .restore-message {
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .restore-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .restore-confirm-btn {
+    flex: 1;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: var(--danger);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .restore-confirm-btn:hover {
+    opacity: 0.9;
+  }
+</style>

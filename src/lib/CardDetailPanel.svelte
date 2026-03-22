@@ -4,16 +4,18 @@
   import { addToast } from "./toast";
 
   // Props
-  let { 
+  let {
     cardId = null,
     noteId = null,
     onClose = () => {},
-    onFlagChange = (cardId: number, flag: number) => {}
-  }: { 
+    onFlagChange = (cardId: number, flag: number) => {},
+    onEdit = (card: any) => {}
+  }: {
     cardId: number | null;
     noteId?: number | null;
     onClose?: () => void;
     onFlagChange?: (cardId: number, flag: number) => void;
+    onEdit?: (card: any) => void;
   } = $props();
 
   // State
@@ -102,12 +104,12 @@
 </script>
 
 {#if cardId}
-  <div 
-    class="h-full flex flex-col bg-bg-card border-l border-border"
+  <div
+    class="h-full flex flex-col bg-bg-card"
     transition:fly={{ x: 20, duration: 240 }}
   >
     <!-- Header -->
-    <div class="flex items-center justify-between p-4 border-b border-border">
+    <div class="flex items-center justify-between p-4 border-b border-border/30">
       <h3 class="font-medium">Card Details</h3>
       <button 
         onclick={onClose} 
@@ -123,7 +125,7 @@
     {#if loading}
       <!-- Loading skeleton -->
       <div class="flex-1 p-4 space-y-4">
-        <div class="h-48 bg-bg-subtle rounded-3xl animate-pulse"></div>
+        <div class="h-48 bg-bg-subtle rounded-xl animate-pulse"></div>
         <div class="space-y-2">
           {#each Array(6) as _}
             <div class="h-4 bg-bg-subtle rounded animate-pulse"></div>
@@ -133,8 +135,8 @@
     {:else if detail}
       <div class="flex-1 overflow-y-auto p-4 space-y-4">
         <!-- Card Preview -->
-        <div class="bg-white rounded-3xl shadow-lg overflow-hidden">
-          <div class="p-4 border-b border-border/50">
+        <div class="neu-raised rounded-xl overflow-hidden">
+          <div class="p-4 border-b border-border/30">
             <div class="font-serif text-sm">{@html detail.front_html}</div>
           </div>
           <div class="p-4">
@@ -174,7 +176,7 @@
           </div>
           
           <!-- Tags -->
-          <div class="pt-2 border-t border-border/50">
+          <div class="pt-2 border-t border-border/30">
             <div class="text-xs text-text-secondary mb-2">Tags</div>
             <div class="flex flex-wrap gap-1">
               {#if detail.tags && detail.tags.length > 0}
@@ -235,8 +237,18 @@
         <!-- Action Buttons -->
         <div class="flex gap-2 pt-2">
           <button
+            onclick={() => onEdit(detail)}
+            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 neu-subtle rounded-xl text-sm hover:bg-bg-subtle transition-colors"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
+          </button>
+          
+          <button
             onclick={handleSuspend}
-            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-border rounded-xl text-sm bg-white hover:bg-bg-subtle transition-colors"
+            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 neu-subtle rounded-xl text-sm hover:bg-bg-subtle transition-colors"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -248,7 +260,7 @@
             <div class="flex-1 flex gap-1">
               <button
                 onclick={() => showDeleteConfirm = false}
-                class="flex-1 px-3 py-2 border border-border rounded-xl text-sm bg-white hover:bg-bg-subtle transition-colors"
+                class="flex-1 px-3 py-2 neu-subtle rounded-xl text-sm hover:bg-bg-subtle transition-colors"
               >
                 Cancel
               </button>
@@ -262,7 +274,7 @@
           {:else}
             <button
               onclick={() => showDeleteConfirm = true}
-              class="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-border rounded-xl text-sm text-danger bg-white hover:bg-red-50 transition-colors"
+              class="flex-1 flex items-center justify-center gap-2 px-3 py-2 neu-subtle rounded-xl text-sm text-danger hover:bg-red-50 transition-colors"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

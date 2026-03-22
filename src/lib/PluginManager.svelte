@@ -1,24 +1,27 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { fly, fade } from "svelte/transition";
   import { addToast } from "./toast";
   import { pluginEngine } from "./pluginEngine";
   import { unloadPlugin, type PluginManifest } from "./pluginLoader";
+  import NeuDialog from "./ui/NeuDialog.svelte";
+  import NeuToggle from "./ui/NeuToggle.svelte";
 
   interface Props {
+    isOpen: boolean;
     onClose: () => void;
   }
 
-  let { onClose }: Props = $props();
+  let { isOpen, onClose }: Props = $props();
 
   let plugins = $state<PluginManifest[]>([]);
   let loading = $state(true);
-  let showHelp = $state(false);
   let expandedErrors = $state<Set<string>>(new Set());
 
   // Load plugins on mount
   $effect(() => {
-    loadPlugins();
+    if (isOpen) {
+      loadPlugins();
+    }
   });
 
   async function loadPlugins() {
@@ -58,6 +61,17 @@
     }
   }
 
+  async function uninstallPlugin(pluginId: string) {
+    if (!confirm(`Uninstall plugin "${pluginId}"?`)) return;
+    try {
+      await invoke("uninstall_plugin", { pluginId });
+      addToast(`${pluginId} uninstalled.`, "success");
+      await loadPlugins();
+    } catch (e) {
+      addToast(`Failed to uninstall plugin: ${e}`, "error");
+    }
+  }
+
   async function openPluginsFolder() {
     try {
       await invoke("open_plugins_folder");
@@ -76,241 +90,424 @@
     expandedErrors = newSet;
   }
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
-
   function getPluginStatus(plugin: PluginManifest): 'enabled' | 'disabled' | 'error' {
     if (plugin.load_error) return 'error';
     if (plugin.enabled) return 'enabled';
     return 'disabled';
   }
-
-  function getStatusDot(status: 'enabled' | 'disabled' | 'error'): string {
-    switch (status) {
-      case 'enabled': return 'bg-green-500';
-      case 'disabled': return 'bg-gray-400';
-      case 'error': return 'bg-red-500';
-    }
-  }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div 
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-  onclick={handleBackdropClick}
-  transition:fade={{ duration: 150 }}
->
-  <div 
-    class="bg-bg-card border border-border rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col"
-    transition:fly={{ y: 20, duration: 200 }}
-  >
-    <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-      <div class="flex items-center gap-3">
-        <h2 class="text-xl font-semibold text-text-primary">Plugins</h2>
-        <button
-          class="w-6 h-6 flex items-center justify-center rounded-full bg-bg-subtle text-text-secondary hover:text-text-primary hover:bg-border transition-colors"
-          onclick={() => showHelp = !showHelp}
-          title="Help"
-        >
-          ?
-        </button>
+<NeuDialog {isOpen} {onClose} title="Plugins" size="lg">
+  <div class="plugin-manager-content">
+    {#if loading}
+      <div class="loading-state">
+        <div class="spinner"></div>
       </div>
-      <button
-        class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-subtle text-text-secondary hover:text-text-primary transition-colors"
-        onclick={onClose}
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Help Section -->
-    {#if showHelp}
-      <div class="px-6 py-4 bg-bg-subtle border-b border-border">
-        <div class="space-y-3 text-sm text-text-secondary">
-          <p>
-            <strong class="text-text-primary">How to install plugins:</strong> Drop a plugin folder 
-            into the plugins directory and restart the app.
-          </p>
-          <p>
-            <strong class="text-text-primary">Plugin manifest (manifest.json):</strong>
-          </p>
-          <pre class="bg-bg-base p-3 rounded-lg overflow-x-auto text-xs font-mono">{`{
-  "id": "my-plugin",
-  "name": "My Plugin",
-  "version": "1.0.0",
-  "description": "What it does",
-  "entry_point": "index.js",
-  "hooks": ["card:render:front"]
-}`}</pre>
-          <p class="text-danger">
-            <strong>Security warning:</strong> Plugins have full access to your card data and the app. 
-            Only install plugins from sources you trust.
-          </p>
+    {:else if plugins.length === 0}
+      <!-- Empty State -->
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg class="empty-icon-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
         </div>
-      </div>
-    {/if}
-
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-6">
-      <!-- Plugin Directory Info -->
-      <div class="flex items-center justify-between mb-4 text-sm">
-        <span class="text-text-secondary">
-          Plugins are loaded from: 
-          <code class="bg-bg-subtle px-2 py-0.5 rounded text-xs">~/.local/share/anki-wrapper/plugins/</code>
-        </span>
+        <h3 class="empty-title">No plugins installed</h3>
+        <p class="empty-description">
+          Drop a plugin folder into the plugins directory to get started.
+        </p>
         <button
-          class="px-3 py-1.5 rounded-lg bg-accent text-white text-sm hover:bg-accent/90 transition-colors"
+          class="open-folder-btn"
           onclick={openPluginsFolder}
         >
-          Open Folder
+          Open Plugins Folder
         </button>
       </div>
-
-      {#if loading}
-        <div class="flex items-center justify-center py-12">
-          <div class="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full"></div>
-        </div>
-      {:else if plugins.length === 0}
-        <!-- Empty State -->
-        <div class="text-center py-12">
-          <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-bg-subtle flex items-center justify-center">
-            <svg class="w-8 h-8 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </div>
-          <h3 class="text-lg font-medium text-text-primary mb-2">No plugins installed</h3>
-          <p class="text-text-secondary text-sm mb-4">
-            Drop a plugin folder into the plugins directory to get started.
-          </p>
-          <button
-            class="px-4 py-2 rounded-lg bg-accent text-white text-sm hover:bg-accent/90 transition-colors"
-            onclick={openPluginsFolder}
-          >
-            Open Plugins Folder
-          </button>
-        </div>
-      {:else}
-        <!-- Plugin List -->
-        <div class="space-y-3">
-          {#each plugins as plugin (plugin.id)}
-            {@const status = getPluginStatus(plugin)}
-            {@const runtimeErrors = (plugin as any).runtimeErrors || []}
-            {@const hasErrors = !!plugin.load_error || runtimeErrors.length > 0}
-            
-            <div class="bg-bg-base border border-border rounded-xl p-4 hover:border-accent/50 transition-colors">
-              <div class="flex items-start justify-between gap-4">
-                <!-- Status indicator and info -->
-                <div class="flex items-start gap-3 flex-1 min-w-0">
-                  <!-- Status dot -->
-                  <div class="mt-1.5 w-2.5 h-2.5 rounded-full {getStatusDot(status)} flex-shrink-0"></div>
-                  
-                  <div class="flex-1 min-w-0">
-                    <!-- Name and version -->
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <span class="font-medium text-text-primary">{plugin.name}</span>
-                      <span class="text-xs text-text-secondary">v{plugin.version}</span>
-                      {#if status === 'error'}
-                        <span class="text-xs text-danger font-medium">ERROR</span>
-                      {/if}
-                    </div>
+    {:else}
+      <!-- Plugin List -->
+      <div class="plugin-list">
+        {#each plugins as plugin (plugin.id)}
+          {@const status = getPluginStatus(plugin)}
+          {@const runtimeErrors = (plugin as any).runtimeErrors || []}
+          {@const hasErrors = !!plugin.load_error || runtimeErrors.length > 0}
+          
+          <div class="plugin-card neu-raised">
+            <div class="plugin-header">
+              <div class="plugin-info">
+                <div class="plugin-name-row">
+                  <span class="plugin-name">{plugin.name}</span>
+                  <span class="plugin-version">v{plugin.version}</span>
+                  {#if status === 'error'}
+                    <span class="plugin-error-badge">ERROR</span>
+                  {/if}
+                </div>
+                
+                <p class="plugin-description">
+                  {#if plugin.load_error}
+                    <span class="error-text">{plugin.load_error}</span>
+                  {:else}
+                    {plugin.description}
+                  {/if}
+                </p>
+                
+                {#if plugin.author}
+                  <p class="plugin-author">Author: {plugin.author}</p>
+                {/if}
+                
+                <!-- Runtime Errors -->
+                {#if runtimeErrors.length > 0}
+                  <div class="runtime-errors">
+                    <button
+                      class="error-toggle-btn"
+                      onclick={() => toggleErrorExpand(plugin.id)}
+                    >
+                      <span>⚠ {runtimeErrors.length} runtime error(s)</span>
+                      <svg 
+                        class="error-toggle-icon" 
+                        class:expanded={expandedErrors.has(plugin.id)}
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                     
-                    <!-- Description -->
-                    <p class="text-sm text-text-secondary mt-0.5">
-                      {#if plugin.load_error}
-                        <span class="text-danger">{plugin.load_error}</span>
-                      {:else}
-                        {plugin.description}
-                      {/if}
-                    </p>
-                    
-                    <!-- Hooks (if no load error) -->
-                    {#if !plugin.load_error && plugin.hooks && plugin.hooks.length > 0}
-                      <p class="text-xs text-text-secondary mt-1">
-                        Hooks: {plugin.hooks.join(', ')}
-                      </p>
-                    {/if}
-                    
-                    <!-- Author -->
-                    {#if plugin.author}
-                      <p class="text-xs text-text-secondary mt-1">
-                        Author: {plugin.author}
-                      </p>
-                    {/if}
-                    
-                    <!-- Runtime Errors -->
-                    {#if runtimeErrors.length > 0}
-                      <div class="mt-2">
-                        <button
-                          class="text-xs text-danger hover:underline flex items-center gap-1"
-                          onclick={() => toggleErrorExpand(plugin.id)}
-                        >
-                          <span>⚠ {runtimeErrors.length} runtime error(s)</span>
-                          <svg 
-                            class="w-3 h-3 transition-transform" 
-                            class:rotate-180={expandedErrors.has(plugin.id)}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                          >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        
-                        {#if expandedErrors.has(plugin.id)}
-                          <div class="mt-2 p-2 bg-danger/10 rounded-lg border border-danger/20">
-                            {#each runtimeErrors as error}
-                              <p class="text-xs font-mono text-danger break-all">{error}</p>
-                            {/each}
-                          </div>
-                        {/if}
+                    {#if expandedErrors.has(plugin.id)}
+                      <div class="error-details">
+                        {#each runtimeErrors as error}
+                          <p class="error-message">{error}</p>
+                        {/each}
                       </div>
                     {/if}
                   </div>
-                </div>
+                {/if}
+              </div>
+              
+              <div class="plugin-actions">
+                {#if status === 'error'}
+                  <span class="cannot-enable">Cannot enable</span>
+                {:else}
+                  <NeuToggle
+                    checked={plugin.enabled}
+                    onchange={() => togglePlugin(plugin.id, plugin.enabled)}
+                  />
+                {/if}
                 
-                <!-- Toggle switch -->
-                <div class="flex-shrink-0">
-                  {#if status === 'error'}
-                    <span class="text-xs text-text-secondary px-2 py-1 bg-bg-subtle rounded">
-                      Cannot enable
-                    </span>
-                  {:else}
-                    <button
-                      class="relative w-12 h-6 rounded-full transition-colors {plugin.enabled ? 'bg-green-500' : 'bg-gray-400'}"
-                      onclick={() => togglePlugin(plugin.id, plugin.enabled)}
-                      disabled={status === 'error'}
-                    >
-                      <span 
-                        class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform {plugin.enabled ? 'left-7' : 'left-1'}"
-                      ></span>
-                    </button>
-                  {/if}
-                </div>
+                <button
+                  class="uninstall-btn neu-subtle"
+                  onclick={() => uninstallPlugin(plugin.id)}
+                  title="Uninstall plugin"
+                >
+                  <svg class="uninstall-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
 
-    <!-- Footer -->
-    <div class="px-6 py-4 border-t border-border flex items-center justify-between">
-      <span class="text-sm text-text-secondary">
-        Plugin API version: 1.0.0
-      </span>
+    <!-- Install Plugin Section -->
+    <div class="install-section neu-pressed">
+      <div class="install-content">
+        <span class="install-label">Install Plugin</span>
+        <p class="install-description">
+          Drop a plugin folder into the plugins directory or use the button below.
+        </p>
+      </div>
       <button
-        class="px-4 py-2 rounded-lg bg-bg-subtle text-text-primary hover:bg-border transition-colors"
-        onclick={onClose}
+        class="install-btn neu-subtle"
+        onclick={openPluginsFolder}
       >
-        Close
+        Open Plugins Folder
       </button>
     </div>
   </div>
-</div>
+</NeuDialog>
+
+<style>
+  .plugin-manager-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 0;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--accent);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 0;
+    text-align: center;
+  }
+
+  .empty-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    border-radius: 50%;
+    background: var(--bg-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .empty-icon-svg {
+    width: 32px;
+    height: 32px;
+    color: var(--text-secondary);
+  }
+
+  .empty-title {
+    font-family: var(--sans);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .empty-description {
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 16px 0;
+  }
+
+  .open-folder-btn {
+    padding: 10px 20px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .open-folder-btn:hover {
+    opacity: 0.9;
+  }
+
+  .plugin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .plugin-card {
+    padding: 20px 24px;
+  }
+
+  .plugin-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .plugin-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .plugin-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+
+  .plugin-name {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .plugin-version {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .plugin-error-badge {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--danger);
+  }
+
+  .plugin-description {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 4px 0 0 0;
+    line-height: 1.5;
+  }
+
+  .error-text {
+    color: var(--danger);
+  }
+
+  .plugin-author {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 4px 0 0 0;
+  }
+
+  .runtime-errors {
+    margin-top: 8px;
+  }
+
+  .error-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--danger);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .error-toggle-btn:hover {
+    text-decoration: underline;
+  }
+
+  .error-toggle-icon {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s ease;
+  }
+
+  .error-toggle-icon.expanded {
+    transform: rotate(180deg);
+  }
+
+  .error-details {
+    margin-top: 8px;
+    padding: 8px;
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+  }
+
+  .error-message {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--danger);
+    margin: 0;
+    word-break: break-all;
+  }
+
+  .plugin-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .cannot-enable {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+  }
+
+  .uninstall-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    color: var(--danger);
+  }
+
+  .uninstall-btn:hover {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+  }
+
+  .uninstall-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .install-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    gap: 16px;
+  }
+
+  .install-content {
+    flex: 1;
+  }
+
+  .install-label {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .install-description {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .install-btn {
+    padding: 10px 16px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .install-btn:hover {
+    background: var(--accent-soft);
+  }
+</style>

@@ -126,7 +126,7 @@
 
   <!-- Suggestions Dropdown -->
   {#if showSuggestions && filteredSuggestions.length > 0}
-    <div class="absolute z-50 w-full bg-white rounded-xl shadow-lg border border-border max-h-[200px] overflow-y-auto mt-1">
+    <div class="absolute z-50 w-full bg-bg-card rounded-xl shadow-lg border border-border max-h-[200px] overflow-y-auto mt-1">
       {#each filteredSuggestions as suggestion, index}
         <button
           type="button"

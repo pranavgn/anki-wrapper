@@ -451,18 +451,18 @@
   tabindex="-1"
 >
   <!-- Header -->
-  <div class="flex items-center gap-4 p-4 border-b border-border">
+  <div class="flex items-center gap-4 p-4 border-b border-border/30">
     <!-- Mode Toggle -->
     <div class="flex bg-bg-subtle rounded-xl p-1">
       <button
         onclick={() => switchMode('cards')}
-        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'cards' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'cards' ? 'neu-raised text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
       >
         Cards
       </button>
       <button
         onclick={() => switchMode('notes')}
-        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'notes' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'notes' ? 'neu-raised text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
       >
         Notes
       </button>
@@ -480,7 +480,7 @@
         type="text"
         bind:value={query}
         placeholder="Search cards...  Try: deck:French  tag:vocab  is:due"
-        class="w-full h-12 pl-12 pr-10 bg-bg-card border border-border rounded-2xl text-sm font-mono focus:outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
+        class="w-full h-12 pl-12 pr-10 bg-bg-card rounded-2xl text-sm font-mono focus:outline-none focus:ring-3 focus:ring-accent-soft"
       />
       {#if query}
         <button
@@ -507,7 +507,7 @@
 
   <!-- Active Filters Bar -->
   {#if filters.length > 0}
-    <div class="flex items-center gap-2 px-4 py-2 border-b border-border bg-bg-subtle">
+    <div class="flex items-center gap-2 px-4 py-2 border-b border-border/30 bg-bg-subtle">
       {#each filters as filter}
         <button
           onclick={() => removeFilter(filter)}
@@ -577,7 +577,7 @@
           </div>
         {:else}
           <!-- Results count -->
-          <div class="px-4 py-2 text-xs text-text-secondary text-right border-b border-border">
+          <div class="px-4 py-2 text-xs text-text-secondary text-right border-b border-border/30">
             Showing {rows.length} cards
           </div>
           
@@ -587,7 +587,7 @@
             <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-2">
               <input 
                 type="checkbox" 
-                class="w-4 h-4 rounded border-border cursor-pointer accent-accent"
+                class="w-4 h-4 rounded cursor-pointer accent-accent"
                 checked={allSelected}
                 bind:this={headerCheckbox}
                 onclick={toggleSelectAll}
@@ -652,21 +652,21 @@
                 class="group cursor-pointer"
                 style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
               >
-                <div class="h-11 flex items-center justify-center border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}" onclick={(e) => e.stopPropagation()}>
+                <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}" onclick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
-                    class="w-4 h-4 rounded border-border cursor-pointer accent-accent"
+                    class="w-4 h-4 rounded cursor-pointer accent-accent"
                     checked={selectedIds.has(row.card_id)}
                     onclick={(e) => handleRowSelect(row.card_id, i, e)}
                   />
                 </div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''} {row.queue === -1 ? 'italic text-text-secondary' : ''} {row.queue < -1 ? 'line-through' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.due_days < 0 ? 'text-danger font-medium' : row.due_days === 0 ? 'text-accent font-medium' : 'text-text-secondary'}">{row.due_str}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.interval > 0 ? row.interval + 'd' : '—'}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.ease < 200 ? 'text-danger' : row.ease > 250 ? 'text-success' : 'text-text-secondary'}">{(row.ease / 10).toFixed(0)}%</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.lapses > 7 ? 'text-danger font-medium' : 'text-text-secondary'}">{row.lapses}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''} {row.queue === -1 ? 'italic text-text-secondary' : ''} {row.queue < -1 ? 'line-through' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.due_days < 0 ? 'text-danger font-medium' : row.due_days === 0 ? 'text-accent font-medium' : 'text-text-secondary'}">{row.due_str}</span></div>
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.interval > 0 ? row.interval + 'd' : '—'}</span></div>
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.ease < 200 ? 'text-danger' : row.ease > 250 ? 'text-success' : 'text-text-secondary'}">{(row.ease / 10).toFixed(0)}%</span></div>
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.lapses > 7 ? 'text-danger font-medium' : 'text-text-secondary'}">{row.lapses}</span></div>
+                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
                   {#if row.tags && row.tags.length > 0}
                     <div class="flex gap-1">
                       {#each row.tags.slice(0, 2) as tag}
@@ -678,7 +678,7 @@
                     </div>
                   {/if}
                 </div>
-                <div class="h-11 flex items-center justify-center border-b border-border transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
+                <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
                   {#if row.flag > 0}
                     <div class="w-3 h-3 rounded-full" style="background-color: {row.flag === 1 ? '#ef4444' : row.flag === 2 ? '#f97316' : row.flag === 3 ? '#eab308' : row.flag === 4 ? '#22c55e' : '#3b82f6'}"></div>
                   {/if}
@@ -698,7 +698,7 @@
         </div>
       {:else}
         <!-- Results count for notes -->
-        <div class="px-4 py-2 text-xs text-text-secondary text-right border-b border-border">
+        <div class="px-4 py-2 text-xs text-text-secondary text-right border-b border-border/30">
           Showing {noteRows.length} notes
         </div>
         
@@ -708,7 +708,7 @@
           <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-2">
             <input 
               type="checkbox" 
-              class="w-4 h-4 rounded border-border cursor-pointer accent-accent"
+              class="w-4 h-4 rounded cursor-pointer accent-accent"
               checked={allSelected}
               bind:this={headerCheckbox}
               onclick={toggleSelectAll}
@@ -732,20 +732,20 @@
               class="group cursor-pointer"
               style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
             >
-              <div class="h-11 flex items-center justify-center border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}" onclick={(e) => e.stopPropagation()}>
+              <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}" onclick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
-                  class="w-4 h-4 rounded border-border cursor-pointer accent-accent"
+                  class="w-4 h-4 rounded cursor-pointer accent-accent"
                   checked={selectedNoteIds.has(row.note_id)}
                   onclick={(e) => handleNoteRowSelect(row.note_id, i, e)}
                 />
               </div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate max-w-xs">{row.front_preview}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate max-w-xs text-text-secondary">{row.back_preview}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.notetype_name}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.card_count}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}">
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate max-w-xs">{row.front_preview}</span></div>
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate max-w-xs text-text-secondary">{row.back_preview}</span></div>
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.notetype_name}</span></div>
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.card_count}</span></div>
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}">
                 {#if row.tags && row.tags.length > 0}
                   <div class="flex gap-1">
                     {#each row.tags.slice(0, 2) as tag}
@@ -757,7 +757,7 @@
                   </div>
                 {/if}
               </div>
-              <div class="h-11 flex items-center px-4 border-b border-border transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.created_days_ago === 0 ? 'Today' : row.created_days_ago === 1 ? '1 day ago' : row.created_days_ago + ' days ago'}</span></div>
+              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.created_days_ago === 0 ? 'Today' : row.created_days_ago === 1 ? '1 day ago' : row.created_days_ago + ' days ago'}</span></div>
             </div>
           {/each}
         </div>
@@ -768,7 +768,7 @@
 
     <!-- Detail Panel -->
     {#if selectedCardId || selectedNoteId}
-      <div class="w-[380px] flex-shrink-0 border-l border-border overflow-y-auto">
+      <div class="w-[380px] flex-shrink-0 border-l border-border/30 overflow-y-auto">
         <CardDetailPanel
           cardId={selectedCardId}
           noteId={selectedNoteId}
@@ -790,7 +790,7 @@
       >
         <!-- Dropdown overlays -->
         {#if showMoveDropdown}
-          <div class="absolute bottom-full mb-2 left-0 bg-white rounded-xl shadow-xl border border-border py-1 min-w-48">
+          <div class="absolute bottom-full mb-2 left-0 bg-bg-card rounded-xl shadow-xl border border-border/30 py-1 min-w-48">
             {#each availableDecks as deck}
               <button
                 onclick={() => handleMoveToDeck(deck.id, deck.name)}
@@ -803,13 +803,13 @@
         {/if}
         
         {#if showTagInput}
-          <div class="absolute bottom-full mb-2 left-0 bg-white rounded-xl shadow-xl border border-border p-3">
+          <div class="absolute bottom-full mb-2 left-0 bg-bg-card rounded-xl shadow-xl border border-border/30 p-3">
             <div class="flex gap-2">
               <input
                 type="text"
                 bind:value={newTag}
                 placeholder="Enter tag..."
-                class="px-3 py-1.5 border border-border rounded-lg text-sm w-40"
+                class="px-3 py-1.5 rounded-lg text-sm w-40"
                 onkeydown={(e) => e.key === 'Enter' && handleAddTag()}
               />
               <button
@@ -823,12 +823,12 @@
         {/if}
         
         {#if showDeleteConfirm}
-          <div class="absolute bottom-full mb-2 right-0 bg-white rounded-xl shadow-xl border border-border p-3">
+          <div class="absolute bottom-full mb-2 right-0 bg-bg-card rounded-xl shadow-xl border border-border/30 p-3">
             <p class="text-sm mb-2">Delete {getUniqueNoteIds().length} notes and all their cards? This cannot be undone.</p>
             <div class="flex gap-2 justify-end">
               <button
                 onclick={() => showDeleteConfirm = false}
-                class="px-3 py-1.5 border border-border rounded-lg text-sm"
+                class="px-3 py-1.5 rounded-lg text-sm"
               >
                 Cancel
               </button>
@@ -848,11 +848,11 @@
             {allSelected ? `All ${rows.length} selected` : `${selectionCount} selected`}
           </span>
           
-          <div class="w-px h-5 bg-white/15 mx-2"></div>
+          <div class="w-px h-5 bg-text-secondary/15 mx-2"></div>
           
           <button
             onclick={handleSuspend}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 text-sm"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -862,7 +862,7 @@
           
           <button
             onclick={handleUnsuspend}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 text-sm"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -873,7 +873,7 @@
           
           <button
             onclick={handleBury}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 text-sm"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -883,7 +883,7 @@
           
           <button
             onclick={() => { loadDecks(); showMoveDropdown = !showMoveDropdown; showTagInput = false; showDeleteConfirm = false; }}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 text-sm"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -893,7 +893,7 @@
           
           <button
             onclick={() => { showTagInput = !showTagInput; showMoveDropdown = false; showDeleteConfirm = false; }}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 text-sm"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -903,7 +903,7 @@
           
           <button
             onclick={() => { showDeleteConfirm = !showDeleteConfirm; showMoveDropdown = false; showTagInput = false; }}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 text-sm text-[#FCA5A5]"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm text-[#FCA5A5]"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -913,7 +913,7 @@
           
           <button
             onclick={clearSelection}
-            class="p-1.5 rounded-xl hover:bg-white/10 ml-1"
+            class="p-1.5 rounded-xl hover:bg-text-secondary/10 ml-1"
             aria-label="Clear selection"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

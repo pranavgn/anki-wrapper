@@ -9,6 +9,7 @@
     type TextImportOptions,
   } from "./importer";
   import { addToast } from "./toast";
+  import NeuDialog from "./ui/NeuDialog.svelte";
 
   // Props
   let {
@@ -187,12 +188,6 @@
     onClose?.();
   }
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  }
-
   function getDelimiterLabel(d: string): string {
     if (d === "tab") return "Tab";
     if (d === "comma") return "Comma";
@@ -201,279 +196,646 @@
   }
 </script>
 
-{#if isOpen}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm animate-in fade-in duration-150"
-    onclick={handleBackdropClick}
-    onkeydown={(e) => e.key === "Escape" && handleClose()}
-  >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="bg-bg-card rounded-3xl p-8 max-w-lg w-full mx-4 shadow-xl animate-in zoom-in-95 duration-200"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
+<NeuDialog {isOpen} onClose={handleClose} title="Import Deck" size="lg">
+  <!-- Back button -->
+  {#if currentStep !== "format"}
+    <button
+      class="back-button"
+      onclick={goBack}
     >
-      <!-- Header -->
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-xl font-semibold text-text-primary">Import Deck</h2>
-        <button
-          class="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-subtle rounded-lg transition-colors cursor-pointer"
-          onclick={handleClose}
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      <svg class="back-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back
+    </button>
+  {/if}
+
+  <!-- Step 1: Format Picker -->
+  {#if currentStep === "format"}
+    <div class="format-grid">
+      <button
+        class="format-card neu-raised"
+        onclick={() => selectFormat("apkg")}
+      >
+        <div class="format-header">
+          <div class="format-info">
+            <div class="format-name">Anki Package (.apkg)</div>
+            <div class="format-description">Import one or more decks</div>
+          </div>
+          <span class="format-badge badge-recommended">Recommended</span>
+        </div>
+      </button>
+
+      <button
+        class="format-card neu-raised"
+        onclick={() => selectFormat("colpkg")}
+      >
+        <div class="format-header">
+          <div class="format-info">
+            <div class="format-name">Collection Package (.colpkg)</div>
+            <div class="format-description">Replace your entire collection from a backup</div>
+          </div>
+          <span class="format-badge badge-destructive">Destructive</span>
+        </div>
+      </button>
+
+      <button
+        class="format-card neu-raised"
+        onclick={() => selectFormat("text")}
+      >
+        <div class="format-info">
+          <div class="format-name">Text / CSV (.txt, .csv)</div>
+          <div class="format-description">Tab or comma-separated flashcard data</div>
+        </div>
+      </button>
+    </div>
+  {/if}
+
+  <!-- Step 2a: APKG Import -->
+  {#if currentStep === "apkg"}
+    <div class="import-step">
+      <button
+        class="file-picker neu-pressed"
+        onclick={handleApkgImport}
+        disabled={isLoading}
+      >
+        {#if isLoading}
+          <svg class="spinner" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
+          <span class="file-picker-text">Importing...</span>
+        {:else}
+          <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          <span class="file-picker-text">Click to choose a file</span>
+          <span class="file-picker-hint">.apkg files only</span>
+        {/if}
+      </button>
+
+      {#if errorMessage}
+        <p class="error-message">{errorMessage}</p>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Step 2b: COLPKG Import -->
+  {#if currentStep === "colpkg"}
+    <div class="import-step">
+      {#if !showColpkgWarning}
+        <button
+          class="file-picker neu-pressed"
+          onclick={showColpkgConfirm}
+          disabled={isLoading}
+        >
+          <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          </svg>
+          <span class="file-picker-text">Click to choose a file</span>
+          <span class="file-picker-hint">.colpkg files only</span>
+        </button>
+      {:else}
+        <div class="warning-box">
+          <p class="warning-text">
+            This will replace your entire local collection with the contents of the .colpkg file. This cannot be undone.
+          </p>
+        </div>
+        <div class="warning-actions">
+          <button
+            class="warning-btn neu-subtle"
+            onclick={() => (showColpkgWarning = false)}
+          >
+            Cancel
+          </button>
+          <button
+            class="warning-btn danger-btn"
+            onclick={handleColpkgImport}
+            disabled={isLoading}
+          >
+            {isLoading ? "Importing..." : "Yes, Replace Collection"}
+          </button>
+        </div>
+      {/if}
+
+      {#if errorMessage}
+        <p class="error-message">{errorMessage}</p>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Step 2c: Text/CSV Import -->
+  {#if currentStep === "text"}
+    <div class="text-import-form">
+      <div class="form-group">
+        <label class="form-label">Deck</label>
+        <select
+          class="form-select neu-pressed"
+          bind:value={selectedDeckId}
+        >
+          {#each availableDecks as deck}
+            <option value={deck.id}>{deck.name}</option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Note Type</label>
+        <input
+          type="text"
+          class="form-input neu-pressed"
+          bind:value={notetypeName}
+          placeholder="Basic"
+        />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Delimiter</label>
+        <div class="button-group">
+          {#each ["tab", "comma", "semicolon"] as d}
+            <button
+              class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
+              onclick={() => (delimiter = d as typeof delimiter)}
+            >
+              {getDelimiterLabel(d)}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">Allow HTML in fields</label>
+        <button
+          class="toggle-switch {htmlEnabled ? 'active' : ''}"
+          onclick={() => (htmlEnabled = !htmlEnabled)}
+        >
+          <span class="toggle-knob"></span>
         </button>
       </div>
 
-      <!-- Back button -->
-      {#if currentStep !== "format"}
-        <button
-          class="mb-4 text-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1"
-          onclick={goBack}
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
-      {/if}
-
-      <!-- Step 1: Format Picker -->
-      {#if currentStep === "format"}
-        <div class="space-y-3">
-          <button
-            class="w-full p-4 border border-border rounded-xl hover:bg-bg-subtle transition-colors cursor-pointer text-left"
-            onclick={() => selectFormat("apkg")}
-          >
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="font-medium text-text-primary">Anki Package (.apkg)</div>
-                <div class="text-sm text-text-secondary">Import one or more decks</div>
-              </div>
-              <span class="px-2 py-1 bg-success/10 text-success text-xs font-medium rounded-full">
-                Recommended
-              </span>
-            </div>
-          </button>
-
-          <button
-            class="w-full p-4 border border-border rounded-xl hover:bg-bg-subtle transition-colors cursor-pointer text-left"
-            onclick={() => selectFormat("colpkg")}
-          >
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="font-medium text-text-primary">Collection Package (.colpkg)</div>
-                <div class="text-sm text-text-secondary">Replace your entire collection from a backup</div>
-              </div>
-              <span class="px-2 py-1 bg-danger/10 text-danger text-xs font-medium rounded-full">
-                Destructive
-              </span>
-            </div>
-          </button>
-
-          <button
-            class="w-full p-4 border border-border rounded-xl hover:bg-bg-subtle transition-colors cursor-pointer text-left"
-            onclick={() => selectFormat("text")}
-          >
-            <div>
-              <div class="font-medium text-text-primary">Text / CSV (.txt, .csv)</div>
-              <div class="text-sm text-text-secondary">Tab or comma-separated flashcard data</div>
-            </div>
-          </button>
-        </div>
-      {/if}
-
-      <!-- Step 2a: APKG Import -->
-      {#if currentStep === "apkg"}
-        <div class="py-8">
-          <button
-            class="w-full py-12 border-2 border-dashed border-border rounded-xl hover:border-accent hover:bg-accent-soft transition-colors cursor-pointer flex flex-col items-center justify-center gap-2"
-            onclick={handleApkgImport}
-            disabled={isLoading}
-          >
-            {#if isLoading}
-              <svg class="h-8 w-8 text-accent animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span class="text-text-secondary">Importing...</span>
-            {:else}
-              <svg class="h-8 w-8 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <span class="text-text-primary font-medium">Click to choose a file</span>
-              <span class="text-text-secondary text-sm">.apkg files only</span>
-            {/if}
-          </button>
-
-          {#if errorMessage}
-            <p class="mt-4 text-sm text-danger text-center">{errorMessage}</p>
-          {/if}
-        </div>
-      {/if}
-
-      <!-- Step 2b: COLPKG Import -->
-      {#if currentStep === "colpkg"}
-        <div class="py-8">
-          {#if !showColpkgWarning}
+      <div class="form-group">
+        <label class="form-label">Duplicate Handling</label>
+        <div class="button-group">
+          {#each ["update", "preserve", "ignore"] as policy}
             <button
-              class="w-full py-12 border-2 border-dashed border-border rounded-xl hover:border-accent hover:bg-accent-soft transition-colors cursor-pointer flex flex-col items-center justify-center gap-2"
-              onclick={showColpkgConfirm}
-              disabled={isLoading}
+              class="group-btn {duplicatePolicy === policy ? 'active' : 'neu-subtle'}"
+              onclick={() => (duplicatePolicy = policy as typeof duplicatePolicy)}
             >
-              <svg class="h-8 w-8 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-              <span class="text-text-primary font-medium">Click to choose a file</span>
-              <span class="text-text-secondary text-sm">.colpkg files only</span>
+              {policy.charAt(0).toUpperCase() + policy.slice(1)}
             </button>
-          {:else}
-            <div class="border border-danger/30 bg-danger/5 rounded-xl p-4 mb-4">
-              <p class="text-sm text-danger">
-                This will replace your entire local collection with the contents of the .colpkg file. This cannot be undone.
-              </p>
-            </div>
-            <div class="flex gap-3">
-              <button
-                class="flex-1 px-4 py-2 border border-border rounded-xl hover:bg-bg-subtle transition-colors cursor-pointer"
-                onclick={() => (showColpkgWarning = false)}
-              >
-                Cancel
-              </button>
-              <button
-                class="flex-1 px-4 py-2 bg-danger text-white rounded-xl hover:bg-danger/90 transition-colors cursor-pointer"
-                onclick={handleColpkgImport}
-                disabled={isLoading}
-              >
-                {isLoading ? "Importing..." : "Yes, Replace Collection"}
-              </button>
-            </div>
-          {/if}
-
-          {#if errorMessage}
-            <p class="mt-4 text-sm text-danger text-center">{errorMessage}</p>
-          {/if}
+          {/each}
         </div>
-      {/if}
+      </div>
 
-      <!-- Step 2c: Text/CSV Import -->
-      {#if currentStep === "text"}
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Deck</label>
-            <select
-              class="w-full px-3 py-2 border border-border rounded-xl bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
-              bind:value={selectedDeckId}
-            >
-              {#each availableDecks as deck}
-                <option value={deck.id}>{deck.name}</option>
-              {/each}
-            </select>
-          </div>
+      <button
+        class="import-btn"
+        onclick={handleTextImport}
+        disabled={isLoading}
+      >
+        {isLoading ? "Importing..." : "Choose File"}
+      </button>
 
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Note Type</label>
-            <input
-              type="text"
-              class="w-full px-3 py-2 border border-border rounded-xl bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
-              bind:value={notetypeName}
-              placeholder="Basic"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-2">Delimiter</label>
-            <div class="flex rounded-xl border border-border overflow-hidden">
-              {#each ["tab", "comma", "semicolon"] as d}
-                <button
-                  class="flex-1 px-3 py-2 text-sm transition-colors cursor-pointer {delimiter === d ? 'bg-accent text-white' : 'bg-bg-card text-text-primary hover:bg-bg-subtle'}"
-                  onclick={() => (delimiter = d as typeof delimiter)}
-                >
-                  {getDelimiterLabel(d)}
-                </button>
-              {/each}
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <label class="text-sm font-medium text-text-primary">Allow HTML in fields</label>
-            <button
-              class="relative w-12 h-6 rounded-full transition-colors cursor-pointer {htmlEnabled ? 'bg-accent' : 'bg-border'}"
-              onclick={() => (htmlEnabled = !htmlEnabled)}
-            >
-              <span
-                class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform {htmlEnabled ? 'translate-x-6' : 'translate-x-0'}"
-              ></span>
-            </button>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-2">Duplicate Handling</label>
-            <div class="flex rounded-xl border border-border overflow-hidden">
-              {#each ["update", "preserve", "ignore"] as policy}
-                <button
-                  class="flex-1 px-3 py-2 text-sm transition-colors cursor-pointer {duplicatePolicy === policy ? 'bg-accent text-white' : 'bg-bg-card text-text-primary hover:bg-bg-subtle'}"
-                  onclick={() => (duplicatePolicy = policy as typeof duplicatePolicy)}
-                >
-                  {policy.charAt(0).toUpperCase() + policy.slice(1)}
-                </button>
-              {/each}
-            </div>
-          </div>
-
-          <button
-            class="w-full px-4 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors cursor-pointer disabled:opacity-50"
-            onclick={handleTextImport}
-            disabled={isLoading}
-          >
-            {isLoading ? "Importing..." : "Choose File"}
-          </button>
-
-          {#if errorMessage}
-            <p class="text-sm text-danger text-center">{errorMessage}</p>
-          {/if}
-        </div>
-      {/if}
-
-      <!-- Step 3: Result -->
-      {#if currentStep === "result" && importResult}
-        <div class="text-center py-4">
-          <svg class="h-16 w-16 text-success mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <h3 class="text-xl font-semibold text-text-primary mb-6">Import Complete</h3>
-
-          <div class="grid grid-cols-2 gap-4 text-left bg-bg-subtle rounded-xl p-4 mb-6">
-            <div>
-              <div class="text-xs text-text-secondary uppercase tracking-wide">Notes Added</div>
-              <div class="text-lg font-semibold text-text-primary">{importResult.notes_added}</div>
-            </div>
-            <div>
-              <div class="text-xs text-text-secondary uppercase tracking-wide">Notes Updated</div>
-              <div class="text-lg font-semibold text-text-primary">{importResult.notes_updated}</div>
-            </div>
-            <div>
-              <div class="text-xs text-text-secondary uppercase tracking-wide">Notes Skipped</div>
-              <div class="text-lg font-semibold text-text-primary">{importResult.notes_skipped}</div>
-            </div>
-            <div>
-              <div class="text-xs text-text-secondary uppercase tracking-wide">Decks Added</div>
-              <div class="text-lg font-semibold text-text-primary">
-                {importResult.decks_added.length > 0 ? importResult.decks_added.join(", ") : "None"}
-              </div>
-            </div>
-          </div>
-
-          <button
-            class="w-full px-4 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors cursor-pointer"
-            onclick={handleDone}
-          >
-            Done
-          </button>
-        </div>
+      {#if errorMessage}
+        <p class="error-message">{errorMessage}</p>
       {/if}
     </div>
-  </div>
-{/if}
+  {/if}
+
+  <!-- Step 3: Result -->
+  {#if currentStep === "result" && importResult}
+    <div class="result-step">
+      <svg class="result-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+      </svg>
+      <h3 class="result-title">Import Complete</h3>
+
+      <div class="result-stats neu-pressed">
+        <div class="stat-item">
+          <div class="stat-label">Notes Added</div>
+          <div class="stat-value">{importResult.notes_added}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Notes Updated</div>
+          <div class="stat-value">{importResult.notes_updated}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Notes Skipped</div>
+          <div class="stat-value">{importResult.notes_skipped}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Decks Added</div>
+          <div class="stat-value">
+            {importResult.decks_added.length > 0 ? importResult.decks_added.join(", ") : "None"}
+          </div>
+        </div>
+      </div>
+
+      <button
+        class="done-btn"
+        onclick={handleDone}
+      >
+        Done
+      </button>
+    </div>
+  {/if}
+</NeuDialog>
+
+<style>
+  .back-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 16px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s ease;
+  }
+
+  .back-button:hover {
+    color: var(--text-primary);
+  }
+
+  .back-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .format-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .format-card {
+    display: block;
+    width: 100%;
+    padding: 16px 20px;
+    text-align: left;
+    cursor: pointer;
+    border: none;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .format-card:hover {
+    box-shadow: 7px 7px 16px rgba(0,0,0,0.09), -5px -5px 12px rgba(255,255,255,0.88);
+    transform: translateY(-1px);
+  }
+
+  .format-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .format-info {
+    flex: 1;
+  }
+
+  .format-name {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .format-description {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .format-badge {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+  }
+
+  .badge-recommended {
+    background: var(--success);
+    color: white;
+  }
+
+  .badge-destructive {
+    background: var(--danger);
+    color: white;
+  }
+
+  .import-step {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .file-picker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 48px 24px;
+    cursor: pointer;
+    border: none;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .file-picker:hover:not(:disabled) {
+    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.08), inset -3px -3px 6px rgba(255,255,255,0.5);
+  }
+
+  .file-picker:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    color: var(--accent);
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .file-icon {
+    width: 32px;
+    height: 32px;
+    color: var(--text-secondary);
+  }
+
+  .file-picker-text {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .file-picker-hint {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .warning-box {
+    padding: 16px;
+    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+  }
+
+  .warning-text {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--danger);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .warning-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .warning-btn {
+    flex: 1;
+    padding: 10px 16px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .danger-btn {
+    background: var(--danger);
+    color: white;
+  }
+
+  .danger-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 90%, black);
+  }
+
+  .danger-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .text-import-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .form-select,
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    outline: none;
+  }
+
+  .form-select {
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .form-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .button-group {
+    display: flex;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .group-btn {
+    flex: 1;
+    padding: 10px 12px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .group-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--bg-deep);
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    box-shadow: var(--neu-down);
+  }
+
+  .toggle-switch.active {
+    background: var(--accent);
+  }
+
+  .toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    transition: left 0.2s ease;
+  }
+
+  .toggle-switch.active .toggle-knob {
+    left: 23px;
+  }
+
+  .import-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .import-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 90%, black);
+  }
+
+  .import-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .error-message {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--danger);
+    text-align: center;
+    margin: 0;
+  }
+
+  .result-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .result-icon {
+    width: 64px;
+    height: 64px;
+    color: var(--success);
+    margin-bottom: 16px;
+  }
+
+  .result-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 24px 0;
+  }
+
+  .result-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width: 100%;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .stat-item {
+    text-align: left;
+  }
+
+  .stat-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .done-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .done-btn:hover {
+    background: color-mix(in srgb, var(--accent) 90%, black);
+  }
+</style>

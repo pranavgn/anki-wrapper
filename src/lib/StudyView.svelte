@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke, isTauri } from "@tauri-apps/api/core";
   import { onMount, onDestroy } from "svelte";
+  import MiniDeck from "./MiniDeck.svelte";
+  import { prefs } from "./prefs.svelte.ts";
 
   // Props using Svelte 5 runes
   interface Props {
@@ -15,8 +17,12 @@
   let isLoading = $state(true);
   let error = $state("");
   let currentCard = $state<any>(null);
-  let cardState = $state<'idle' | 'flipped' | 'leaving-left' | 'leaving-right' | 'leaving-up' | 'leaving-down' | 'entering'>('idle');
-  let flagBorderColor = $state('#3b82f6'); // Default blue color
+  let isFlipped = $state(false);
+  let cardAnimation = $state<'idle' | 'fly-out' | 'return'>('idle');
+  let reviewedCount = $state(0);
+  let totalCards = $state(0);
+  let remainingCards = $state(0);
+  let miniDeckRef: MiniDeck;
 
   // Load first card on mount
   onMount(async () => {
@@ -32,6 +38,11 @@
       const card = await invoke<any>("get_next_card", { deckId });
       console.log("Card received:", card);
       currentCard = card;
+      
+      // Get deck stats for progress
+      const stats = await invoke<any>("get_deck_stats_for_review", { deckId });
+      totalCards = stats.new_count + stats.learn_count + stats.review_count;
+      remainingCards = totalCards;
     } catch (err) {
       console.error("Error loading card:", err);
       error = String(err);
@@ -43,139 +54,457 @@
   onDestroy(() => {
   });
 
-  // Derived style for active card
-  let activeCardStyle = $derived.by(() => {
-    // Build transform
-    let transform = '';
-    if (cardState === 'flipped') transform = 'rotateY(180deg)';
-    else if (cardState === 'leaving-left') transform = 'translateX(-120%) rotate(-8deg)';
-    else if (cardState === 'leaving-right') transform = 'translateX(120%) rotate(8deg)';
-    else if (cardState === 'leaving-up') transform = 'translateY(-60px)';
-    else if (cardState === 'leaving-down') transform = 'translateY(60px)';
-    else if (cardState === 'entering') transform = 'scale(0.93)';
+  function toggleFlip() {
+    if (cardAnimation !== 'idle') return;
+    isFlipped = !isFlipped;
+  }
 
-    // Build opacity
-    let opacity = '';
-    if (cardState === 'leaving-up' || cardState === 'leaving-down' || cardState === 'entering') {
-      opacity = 'opacity: 0;';
-    }
+  async function answerCard(ease: number) {
+    if (!currentCard || cardAnimation !== 'idle') return;
 
-    // Build transition — filter out empty strings so we never get "transition: , , ;"
-    const transitionParts: string[] = [];
-    if (cardState === 'flipped') {
-      transitionParts.push('transform 480ms cubic-bezier(0.4, 0, 0.2, 1)');
-    }
-    if (cardState.startsWith('leaving')) {
-      transitionParts.push('transform 280ms ease-in', 'opacity 280ms ease-in');
-    }
-    if (cardState === 'entering') {
-      transitionParts.push('transform 240ms ease-out', 'opacity 240ms ease-out');
-    }
-    // For idle state, use a default transition so entering→idle animates smoothly
-    if (cardState === 'idle') {
-      transitionParts.push('transform 240ms ease-out', 'opacity 240ms ease-out');
-    }
-    const transition = transitionParts.length > 0
-      ? `transition: ${transitionParts.join(', ')};`
-      : '';
+    const isAgain = ease === 1;
+    
+    // Set animation
+    cardAnimation = isAgain ? 'return' : 'fly-out';
+    
+    // Wait for animation
+    await new Promise(resolve => setTimeout(resolve, isAgain ? 650 : 700));
 
-    return `transform-style: preserve-3d; z-index: 2; ${transform ? `transform: ${transform};` : ''} ${opacity} ${transition} border-top: 3px solid ${flagBorderColor}`;
-  });
+    try {
+      await invoke("answer_card", { 
+        cardId: currentCard.id, 
+        ease: ease 
+      });
+      
+      reviewedCount++;
+      remainingCards = Math.max(0, remainingCards - 1);
+      
+      // Trigger mini deck animation for non-Again answers
+      if (!isAgain && miniDeckRef) {
+        miniDeckRef.triggerReceiveAnimation();
+      }
+
+      // Load next card
+      const nextCard = await invoke<any>("get_next_card", { deckId });
+      currentCard = nextCard;
+      isFlipped = false;
+      cardAnimation = 'idle';
+    } catch (err) {
+      console.error("Error answering card:", err);
+      error = String(err);
+      cardAnimation = 'idle';
+    }
+  }
+
+  function navigateToBrowser() {
+    // This will be handled by the parent component
+    window.dispatchEvent(new CustomEvent('navigate-to-browser'));
+  }
+
+  // Progress percentage
+  const progressPercent = $derived(totalCards > 0 ? Math.round((reviewedCount / totalCards) * 100) : 0);
+
+  // Get interval text for buttons
+  function getIntervalText(ease: number): string {
+    if (!currentCard?.intervals) return '';
+    const intervals = currentCard.intervals;
+    if (ease === 1) return intervals.again || '1m';
+    if (ease === 2) return intervals.hard || '10m';
+    if (ease === 3) return intervals.good || '1d';
+    if (ease === 4) return intervals.easy || '4d';
+    return '';
+  }
 </script>
 
 <div class="absolute inset-0 bg-bg-base flex flex-col overflow-hidden z-50">
-  <!-- Header -->
-  <header class="relative z-10 flex justify-between items-center px-6 py-4">
-    <div class="flex items-center gap-2">
-      <button
-        onclick={onExit}
-        class="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
-        aria-label="Back to dashboard"
-      >
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-        <span class="text-sm font-medium">Back</span>
-      </button>
+  <!-- Progress Bar -->
+  <div class="px-6 pt-4">
+    <div 
+      class="neu-pressed"
+      style="
+        background: var(--bg-deep);
+        box-shadow: var(--neu-down);
+        border-radius: 10px;
+        height: 5px;
+        overflow: hidden;
+      "
+    >
+      <div 
+        style="
+          height: 100%;
+          width: {progressPercent}%;
+          background: linear-gradient(90deg, var(--accent), var(--success));
+          border-radius: 10px;
+          transition: width 0.5s ease-out;
+        "
+      ></div>
     </div>
-  </header>
+  </div>
+
+  <!-- Card Count -->
+  <div class="flex justify-between items-center px-6 py-3">
+    <span style="font-family: var(--sans); font-size: 13px; color: var(--text-muted);">
+      {remainingCards} remaining
+    </span>
+    <span style="font-family: var(--sans); font-size: 13px; color: var(--text-muted);">
+      {reviewedCount} reviewed
+    </span>
+  </div>
 
   <!-- Main Content -->
   <main class="flex-1 flex items-center justify-center p-6">
     <div class="w-full max-w-[680px]">
       <!-- Loading State -->
       {#if isLoading}
-        <div class="bg-bg-card rounded-3xl shadow-warm p-10 text-center border border-border">
-          <div class="animate-spin rounded-full h-12 w-12 border-4 border-accent border-t-transparent mx-auto mb-4"></div>
-          <p class="text-text-secondary">Loading card...</p>
+        <div 
+          class="neu-raised text-center"
+          style="
+            background: var(--bg-card);
+            box-shadow: var(--neu-up);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+          "
+        >
+          <div 
+            class="animate-spin rounded-full h-12 w-12 border-4 mx-auto mb-4"
+            style="border-color: var(--accent); border-top-color: transparent;"
+          ></div>
+          <p style="font-family: var(--sans); color: var(--text-secondary);">Loading card...</p>
         </div>
       
       <!-- Error State -->
       {:else if error}
-        <div class="bg-bg-card rounded-3xl shadow-warm p-10 text-center border border-border">
-          <div class="w-16 h-16 bg-danger/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="h-8 w-8 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div 
+          class="neu-raised text-center"
+          style="
+            background: var(--bg-card);
+            box-shadow: var(--neu-up);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+          "
+        >
+          <div 
+            class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            style="background: color-mix(in srgb, var(--danger) 10%, transparent);"
+          >
+            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--danger);">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 class="text-xl font-semibold text-text-primary mb-2">Error</h2>
-          <p class="text-text-secondary mb-6">{error}</p>
+          <h2 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Error</h2>
+          <p style="font-family: var(--sans); color: var(--text-secondary); margin-bottom: 24px;">{error}</p>
           <button
             onclick={onExit}
-            class="px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium cursor-pointer active:scale-95"
+            class="neu-raised cursor-pointer"
+            style="
+              background: var(--accent);
+              color: white;
+              font-family: var(--sans);
+              font-weight: 500;
+              padding: 12px 24px;
+              border-radius: var(--radius-md);
+              border: none;
+            "
           >
-            Back to Dashboard
+            Back to Deck
           </button>
         </div>
       
       <!-- No Cards Left -->
       {:else if !currentCard}
-        <div class="bg-bg-card rounded-3xl shadow-warm p-10 text-center border border-border animate-in zoom-in-95 duration-300">
-          <svg class="w-20 h-20 text-text-secondary opacity-40 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4" />
-          </svg>
-          <h2 class="text-2xl font-semibold text-text-primary mb-2">All done for today!</h2>
-          <p class="text-text-secondary mb-6">
-            You've reviewed all cards. Great job!
+        <div 
+          class="text-center"
+          style="animation: scaleIn 0.3s ease-out;"
+        >
+          <div class="text-6xl mb-6">🎉</div>
+          <h2 style="font-family: var(--serif); font-size: 30px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+            All done for today!
+          </h2>
+          <p style="font-family: var(--sans); font-size: 16px; color: var(--text-secondary); margin-bottom: 32px;">
+            You've reviewed {reviewedCount} cards. Great job!
           </p>
           <button
             onclick={onExit}
-            class="px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium cursor-pointer active:scale-95"
+            class="neu-raised cursor-pointer"
+            style="
+              background: var(--accent);
+              color: white;
+              font-family: var(--sans);
+              font-weight: 500;
+              padding: 14px 32px;
+              border-radius: var(--radius-md);
+              border: none;
+            "
           >
-            Back to Decks
+            Back to Deck
           </button>
         </div>
       
       <!-- Card Display -->
       {:else}
-        <div class="bg-bg-card rounded-3xl shadow-warm border border-border overflow-visible relative" style={activeCardStyle}>
-          <div class="p-10">
-            <h2 class="text-xl font-semibold text-text-primary mb-4">Card Content</h2>
-            
-            <div class="mb-4">
-              <h3 class="font-medium text-text-secondary mb-2">Front Side:</h3>
-              <div class="bg-bg-base p-4 rounded-xl">
-                {@html currentCard.front}
-              </div>
-            </div>
-            
-            <div class="mb-6">
-              <h3 class="font-medium text-text-secondary mb-2">Back Side:</h3>
-              <div class="bg-bg-base p-4 rounded-xl">
-                {@html currentCard.back}
-              </div>
-            </div>
-            
-            <button
-              onclick={() => onExit()}
-              class="px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium cursor-pointer active:scale-95"
+        <div class="relative">
+          <!-- Ghost cards behind -->
+          <div 
+            class="absolute inset-0 neu-raised"
+            style="
+              background: var(--bg-card);
+              box-shadow: var(--neu-up);
+              border-radius: var(--radius-lg);
+              opacity: 0.28;
+              transform: translateY(11px) scale(0.93) rotate(2.2deg);
+              z-index: 0;
+            "
+          ></div>
+          <div 
+            class="absolute inset-0 neu-raised"
+            style="
+              background: var(--bg-card);
+              box-shadow: var(--neu-up);
+              border-radius: var(--radius-lg);
+              opacity: 0.5;
+              transform: translateY(5.5px) scale(0.965) rotate(-1.1deg);
+              z-index: 1;
+            "
+          ></div>
+
+          <!-- Main card with flip -->
+          <div 
+            class="card-flip-container relative"
+            style="z-index: 2;"
+          >
+            <div 
+              class="card-flip-inner {isFlipped ? 'flipped' : ''} {cardAnimation === 'fly-out' ? 'card-fly-out' : ''} {cardAnimation === 'return' ? 'card-return' : ''}"
+              onclick={toggleFlip}
+              role="button"
+              tabindex="0"
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleFlip()}
             >
-              Exit Study
-            </button>
+              <!-- Front Face -->
+              <div 
+                class="card-face neu-raised"
+                style="
+                  background: var(--bg-card);
+                  box-shadow: var(--neu-up);
+                  border-radius: var(--radius-lg);
+                  padding: 52px 40px;
+                  min-height: 320px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div 
+                  class="prose prose-lg max-w-none text-center"
+                  style="font-family: var(--serif); font-size: 26px; color: var(--text-primary);"
+                >
+                  {@html currentCard.front}
+                </div>
+                <p 
+                  class="mt-6"
+                  style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);"
+                >
+                  Tap to reveal
+                </p>
+              </div>
+
+              <!-- Back Face -->
+              <div 
+                class="card-face card-back-face neu-raised"
+                style="
+                  background: var(--bg-card-raised);
+                  box-shadow: var(--neu-up);
+                  border-radius: var(--radius-lg);
+                  padding: 52px 40px;
+                  min-height: 320px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div 
+                  class="mb-4"
+                  style="font-family: var(--sans); font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;"
+                >
+                  ANSWER
+                </div>
+                <div 
+                  class="prose prose-lg max-w-none text-center"
+                  style="font-family: var(--serif); font-size: 24px; color: var(--text-primary);"
+                >
+                  {@html currentCard.back}
+                </div>
+                <p 
+                  class="mt-6"
+                  style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);"
+                >
+                  Tap to flip back
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Answer Buttons (only visible when flipped) -->
+        {#if isFlipped && cardAnimation === 'idle'}
+          <div 
+            class="flex gap-3.5 mt-8"
+            style="animation: fadeUp 0.3s ease-out;"
+          >
+            <button
+              onclick={() => answerCard(1)}
+              class="flex-1 neu-raised cursor-pointer"
+              style="
+                background: var(--bg-card);
+                box-shadow: var(--neu-up);
+                border-radius: var(--radius-md);
+                padding: 16px 8px;
+                border: none;
+                text-align: center;
+              "
+            >
+              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--danger);">
+                Again
+              </div>
+              {#if prefs.show_intervals_on_buttons}
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  {getIntervalText(1)}
+                </div>
+              {/if}
+            </button>
+
+            <button
+              onclick={() => answerCard(2)}
+              class="flex-1 neu-raised cursor-pointer"
+              style="
+                background: var(--bg-card);
+                box-shadow: var(--neu-up);
+                border-radius: var(--radius-md);
+                padding: 16px 8px;
+                border: none;
+                text-align: center;
+              "
+            >
+              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--warning);">
+                Hard
+              </div>
+              {#if prefs.show_intervals_on_buttons}
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  {getIntervalText(2)}
+                </div>
+              {/if}
+            </button>
+
+            <button
+              onclick={() => answerCard(3)}
+              class="flex-1 neu-raised cursor-pointer"
+              style="
+                background: var(--bg-card);
+                box-shadow: var(--neu-up);
+                border-radius: var(--radius-md);
+                padding: 16px 8px;
+                border: none;
+                text-align: center;
+              "
+            >
+              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--success);">
+                Good
+              </div>
+              {#if prefs.show_intervals_on_buttons}
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  {getIntervalText(3)}
+                </div>
+              {/if}
+            </button>
+
+            <button
+              onclick={() => answerCard(4)}
+              class="flex-1 neu-raised cursor-pointer"
+              style="
+                background: var(--bg-card);
+                box-shadow: var(--neu-up);
+                border-radius: var(--radius-md);
+                padding: 16px 8px;
+                border: none;
+                text-align: center;
+              "
+            >
+              <div style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: #5B9BD5;">
+                Easy
+              </div>
+              {#if prefs.show_intervals_on_buttons}
+                <div style="font-family: var(--sans); font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  {getIntervalText(4)}
+                </div>
+              {/if}
+            </button>
+          </div>
+        {/if}
       {/if}
     </div>
   </main>
+
+  <!-- Mini Deck -->
+  {#if currentCard}
+    <MiniDeck 
+      bind:this={miniDeckRef}
+      reviewedCount={reviewedCount}
+      onNavigateToBrowser={navigateToBrowser}
+    />
+  {/if}
 </div>
+
+<style>
+  .card-flip-container {
+    perspective: 1200px;
+  }
+
+  .card-flip-inner {
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.15, 1);
+    transform-style: preserve-3d;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .card-flip-inner.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .card-face {
+    backface-visibility: hidden;
+    position: absolute;
+    inset: 0;
+  }
+
+  .card-back-face {
+    transform: rotateY(180deg);
+  }
+
+  .card-fly-out {
+    animation: cardFlyToDeck 0.7s cubic-bezier(0.4,0,0.2,1) forwards;
+  }
+
+  .card-return {
+    animation: cardReturnShuffle 0.65s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  @keyframes cardFlyToDeck {
+    0% { transform: scale(1) translate(0,0) rotate(0deg); opacity:1; }
+    50% { transform: scale(0.45) translate(260px,190px) rotate(12deg); opacity:0.85; }
+    100% { transform: scale(0.1) translate(430px,310px) rotate(20deg); opacity:0; }
+  }
+
+  @keyframes cardReturnShuffle {
+    0% { transform: translateX(0) translateY(0) rotate(0deg); opacity:1; }
+    20% { transform: translateX(-60px) translateY(-10px) rotate(-8deg); opacity:0.7; }
+    50% { transform: translateX(-30px) translateY(25px) rotate(4deg); opacity:0.4; }
+    70% { transform: translateX(10px) translateY(10px) rotate(-2deg); opacity:0.6; }
+    100% { transform: translateX(0) translateY(0) rotate(0deg); opacity:1; }
+  }
+
+  @keyframes scaleIn {
+    from { opacity:0; transform:scale(0.95); }
+    to { opacity:1; transform:scale(1); }
+  }
+</style>

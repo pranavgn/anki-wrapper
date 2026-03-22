@@ -4,14 +4,25 @@
   import { addToast } from "./toast";
   import TagInput from "./TagInput.svelte";
   import RichTextEditor from "./RichTextEditor.svelte";
+  import NeuDialog from "./ui/NeuDialog.svelte";
   import { renderMath, clearMathJaxCache, preprocessAnkiMath } from "./mathjax";
 
   // Props using Svelte 5 runes
-  interface Props {
-    onBack: () => void;
+  interface EditCardData {
+    cardId: number;
+    noteId: number;
+    front: string;
+    back: string;
+    deckId: number;
+    tags: string[];
   }
 
-  let { onBack }: Props = $props();
+  interface Props {
+    onBack: () => void;
+    editCard?: EditCardData | null;
+  }
+
+  let { onBack, editCard = null }: Props = $props();
 
   // Notetype types
   interface NotetypeInfo {
@@ -61,6 +72,12 @@
   // Track current cloze number for cloze insertion
   let currentClozeNumber = $state(1);
 
+  // Delete confirmation dialog
+  let showDeleteConfirm = $state(false);
+
+  // Determine if we're in edit mode
+  let isEditMode = $derived(!!editCard);
+
   // Load notetypes and decks on mount
   onMount(async () => {
     try {
@@ -86,6 +103,13 @@
       } catch (e) {
         console.error("Error loading tags:", e);
       }
+
+      // If in edit mode, populate fields
+      if (editCard) {
+        selectedDeckId = editCard.deckId;
+        currentTags = [...editCard.tags];
+        // Field values will be set after notetype detail loads
+      }
     } catch (error) {
       console.error("Error loading data:", error);
       addToast(error instanceof Error ? error.message : "Failed to load data", "error");
@@ -106,6 +130,12 @@
       
       // Reset field values to empty strings for each field
       fieldValues = new Array(detail.fields.length).fill("");
+      
+      // If in edit mode, populate with existing card data
+      if (editCard && detail.fields.length >= 2) {
+        fieldValues[0] = editCard.front;
+        fieldValues[1] = editCard.back;
+      }
       
       // Reset cloze number
       currentClozeNumber = 1;
@@ -195,49 +225,83 @@
 
     isSaving = true;
     try {
-      // Use the new generic add_note command
-      const noteId = await invoke<number>("add_note", {
-        deckId: selectedDeckId,
-        notetypeId: selectedNotetypeId,
-        fields: fieldValues,
-        tags: currentTags
-      });
+      if (isEditMode && editCard) {
+        // Update existing card
+        await invoke("update_note", {
+          noteId: editCard.noteId,
+          fields: fieldValues,
+          tags: currentTags
+        });
 
-      // Set tags on the note if any tags were added
-      if (currentTags.length > 0) {
-        try {
-          await invoke("set_note_tags", {
-            noteId: noteId,
-            tags: currentTags
+        // Update deck if changed
+        if (selectedDeckId !== editCard.deckId) {
+          await invoke("set_card_deck", {
+            cardId: editCard.cardId,
+            deckId: selectedDeckId
           });
-        } catch (tagError) {
-          console.error("Error setting tags:", tagError);
         }
+
+        addToast("Card updated successfully!", "success");
+      } else {
+        // Add new card
+        const noteId = await invoke<number>("add_note", {
+          deckId: selectedDeckId,
+          notetypeId: selectedNotetypeId,
+          fields: fieldValues,
+          tags: currentTags
+        });
+
+        // Set tags on the note if any tags were added
+        if (currentTags.length > 0) {
+          try {
+            await invoke("set_note_tags", {
+              noteId: noteId,
+              tags: currentTags
+            });
+          } catch (tagError) {
+            console.error("Error setting tags:", tagError);
+          }
+        }
+
+        // Clear fields and show success
+        fieldValues = new Array(notetypeDetail.fields.length).fill("");
+        currentTags = [];
+        currentClozeNumber = 1;
+
+        addToast("Card added successfully!", "success");
+
+        // Refocus on first editor
+        setTimeout(() => {
+          const firstEditor = document.querySelector('.rich-editor') as HTMLDivElement;
+          firstEditor?.focus();
+        }, 100);
       }
 
-      // Clear fields and show success
-      fieldValues = new Array(notetypeDetail.fields.length).fill("");
-      currentTags = [];
-      currentClozeNumber = 1;
       saved = true;
 
       // Show checkmark for 800ms then reset
       setTimeout(() => {
         saved = false;
       }, 800);
-
-      addToast("Card added successfully!", "success");
-
-      // Refocus on first editor
-      setTimeout(() => {
-        const firstEditor = document.querySelector('.rich-editor') as HTMLDivElement;
-        firstEditor?.focus();
-      }, 100);
     } catch (error) {
       console.error("Error saving card:", error);
-      addToast(error instanceof Error ? error.message : "Failed to add card", "error");
+      addToast(error instanceof Error ? error.message : "Failed to save card", "error");
     } finally {
       isSaving = false;
+    }
+  }
+
+  async function handleDelete() {
+    if (!editCard) return;
+    
+    try {
+      await invoke("delete_note", { noteId: editCard.noteId });
+      addToast("Card deleted successfully!", "success");
+      showDeleteConfirm = false;
+      onBack();
+    } catch (error) {
+      console.error("Error deleting card:", error);
+      addToast(error instanceof Error ? error.message : "Failed to delete card", "error");
     }
   }
 
@@ -299,7 +363,7 @@
   });
 
   // Preview element ref for math rendering
-  let previewEl: HTMLElement;
+  let previewEl = $state<HTMLElement | null>(null);
 
   // Debounced math rendering for preview
   let mathRenderTimeout: ReturnType<typeof setTimeout>;
@@ -325,46 +389,32 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-  <!-- Editor Panel -->
-  <div class="space-y-6">
-    <!-- Notetype Selector -->
-    <div>
-      <label class="block text-sm font-medium text-text-secondary uppercase tracking-wider mb-2">
-        Notetype
-      </label>
-      <div class="relative">
-        <select
-          bind:value={selectedNotetypeId}
-          class="w-full rounded-xl bg-bg-subtle px-4 py-3 text-text-primary font-medium appearance-none cursor-pointer"
-          aria-label="Select notetype"
-        >
-          {#each notetypes as nt}
-            <option value={nt.id}>{nt.name}</option>
-          {/each}
-        </select>
-        <svg class="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-    </div>
+<div class="card-editor-container animate-slide-left">
+  <!-- Title -->
+  <h1 class="editor-title">
+    {isEditMode ? "Edit Card" : "New Card"}
+  </h1>
 
+  <!-- Editor Fields -->
+  <div class="editor-fields">
     <!-- Dynamic Fields -->
     {#if notetypeDetail}
       {#each notetypeDetail.fields as field, index}
-        <div>
-          <label class="block text-sm font-medium text-text-secondary uppercase tracking-wider mb-2">
-            {field.name}
-            {#if isCloze && index === 0}
-              <span class="text-xs font-normal normal-case text-text-secondary">(Use {'{{c1::...}}'} for cloze)</span>
-            {/if}
-          </label>
-          <RichTextEditor
-            value={fieldValues[index] || ""}
-            onchange={(v) => handleFieldChange(index, v)}
-            placeholder={index === 0 ? "Question / Text" : "Answer / Extra"}
-            minHeight="140px"
-          />
+        <div class="field-group">
+          <label class="field-label" for="field-{index}">
+              {field.name}
+              {#if isCloze && index === 0}
+                <span class="cloze-hint">(Use {'{{c1::...}}'} for cloze)</span>
+              {/if}
+            </label>
+          <div class="editor-container neu-pressed">
+            <RichTextEditor
+              value={fieldValues[index] || ""}
+              onchange={(v) => handleFieldChange(index, v)}
+              placeholder={index === 0 ? "Question / Text" : "Answer / Extra"}
+              minHeight="140px"
+            />
+          </div>
         </div>
       {/each}
       
@@ -372,136 +422,474 @@
       {#if isCloze}
         <button
           onclick={insertCloze}
-          class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 text-accent hover:bg-accent/20 text-sm"
+          class="cloze-btn neu-subtle"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-          Insert Cloze {{currentClozeNumber}}
-          <span class="text-xs opacity-60">(Ctrl+Shift+C)</span>
+          Insert Cloze {currentClozeNumber}
+          <span class="cloze-shortcut">(Ctrl+Shift+C)</span>
         </button>
-        <p class="text-xs text-text-secondary">
+        <p class="cloze-info">
           Current cloze number: {currentClozeNumber}. After inserting a cloze, the number will auto-increment.
         </p>
       {/if}
     {/if}
 
     <!-- Deck Selector -->
-    <div>
-      <label class="block text-sm font-medium text-text-secondary uppercase tracking-wider mb-2">
-        Deck
-      </label>
-      <div class="relative">
+    <div class="field-group">
+      <label class="field-label" for="deck-select">Deck</label>
+      <div class="deck-selector neu-pressed">
         <select
+          id="deck-select"
           bind:value={selectedDeckId}
-          class="w-full rounded-xl bg-bg-subtle px-4 py-3 text-text-primary font-medium appearance-none cursor-pointer"
+          class="deck-select"
           aria-label="Select deck"
         >
           {#each decks as deck}
             <option value={deck.id}>{deck.name}</option>
           {/each}
         </select>
-        <svg class="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
         </svg>
       </div>
     </div>
 
     <!-- Tags -->
-    <div>
-      <label class="block text-sm font-medium text-text-secondary uppercase tracking-wider mb-2">
-        Tags
-      </label>
-      <TagInput bind:tags={currentTags} suggestions={allTags} placeholder="Add tag..." />
+    <div class="field-group">
+      <label class="field-label" for="tags-input">Tags</label>
+      <div class="tags-container neu-pressed">
+        <TagInput bind:tags={currentTags} suggestions={allTags} placeholder="Add tag..." />
+      </div>
     </div>
 
     <!-- Save Button -->
-    <div>
+    <div class="save-section">
       <button
         onclick={handleSave}
         disabled={!canSave()}
-        class="w-full py-3 px-6 bg-accent text-white rounded-xl hover:bg-accent/90 disabled:bg-bg-subtle disabled:text-text-secondary font-medium transition-colors cursor-pointer active:scale-95"
+        class="save-btn"
       >
         {#if saved}
-          <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
+          <span class="saved-text">✓ Saved!</span>
         {:else if isSaving}
           Saving...
         {:else}
-          Save Card
+          {isEditMode ? "Update Card" : "Save Card"}
         {/if}
       </button>
-      <p class="text-xs text-text-secondary text-center mt-2">
-        Ctrl+Enter to save
-      </p>
-    </div>
-  </div>
+      <p class="save-hint">Ctrl+Enter to save</p>
 
-  <!-- Live Preview Panel -->
-  <div class="space-y-6">
-    <div>
-      <h3 class="text-sm font-medium text-text-secondary uppercase tracking-wider mb-4">
-        Preview {previews.length > 1 ? `(${previews.length} cards)` : ""}
-      </h3>
-
-      {#if previews.length > 0}
-        {#each previews as preview, idx}
-          {#if previews.length > 1}
-            <p class="text-xs text-text-secondary mb-2">Card {idx + 1} of {previews.length}</p>
-          {/if}
-          <div class="bg-bg-card rounded-3xl shadow-warm border border-border overflow-hidden mb-4" bind:this={previewEl}>
-            <!-- Front -->
-            <div class="p-10 min-h-[150px] flex items-center justify-center">
-              <div class="text-center card-content">
-                <p class="text-1.5xl text-text-primary leading-relaxed font-serif">
-                  {@html preprocessAnkiMath(preview.front)}
-                </p>
-              </div>
-            </div>
-
-            <!-- Divider -->
-            <div class="border-t border-border"></div>
-
-            <!-- Back -->
-            <div class="p-10 min-h-[150px] flex items-center justify-center">
-              <div class="text-center card-content">
-                <p class="text-xl text-text-primary leading-relaxed font-serif">
-                  {@html preprocessAnkiMath(preview.back)}
-                </p>
-              </div>
-            </div>
-          </div>
-        {/each}
-      {:else}
-        <div class="bg-bg-card rounded-3xl shadow-warm border border-border p-10 min-h-[400px] flex items-center justify-center">
-          <p class="text-text-secondary italic text-center">
-            Your card will appear here
-          </p>
-        </div>
+      <!-- Delete Button (Edit Mode Only) -->
+      {#if isEditMode}
+        <button
+          onclick={() => showDeleteConfirm = true}
+          class="delete-btn"
+        >
+          Delete Card
+        </button>
       {/if}
     </div>
   </div>
+
+  <!-- Live Preview -->
+  {#if previews.length > 0}
+    <div class="preview-section">
+      <h2 class="preview-title">
+        Preview {previews.length > 1 ? `(${previews.length} cards)` : ""}
+      </h2>
+
+      {#each previews as preview, idx}
+        {#if previews.length > 1}
+          <p class="preview-card-label">Card {idx + 1} of {previews.length}</p>
+        {/if}
+        <div class="preview-card neu-raised" bind:this={previewEl}>
+          <!-- Front -->
+          <div class="preview-front">
+            <div class="preview-content">
+              <p class="preview-text">
+                {@html preprocessAnkiMath(preview.front)}
+              </p>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="preview-divider"></div>
+
+          <!-- Back -->
+          <div class="preview-back">
+            <div class="preview-content">
+              <p class="preview-text">
+                {@html preprocessAnkiMath(preview.back)}
+              </p>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
+<!-- Delete Confirmation Dialog -->
+<NeuDialog
+  isOpen={showDeleteConfirm}
+  onClose={() => showDeleteConfirm = false}
+  title="Delete Card"
+  size="sm"
+>
+  <div class="delete-dialog-content">
+    <p class="delete-message">
+      Are you sure you want to delete this card? This action cannot be undone.
+    </p>
+    <div class="delete-actions">
+      <button
+        onclick={() => showDeleteConfirm = false}
+        class="cancel-btn neu-subtle"
+      >
+        Cancel
+      </button>
+      <button
+        onclick={handleDelete}
+        class="confirm-delete-btn"
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+</NeuDialog>
+
 <style>
-  .card-content :global(img) {
+  .card-editor-container {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 44px 24px;
+  }
+
+  .animate-slide-left {
+    animation: slideLeft 0.3s ease-out;
+  }
+
+  @keyframes slideLeft {
+    from {
+      opacity: 0;
+      transform: translateX(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .editor-title {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 32px 0;
+    letter-spacing: -0.02em;
+  }
+
+  .editor-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .field-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .cloze-hint {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text-secondary);
+    margin-left: 8px;
+  }
+
+  .editor-container {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .deck-selector {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .deck-select {
+    width: 100%;
+    padding: 14px 40px 14px 16px;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    appearance: none;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .select-arrow {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+
+  .tags-container {
+    padding: 12px;
+  }
+
+  .cloze-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    cursor: pointer;
+    border: none;
+    width: fit-content;
+  }
+
+  .cloze-shortcut {
+    font-size: 11px;
+    opacity: 0.6;
+  }
+
+  .cloze-info {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 4px 0 0 0;
+  }
+
+  .save-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .save-btn {
+    width: 100%;
+    padding: 16px 24px;
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 80%, #000));
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(196, 113, 79, 0.3);
+  }
+
+  .save-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(196, 113, 79, 0.4);
+  }
+
+  .save-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .saved-text {
+    color: white;
+  }
+
+  .save-btn:has(.saved-text) {
+    background: var(--success);
+    box-shadow: 0 4px 12px rgba(107, 143, 113, 0.3);
+  }
+
+  .save-hint {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .delete-btn {
+    width: 100%;
+    padding: 14px 24px;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--danger);
+    background: transparent;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+  }
+
+  .delete-btn:hover {
+    background: var(--danger);
+    color: white;
+  }
+
+  .preview-section {
+    margin-top: 40px;
+  }
+
+  .preview-title {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin: 0 0 16px 0;
+  }
+
+  .preview-card-label {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+  }
+
+  .preview-card {
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .preview-front {
+    padding: 28px 24px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-divider {
+    height: 1px;
+    background: color-mix(in srgb, var(--border) 30%, transparent);
+  }
+
+  .preview-back {
+    padding: 28px 24px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card-raised);
+  }
+
+  .preview-content {
+    width: 100%;
+    text-align: center;
+  }
+
+  .preview-text {
+    font-family: var(--serif);
+    font-size: 20px;
+    line-height: 1.7;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .preview-back .preview-text {
+    font-size: 18px;
+  }
+
+  .preview-card :global(img) {
     max-width: 100%;
     height: auto;
   }
 
-  .card-content :global(audio) {
+  .preview-card :global(audio) {
     width: 100%;
   }
 
-  .card-content :global(.cloze) {
+  .preview-card :global(.cloze) {
     font-weight: 600;
     color: var(--accent);
   }
 
-  .card-content :global(.cloze-deleted) {
+  .preview-card :global(.cloze-deleted) {
     background-color: var(--accent-soft);
     padding: 0.125rem 0.375rem;
     border-radius: 0.25rem;
+  }
+
+  /* Delete Dialog */
+  .delete-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .delete-message {
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .delete-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .cancel-btn {
+    flex: 1;
+    padding: 12px 20px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border: none;
+  }
+
+  .confirm-delete-btn {
+    flex: 1;
+    padding: 12px 20px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: var(--danger);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .confirm-delete-btn:hover {
+    opacity: 0.9;
   }
 </style>

@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { addToast } from "./toast";
   import DeckOptions from "./DeckOptions.svelte";
+  import NeuDropdown from "./ui/NeuDropdown.svelte";
   import {
     pickAndImportApkg,
     pickAndImportColpkg,
@@ -55,6 +56,7 @@
   let openDeckMenuId: number | null = $state(null);
   let selectedDecks: Set<number> = $state(new Set());
   let optionsDeckId: number | null = $state(null);
+  let selectionMode = $state(false);
   
   // Custom Study modal state
   let showCustomStudy = $state(false);
@@ -80,6 +82,7 @@
 
   function clearSelection() {
     selectedDecks = new Set();
+    selectionMode = false;
   }
 
   async function exportSelectedDecks(includeScheduling: boolean) {
@@ -108,14 +111,6 @@
       showImportMenu = false;
     }
   }
-
-  // Derived greeting based on time
-  const greeting = $derived.by(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  });
 
   // Derived total due cards
   const totalDue = $derived.by(() => {
@@ -324,53 +319,125 @@
   }
 
   async function handleDeckClick(deckId: number, deckName: string) {
-    onStudy(deckId, deckName);
+    if (selectionMode) {
+      toggleDeckSelection(deckId);
+    } else {
+      onStudy(deckId, deckName);
+    }
   }
+
+  const importDropdownItems = [
+    {
+      label: "Import .apkg",
+      description: "Anki deck package",
+      onClick: handleImportApkg
+    },
+    {
+      label: "Import .colpkg",
+      description: "Full collection",
+      onClick: handleImportColpkg
+    },
+    {
+      label: "Import text/CSV",
+      description: "Text file import",
+      onClick: handleImportText
+    }
+  ];
 </script>
 
-<div class="max-w-5xl mx-auto">
-  <!-- Header with greeting -->
-  <div class="mb-8">
-    <h1 class="text-2xl font-semibold text-text-primary mb-2">{greeting}</h1>
-    <p class="text-text-secondary">
-      {totalDue} cards due today across {decks.length} {decks.length === 1 ? 'deck' : 'decks'}
-    </p>
+<div class="max-w-[860px] mx-auto px-9 pt-13 pb-13" style="animation: fadeUp 0.4s ease-out;">
+  <!-- Header Row -->
+  <div class="flex justify-between items-start gap-4 mb-12">
+    <div>
+      <h1 style="font-family: var(--serif); font-size: 36px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; margin-bottom: 4px;">Your Decks</h1>
+      <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">{totalDue} cards due today</p>
+    </div>
+    <div class="flex items-center gap-2">
+      {#if selectionMode && selectedDecks.size > 0}
+        <button
+          onclick={() => exportSelectedDecks(false)}
+          class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Export {selectedDecks.size}</span>
+        </button>
+        <button
+          onclick={clearSelection}
+          class="neu-subtle px-3.5 py-1.5 rounded-lg cursor-pointer"
+          style="background: var(--bg-card); box-shadow: var(--neu-subtle); font-family: var(--sans); font-size: 12px; color: var(--text-secondary);"
+        >
+          Clear
+        </button>
+      {:else}
+        <NeuDropdown items={importDropdownItems}>
+          <button
+            class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Import</span>
+          </button>
+        </NeuDropdown>
+        <button
+          onclick={() => selectionMode = !selectionMode}
+          class="neu-subtle px-3.5 py-1.5 rounded-lg cursor-pointer"
+          style="background: var(--bg-card); box-shadow: var(--neu-subtle); font-family: var(--sans); font-size: 12px; color: var(--text-secondary);"
+        >
+          Select
+        </button>
+      {/if}
+    </div>
   </div>
 
   <!-- Deck Grid -->
-  {#if selectedDecks.size > 0}
-    <div class="flex items-center gap-4 mb-4 p-3 bg-accent-soft rounded-xl">
-      <span class="text-sm text-text-primary font-medium">{selectedDecks.size} deck{selectedDecks.size > 1 ? 's' : ''} selected</span>
-      <button
-        class="px-3 py-1.5 text-sm bg-bg-card border border-border rounded-lg hover:bg-bg-subtle transition-colors cursor-pointer"
-        onclick={clearSelection}
-      >
-        Clear
-      </button>
-      <button
-        class="px-3 py-1.5 text-sm bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors cursor-pointer"
-        onclick={() => exportSelectedDecks(false)}
-      >
-        Export Selected
-      </button>
-    </div>
-  {/if}
-  
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+  <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
     {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
       <div
         data-deck-id={deck.id}
-        class="bg-bg-card border border-border rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-in fade-in slide-in-from-bottom-4 cursor-pointer relative"
-        style={`animation-delay: ${index * 40}ms; ${deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}`}
+        class="neu-raised neu-btn relative cursor-pointer"
+        style="
+          background: var(--bg-card);
+          box-shadow: var(--neu-up);
+          border-radius: var(--radius-md);
+          padding: 30px 32px;
+          animation: fadeUp 0.4s ease-out backwards;
+          animation-delay: {index * 40}ms;
+          {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
+          {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
+        "
         role="button"
         tabindex="0"
         onclick={() => handleDeckClick(deck.id, deck.name)}
         onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
       >
+        <!-- Selection checkbox -->
+        {#if selectionMode}
+          <div
+            class="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+            style="
+              background: {selectedDecks.has(deck.id) ? 'var(--accent)' : 'var(--bg-card)'};
+              box-shadow: var(--neu-subtle);
+            "
+            onclick={(e) => { e.stopPropagation(); toggleDeckSelection(deck.id); }}
+          >
+            {#if selectedDecks.has(deck.id)}
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+              </svg>
+            {/if}
+          </div>
+        {/if}
+
         <!-- Expand/Collapse button for nested decks -->
         {#if deck.level > 0}
           <button
-            class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center text-text-secondary hover:text-text-primary cursor-pointer"
+            class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center cursor-pointer"
+            style="color: var(--text-secondary);"
             onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -382,102 +449,63 @@
             </svg>
           </button>
         {/if}
-        
-        <!-- Checkbox -->
-        <label class="absolute top-4 cursor-pointer" style={deck.level > 0 ? 'left-10' : 'left-4'} onclick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={selectedDecks.has(deck.id)}
-            onchange={() => toggleDeckSelection(deck.id)}
-            class="w-5 h-5 rounded border-border text-accent focus:ring-accent/30"
-          />
-        </label>
-        
-        <div class="flex justify-between items-start mb-4 pt-6">
-          <h3 class="text-lg font-semibold text-text-primary line-clamp-2">{deck.short_name || deck.name}</h3>
-          <div class="relative">
-            <button
-              class="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-subtle transition-colors cursor-pointer"
-              aria-label="Deck options"
-              onclick={(e) => { e.stopPropagation(); openDeckMenuId = openDeckMenuId === deck.id ? null : deck.id; }}
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-              </svg>
-            </button>
-            {#if openDeckMenuId === deck.id}
-              <div class="absolute right-0 mt-1 w-48 bg-bg-card border border-border rounded-xl shadow-lg z-20 overflow-hidden">
-                <button
-                  class="w-full px-4 py-2.5 text-left text-sm text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer flex items-center gap-2"
-                  onclick={(e) => { e.stopPropagation(); optionsDeckId = deck.id; openDeckMenuId = null; }}
-                >
-                  <svg class="h-4 w-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Deck Options
-                </button>
-                <button
-                  class="w-full px-4 py-2.5 text-left text-sm text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer flex items-center gap-2"
-                  onclick={(e) => { e.stopPropagation(); handleExportDeck(deck.id, false); }}
-                >
-                  <svg class="h-4 w-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4 8l-4-4m0 0L8 16m4-4v12" />
-                  </svg>
-                  Export Deck (.apkg)
-                </button>
-                <button
-                  class="w-full px-4 py-2.5 text-left text-sm text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer flex items-center gap-2"
-                  onclick={(e) => { e.stopPropagation(); handleExportDeck(deck.id, true); }}
-                >
-                  <svg class="h-4 w-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4 8l-4-4m0 0L8 16m4-4v12" />
-                  </svg>
-                  Export with scheduling
-                </button>
-              </div>
-            {/if}
+
+        <!-- Streak badge -->
+        <div
+          class="absolute top-4 right-4 neu-subtle px-2 py-1 rounded-lg"
+          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+        >
+          <span style="font-family: var(--sans); font-size: 12px; color: var(--success);">🔥 {deck.card_count}d</span>
+        </div>
+
+        <!-- Deck content -->
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size: 30px;">📚</span>
+          <div>
+            <h3 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); line-clamp: 2;">{deck.short_name || deck.name}</h3>
+            <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">{deck.card_count} cards</p>
           </div>
         </div>
-        
-        <div class="flex flex-wrap gap-2 mb-6">
+
+        <!-- Stats row -->
+        <div class="flex items-center gap-4">
           {#if deck.new_count > 0}
-            <span class="inline-flex items-center px-2 py-1 bg-[#DBEAFE] text-[#1D4ED8] text-xs font-medium rounded-full">
-              New: {deck.new_count}
-            </span>
+            <div class="flex items-center gap-1.5">
+              <div class="w-[7px] h-[7px] rounded-full" style="background: #3B82F6;"></div>
+              <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.new_count} new</span>
+            </div>
           {/if}
           {#if deck.learn_count > 0}
-            <span class="inline-flex items-center px-2 py-1 bg-[#FCE7F3] text-[#BE185D] text-xs font-medium rounded-full">
-              Learn: {deck.learn_count}
-            </span>
+            <div class="flex items-center gap-1.5">
+              <div class="w-[7px] h-[7px] rounded-full" style="background: #EC4899;"></div>
+              <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.learn_count} due</span>
+            </div>
           {/if}
           {#if deck.review_count > 0}
-            <span class="inline-flex items-center px-2 py-1 bg-[#D1FAE5] text-[#065F46] text-xs font-medium rounded-full">
-              Review: {deck.review_count}
-            </span>
+            <div class="flex items-center gap-1.5">
+              <div class="w-[7px] h-[7px] rounded-full" style="background: #10B981;"></div>
+              <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.review_count} due</span>
+            </div>
           {/if}
         </div>
-        
-        {#if deck.new_count === 0 && deck.learn_count === 0 && deck.review_count === 0}
-          <div class="text-text-secondary text-sm text-center py-2">
-            All caught up ✓
-          </div>
-        {:else}
-          <button
-            class="w-full px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors text-sm font-medium cursor-pointer"
-            onclick={() => handleDeckClick(deck.id, deck.name)}
-          >
-            Study Now
-          </button>
-        {/if}
       </div>
     {/each}
 
     <!-- Loading skeletons -->
     {#if isLoading}
       {#each Array(3) as _, index}
-        <div class="bg-bg-card border border-border rounded-2xl p-6 animate-in fade-in slide-in-from-bottom-4" style={`animation-delay: ${index * 40}ms`}>
-          <div class="skeleton h-5 w-3/4 mb-4"></div>
+        <div
+          class="neu-raised"
+          style="
+            background: var(--bg-card);
+            box-shadow: var(--neu-up);
+            border-radius: var(--radius-md);
+            padding: 30px 32px;
+            animation: fadeUp 0.4s ease-out backwards;
+            animation-delay: {index * 40}ms;
+          "
+        >
+          <div class="skeleton h-6 w-3/4 mb-4"></div>
           <div class="flex gap-2 mb-6">
             <div class="skeleton h-6 w-12 rounded-full"></div>
             <div class="skeleton h-6 w-16 rounded-full"></div>
@@ -491,44 +519,77 @@
     {#if !isCreatingDeck && !isLoading}
       <button
         onclick={handleCreateDeckClick}
-        class="bg-bg-card border-2 border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] transition-all duration-200 hover:border-accent/50 hover:bg-accent-soft/20 cursor-pointer"
+        class="flex flex-col items-center justify-center cursor-pointer"
+        style="
+          background: var(--bg-base);
+          box-shadow: var(--neu-down);
+          border: 2px dashed var(--border);
+          border-radius: var(--radius-md);
+          padding: 30px 32px;
+          min-height: 200px;
+          animation: fadeUp 0.4s ease-out backwards;
+          animation-delay: {decks.filter(d => shouldShowDeck(d)).length * 40}ms;
+        "
       >
-        <svg class="h-10 w-10 text-text-secondary mb-3 transition-colors hover:text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
-        <span class="text-text-primary font-medium">+ New Deck</span>
-      </button>
-      <!-- Custom Study Button -->
-      <button
-        onclick={openCustomStudyModal}
-        class="bg-bg-card border-2 border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] transition-all duration-200 hover:border-accent/50 hover:bg-accent-soft/20 cursor-pointer"
-      >
-        <svg class="h-10 w-10 text-text-secondary mb-3 transition-colors hover:text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-        <span class="text-text-primary font-medium">Custom Study</span>
+        <span style="font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--text-primary);">New Deck</span>
       </button>
     {:else if isCreatingDeck}
-      <div class="bg-bg-card border-2 border-dashed border-accent rounded-2xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] animate-in fade-in zoom-in-95">
+      <div
+        class="flex flex-col items-center justify-center"
+        style="
+          background: var(--bg-card);
+          box-shadow: var(--neu-down);
+          border: 2px dashed var(--accent);
+          border-radius: var(--radius-md);
+          padding: 30px 32px;
+          min-height: 200px;
+          animation: fadeUp 0.4s ease-out;
+        "
+      >
         <div class="w-full mb-4">
           <input
             type="text"
             bind:value={newDeckName}
             onkeydown={handleKeyDown}
-            class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+            class="w-full px-4 py-2 rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none"
+            style="
+              background: var(--bg-subtle);
+              box-shadow: var(--neu-down);
+              border: none;
+              font-family: var(--sans);
+            "
             placeholder="Deck name..."
           />
         </div>
         <div class="flex gap-3 w-full">
           <button
             onclick={handleCreateDeckSubmit}
-            class="flex-1 px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors text-sm font-medium cursor-pointer"
+            class="flex-1 px-4 py-2 rounded-xl cursor-pointer"
+            style="
+              background: var(--accent);
+              color: white;
+              font-family: var(--sans);
+              font-size: 14px;
+              font-weight: 500;
+              border: none;
+            "
           >
             Create
           </button>
           <button
             onclick={handleCancelCreateDeck}
-            class="px-4 py-2 bg-bg-subtle text-text-primary rounded-xl hover:bg-bg-subtle/80 transition-colors text-sm font-medium cursor-pointer"
+            class="px-4 py-2 rounded-xl cursor-pointer"
+            style="
+              background: var(--bg-subtle);
+              color: var(--text-primary);
+              font-family: var(--sans);
+              font-size: 14px;
+              font-weight: 500;
+              border: none;
+            "
           >
             Cancel
           </button>
@@ -562,7 +623,7 @@
             <input
               type="text"
               bind:value={customStudyName}
-              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+              class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
               placeholder="My Custom Study Deck"
             />
           </div>
@@ -576,7 +637,7 @@
             <input
               type="text"
               bind:value={customStudyQuery}
-              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all font-mono text-sm"
+              class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all font-mono text-sm"
               placeholder="is:due"
             />
             <div class="mt-2 text-xs text-text-secondary">
@@ -600,7 +661,7 @@
               bind:value={customStudyLimit}
               min="1"
               max="9999"
-              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+              class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
             />
           </div>
 
@@ -609,7 +670,7 @@
             <label class="block text-sm font-medium text-text-secondary mb-1">Sort Order</label>
             <select
               bind:value={customStudyOrder}
-              class="w-full px-4 py-2 bg-bg-subtle border border-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+              class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
             >
               {#each orderLabels as label, index}
                 <option value={index}>{label}</option>

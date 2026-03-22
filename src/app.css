@@ -1,163 +1,239 @@
 @import "tailwindcss";
 
-/* Design System: Global CSS Custom Properties */
+/* ══════════════════════════════════════════
+   MNEMORA DESIGN SYSTEM — Neumorphic Warm
+   ══════════════════════════════════════════ */
+
 :root {
-  --bg-base: #F7F4EF;
-  --bg-card: #FFFFFF;
+  /* Surface palette */
+  --bg-base: #F0EBE3;
+  --bg-deep: #E8E2D8;
+  --bg-card: #F7F4EF;
+  --bg-card-raised: #FAF8F4;
   --bg-subtle: #EDE9E3;
-  --text-primary: #1C1917;
-  --text-secondary: #78716C;
+
+  /* Text palette */
+  --text-primary: #2C2825;
+  --text-secondary: #8C8278;
+  --text-muted: #B5ADA3;
+
+  /* Accent palette */
   --accent: #C4714F;
   --accent-soft: #F0E6DF;
   --success: #6B8F71;
   --danger: #C0444A;
   --warning: #C49A4F;
-  --border: #E2DBD2;
 
-  /* Font Stacks */
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --serif: 'Georgia', serif;
+  /* Border — used sparingly, neumorphic elements use shadows instead */
+  --border: #DDD6CC;
 
-  /* Base Styles */
-  font: 18px/145% system-ui, 'Georgia', serif;
-  letter-spacing: 0.18px;
+  /* Neumorphic shadows */
+  --neu-up: 5px 5px 12px rgba(0,0,0,0.07), -4px -4px 10px rgba(255,255,255,0.82);
+  --neu-down: inset 2px 2px 5px rgba(0,0,0,0.07), inset -2px -2px 5px rgba(255,255,255,0.6);
+  --neu-subtle: 2px 2px 6px rgba(0,0,0,0.045), -2px -2px 5px rgba(255,255,255,0.7);
+  --shadow-warm: 0 4px 24px rgba(0,0,0,0.06);
+
+  /* Radii */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  /* Font stacks */
+  --sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --serif: 'Source Serif 4', Georgia, 'Palatino Linotype', serif;
+
+  /* Overlay */
+  --overlay: rgba(0,0,0,0.35);
+
+  /* Base document styles */
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
   color: var(--text-primary);
   background: var(--bg-base);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  --shadow-warm: 0 4px 24px rgba(0,0,0,0.06);
-  --radius-2xl: 1rem;
 }
 
-/* Dark Theme */
+/* ── Dark Theme ── */
 :root.dark {
   --bg-base: #1C1917;
+  --bg-deep: #141210;
   --bg-card: #292524;
+  --bg-card-raised: #2E2A27;
   --bg-subtle: #44403C;
+
   --text-primary: #FAFAF9;
   --text-secondary: #A8A29E;
-  --accent: #C4714F;
-  --accent-soft: #44403C;
-  --success: #6B8F71;
+  --text-muted: #78716C;
+
+  --accent: #D4845F;
+  --accent-soft: #3D2E26;
+  --success: #7DAF83;
   --danger: #F87171;
   --warning: #FBBF24;
   --border: #44403C;
+  --overlay: rgba(0,0,0,0.6);
+
+  --neu-up: 5px 5px 12px rgba(0,0,0,0.35), -3px -3px 8px rgba(255,255,255,0.04);
+  --neu-down: inset 2px 2px 5px rgba(0,0,0,0.3), inset -2px -2px 5px rgba(255,255,255,0.03);
+  --neu-subtle: 2px 2px 6px rgba(0,0,0,0.25), -2px -2px 5px rgba(255,255,255,0.03);
   --shadow-warm: 0 4px 24px rgba(0,0,0,0.3);
 }
 
-/* Smooth Transitions — scoped to interactive elements only */
-button,
-a,
-input,
-select,
-textarea,
-[role="button"],
-.transition-colors {
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-/* Tailwind v4 Theme Configuration */
-
-@theme {
-
-  --color-bg-base: var(--bg-base);
-
-  --color-bg-card: var(--bg-card);
-
-  --color-bg-subtle: var(--bg-subtle);
-
-  --color-text-primary: var(--text-primary);
-
-  --color-text-secondary: var(--text-secondary);
-
-  --color-accent: var(--accent);
-
-  --color-accent-soft: var(--accent-soft);
-
-  --color-success: var(--success);
-
-  --color-danger: var(--danger);
-
-  --color-warning: var(--warning);
-
-  --color-border: var(--border);
-
-  --shadow-warm: var(--shadow-warm);
-
-  --radius-2xl: var(--radius-2xl);
-
-}
-
-/* Typography Refinement */
-h1, h2, h3 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-p, li {
-  line-height: 1.7;
-}
-
-.card-content {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.25rem;
-  line-height: 1.85;
-  /* Card flip animation optimization */
-  will-change: transform, opacity;
-}
-
-/* Page transition optimization */
-main > div {
-  will-change: transform;
-}
-
-/* Main content area paint isolation */
-main {
-  contain: content;
-}
-
-.text-muted {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-/* Skeleton Animation */
-@keyframes shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
+/* ── Skeleton (themed) ── */
 .skeleton {
-  background: linear-gradient(90deg, #EDE9E3 25%, #F7F4EF 50%, #EDE9E3 75%);
+  background: linear-gradient(90deg, var(--bg-subtle) 25%, var(--bg-base) 50%, var(--bg-subtle) 75%);
   background-size: 800px 100%;
   animation: shimmer 1.4s infinite linear;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
-/* Row fade-in animation for card browser */
-@keyframes rowFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ── Neumorphic utility classes ── */
+.neu-raised {
+  background: var(--bg-card);
+  box-shadow: var(--neu-up);
+  border: none;
+  border-radius: var(--radius-md);
+}
+.neu-pressed {
+  background: var(--bg-deep);
+  box-shadow: var(--neu-down);
+  border: none;
+  border-radius: var(--radius-md);
+}
+.neu-subtle {
+  background: var(--bg-card);
+  box-shadow: var(--neu-subtle);
+  border: none;
+  border-radius: var(--radius-sm);
+}
+.neu-btn {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.neu-btn:hover {
+  box-shadow: 7px 7px 16px rgba(0,0,0,0.09), -5px -5px 12px rgba(255,255,255,0.88);
+  transform: translateY(-1px);
+}
+.neu-btn:active {
+  box-shadow: var(--neu-down);
+  transform: translateY(0);
 }
 
-/* Responsive Base Font Size */
-@media (max-width: 1024px) {
-  :root {
-    font-size: 16px;
-  }
+/* ── Transitions — scoped to interactive elements only ── */
+button, a, input, select, textarea, [role="button"], .transition-colors {
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-/* Body Reset */
-body {
-  margin: 0;
-  min-height: 100vh;
+/* ── Typography ── */
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
+p, li { line-height: 1.7; }
+.card-content {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  line-height: 1.85;
+}
+.font-serif { font-family: var(--serif); }
+.font-sans { font-family: var(--sans); }
+
+/* ── Keyframe Animations ── */
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes scaleIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+@keyframes slideLeft { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:translateX(0); } }
+@keyframes slideRight { from { opacity:0; transform:translateX(-18px); } to { opacity:1; transform:translateX(0); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes progressFill { from { width: 0%; } }
+@keyframes modalIn { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+@keyframes rowFadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+/* Card study animations */
+@keyframes cardFlyToDeck {
+  0% { transform: scale(1) translate(0,0) rotate(0deg); opacity:1; }
+  50% { transform: scale(0.45) translate(260px,190px) rotate(12deg); opacity:0.85; }
+  100% { transform: scale(0.1) translate(430px,310px) rotate(20deg); opacity:0; }
+}
+@keyframes cardReturnShuffle {
+  0% { transform: translateX(0) translateY(0) rotate(0deg); opacity:1; }
+  20% { transform: translateX(-60px) translateY(-10px) rotate(-8deg); opacity:0.7; }
+  50% { transform: translateX(-30px) translateY(25px) rotate(4deg); opacity:0.4; }
+  70% { transform: translateX(10px) translateY(10px) rotate(-2deg); opacity:0.6; }
+  100% { transform: translateX(0) translateY(0) rotate(0deg); opacity:1; }
+}
+@keyframes deckReceive { 0% { transform:scale(1); } 30% { transform:scale(1.14); } 60% { transform:scale(0.95); } 100% { transform:scale(1); } }
+@keyframes deckCardArrive { from { transform:translateY(-10px) scale(1.15); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } }
+@keyframes unshuffleIn {
+  from { transform: translate(var(--sx,0px),var(--sy,0px)) rotate(var(--sr,0deg)) scale(0.4); opacity:0; }
+  55% { transform: translate(calc(var(--sx,0px)*0.08),calc(var(--sy,0px)*0.08)) rotate(calc(var(--sr,0deg)*0.04)) scale(1.03); opacity:1; }
+  to { transform: translate(0,0) rotate(0deg) scale(1); opacity:1; }
+}
+
+/* 3D card flip */
+.card-flip-container { perspective: 1200px; }
+.card-flip-inner {
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.15, 1);
+  transform-style: preserve-3d;
+  position: relative;
+}
+.card-flip-inner.flipped { transform: rotateY(180deg); }
+.card-face { backface-visibility: hidden; position: absolute; inset: 0; }
+.card-back-face { transform: rotateY(180deg); }
+
+/* Mini card flip (browse grid) */
+.mini-flip-container { perspective: 800px; }
+.mini-flip-inner {
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.15, 1);
+  transform-style: preserve-3d;
+  position: relative;
+}
+.mini-flip-inner.flipped { transform: rotateY(180deg); }
+
+/* Study animation classes */
+.card-fly-out { animation: cardFlyToDeck 0.7s cubic-bezier(0.4,0,0.2,1) forwards; }
+.card-return { animation: cardReturnShuffle 0.65s cubic-bezier(0.4,0,0.2,1); }
+.deck-receive { animation: deckReceive 0.45s cubic-bezier(0.34,1.56,0.64,1); }
+.unshuffle-card { animation: unshuffleIn 0.55s cubic-bezier(0.34,1.4,0.64,1) backwards; }
+
+/* Focus states — neumorphic */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: var(--neu-down), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Responsive */
+@media (max-width: 1024px) { :root { font-size: 15px; } }
+body { margin: 0; min-height: 100vh; }
+
+/* ── Tailwind v4 Theme ── */
+@theme {
+  --color-bg-base: var(--bg-base);
+  --color-bg-deep: var(--bg-deep);
+  --color-bg-card: var(--bg-card);
+  --color-bg-card-raised: var(--bg-card-raised);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --shadow-warm: var(--shadow-warm);
+  --shadow-neu-up: var(--neu-up);
+  --shadow-neu-down: var(--neu-down);
+  --shadow-neu-subtle: var(--neu-subtle);
 }

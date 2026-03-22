@@ -6,8 +6,9 @@
   import StudyView from "./lib/StudyView.svelte";
   import CardEditor from "./lib/CardEditor.svelte";
   import Dashboard from "./lib/Dashboard.svelte";
+  import DeckOverview from "./lib/DeckOverview.svelte";
   import StatsView from "./lib/StatsView.svelte";
-  import Toast from "./lib/Toast.svelte";
+  import NeuToast from "./lib/ui/NeuToast.svelte";
   import KeyboardShortcuts from "./lib/KeyboardShortcuts.svelte";
   import ImportModal from "./lib/ImportModal.svelte";
   import { exportCollectionColpkg, ImportError } from "./lib/importer";
@@ -24,14 +25,30 @@
   import PluginManager from "./lib/PluginManager.svelte";
 
   // Page state
-  type Page = 'dashboard' | 'study' | 'editor' | 'stats' | 'browser';
+  type Page = 'dashboard' | 'deckOverview' | 'study' | 'editor' | 'stats' | 'browser';
   let currentPage: Page = $state('dashboard');
+  let previousPage: Page = $state('dashboard');
   let browserQuery = $state('');
+  
+  // Card editor state
+  let editingCard = $state<any>(null);
+  
+  // Handle edit card from detail panel
+  function handleEditCard(card: any) {
+    editingCard = card;
+    navigate('editor');
+  }
+
+  // Navigation function
+  function navigate(page: Page) {
+    previousPage = currentPage;
+    currentPage = page;
+  }
 
   // Function to open browser with a specific query (e.g., from leech toast)
   function openBrowserWithQuery(query: string) {
     browserQuery = query;
-    currentPage = 'browser';
+    navigate('browser');
   }
 
   // Keyboard shortcuts
@@ -74,6 +91,7 @@
   // Study view state
   let currentDeckId: number | null = $state(null);
   let currentDeckName = $state("");
+  let activeDeck: any = $state(null);
 
   // Initialize on mount
   onMount(async () => {
@@ -190,14 +208,33 @@
     console.log("startReview called with deckId:", deckId, "deckName:", deckName);
     currentDeckId = deckId;
     currentDeckName = deckName;
-    currentPage = 'study';
+    navigate('study');
     console.log("State after startReview: currentPage=", currentPage, ", currentDeckId=", currentDeckId);
   }
 
+  function openDeckOverview(deck: any) {
+    activeDeck = deck;
+    currentDeckId = deck.id;
+    currentDeckName = deck.name;
+    navigate('deckOverview');
+  }
+
   function exitReviewMode() {
-    currentPage = 'dashboard';
+    if (currentPage === 'study' && previousPage === 'deckOverview') {
+      navigate('deckOverview');
+    } else {
+      navigate('dashboard');
+      currentDeckId = null;
+      currentDeckName = "";
+      activeDeck = null;
+    }
+  }
+
+  function goToDashboard() {
+    navigate('dashboard');
     currentDeckId = null;
     currentDeckName = "";
+    activeDeck = null;
   }
 
   // Global keyboard shortcuts
@@ -244,95 +281,60 @@
   <!-- App Shell -->
   <div class="min-h-screen bg-bg-base flex flex-col">
     <!-- Top Navigation -->
-    <nav class="h-12 bg-bg-base border-b border-border flex items-center px-6 justify-between">
-      <div class="text-sm font-medium text-text-primary">Anki Wrapper</div>
-      <div class="flex gap-4">
-        <button
-          onclick={() => currentPage = 'dashboard'}
-          class="p-2 rounded-lg transition-colors cursor-pointer {currentPage === 'dashboard' ? 'text-accent bg-accent-soft' : 'text-text-secondary hover:bg-bg-subtle'}"
-          aria-label="Dashboard"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-        </button>
-        <button
-          onclick={() => currentPage = 'editor'}
-          class="p-2 rounded-lg transition-colors cursor-pointer {currentPage === 'editor' ? 'text-accent bg-accent-soft' : 'text-text-secondary hover:bg-bg-subtle'}"
-          aria-label="Add Card"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-        <button
-          onclick={() => currentPage = 'browser'}
-          class="p-2 rounded-lg transition-colors cursor-pointer {currentPage === 'browser' ? 'text-accent bg-accent-soft' : 'text-text-secondary hover:bg-bg-subtle'}"
-          aria-label="Browse cards"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        </button>
-        <button
-          onclick={() => currentPage = 'stats'}
-          class="p-2 rounded-lg transition-colors cursor-pointer {currentPage === 'stats' ? 'text-accent bg-accent-soft' : 'text-text-secondary hover:bg-bg-subtle'}"
-          aria-label="Stats"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        </button>
-        <button
-          onclick={() => showImportModal = true}
-          class="px-3 py-1.5 bg-bg-subtle text-text-primary rounded-xl hover:bg-border transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={collectionStatus !== 'ready'}
-          title={collectionStatus === 'loading' ? 'Collection initializing...' : collectionStatus === 'error' ? 'Collection failed to load' : 'Import deck'}
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          Import Deck
-        </button>
-        <button
-          onclick={handleExportCollection}
-          class="p-2 rounded-lg transition-colors cursor-pointer text-text-secondary hover:bg-bg-subtle disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={collectionStatus !== 'ready'}
-          title={collectionStatus === 'loading' ? 'Collection initializing...' : collectionStatus === 'error' ? 'Collection failed to load' : 'Export collection'}
-          aria-label="Export collection"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-        </button>
-        <button
-          onclick={() => showImageOcclusion = true}
-          class="p-2 rounded-lg transition-colors cursor-pointer text-text-secondary hover:bg-bg-subtle"
-          title="Image Occlusion"
-          aria-label="Image Occlusion"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-          </svg>
-        </button>
-        <button
-          onclick={() => showPluginManager = true}
-          class="p-2 rounded-lg transition-colors cursor-pointer text-text-secondary hover:bg-bg-subtle"
-          title="Plugins"
-          aria-label="Plugins"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-          </svg>
-        </button>
+    <nav class="h-14 bg-bg-base border-b border-border flex items-center px-6 justify-between sticky top-0 z-50" style="height: 56px;">
+      <!-- Left Section -->
+      <div class="flex items-center min-w-[180px]">
+        {#if currentPage === 'deckOverview' || currentPage === 'study' || currentPage === 'browser' || currentPage === 'editor' || currentPage === 'stats'}
+          <!-- Back button when in deck context -->
+          <button
+            onclick={goToDashboard}
+            class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Decks</span>
+          </button>
+        {:else}
+          <!-- App name when on dashboard -->
+          <span style="font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em;">Mnemora</span>
+        {/if}
+      </div>
+
+      <!-- Center Section (only visible when deck is active) -->
+      {#if currentDeckId && (currentPage === 'deckOverview' || currentPage === 'study')}
+        <div class="flex items-center gap-2" style="animation: fadeIn 0.3s ease-out;">
+          <span style="font-family: var(--serif); font-size: 18px; font-weight: 500; color: var(--text-primary);">
+            {currentDeckName}
+          </span>
+        </div>
+      {/if}
+
+      <!-- Right Section -->
+      <div class="flex items-center justify-end gap-2.5 min-w-[180px]">
+        {#if currentDeckId && (currentPage === 'deckOverview' || currentPage === 'study')}
+          <!-- Add button when deck is active -->
+          <button
+            onclick={() => navigate('editor')}
+            class="neu-subtle flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Add</span>
+          </button>
+        {/if}
+        <!-- Settings gear button (always visible) -->
         <button
           onclick={() => showSettings = true}
-          class="p-2 rounded-lg transition-colors cursor-pointer text-text-secondary hover:bg-bg-subtle"
+          class="neu-subtle flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
+          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
           title="Settings"
           aria-label="Settings"
         >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
@@ -379,13 +381,25 @@
             in:fly={fly_if_enabled({ x: -30 })}
             out:fly={fly_if_enabled({ x: 30 })}
           >
-            <Dashboard collectionStatus={collectionStatus} onStudy={startReview} />
+            <Dashboard collectionStatus={collectionStatus} onStudy={openDeckOverview} />
+          </div>
+        {:else if currentPage === 'deckOverview' && activeDeck}
+          <div
+            in:fly={fly_if_enabled({ x: 30 })}
+            out:fly={fly_if_enabled({ x: -30 })}
+          >
+            <DeckOverview
+              deck={activeDeck}
+              onStudy={startReview}
+              onBrowse={() => navigate('browser')}
+              onStats={() => navigate('stats')}
+            />
           </div>
         {:else if currentPage === 'study' && currentDeckId}
           <div class="h-full">
             {console.log("Rendering StudyView with deckId:", currentDeckId)}
-            <StudyView 
-              deckId={currentDeckId} 
+            <StudyView
+              deckId={currentDeckId}
               deckName={currentDeckName}
               onExit={exitReviewMode}
             />
@@ -396,7 +410,10 @@
             out:fly={fly_if_enabled({ x: -30 })}
             class="max-w-2xl mx-auto"
           >
-            <CardEditor onBack={() => currentPage = 'dashboard'} />
+            <CardEditor
+              onBack={() => { navigate(previousPage); editingCard = null; }}
+              editCard={editingCard}
+            />
           </div>
         {:else if currentPage === 'stats'}
           <div
@@ -407,9 +424,9 @@
           </div>
         {:else if currentPage === 'browser'}
           <div class="h-full">
-            <CardBrowser 
-              initialQuery={browserQuery} 
-              onClose={() => { currentPage = 'dashboard'; browserQuery = ''; }} 
+            <CardBrowser
+              initialQuery={browserQuery}
+              onClose={() => { navigate(previousPage); browserQuery = ''; }}
             />
           </div>
         {/if}
@@ -417,7 +434,7 @@
     </main>
 
     <!-- Toast Notifications -->
-    <Toast />
+    <NeuToast />
 
     <!-- Keyboard Shortcuts Modal -->
     <KeyboardShortcuts isOpen={showKeyboardShortcuts} onClose={() => showKeyboardShortcuts = false} />

@@ -1,17 +1,18 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { fly, fade } from "svelte/transition";
   import { addToast } from "./toast";
+  import NeuDialog from "./ui/NeuDialog.svelte";
 
   interface Props {
     deckId: number;
     deckName: string;
     isFiltered?: boolean;
+    isOpen: boolean;
     onClose: () => void;
   }
 
-  let { deckId, deckName, isFiltered = false, onClose }: Props = $props();
+  let { deckId, deckName, isFiltered = false, isOpen, onClose }: Props = $props();
 
   interface DeckOptions {
     configId: number;
@@ -201,354 +202,675 @@
       addToast(`Failed to save: ${e}`, "error");
     }
   }
-
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div 
-  class="fixed inset-0 bg-black/15 z-50 flex justify-end"
-  onclick={handleBackdropClick}
-  transition:fade={{ duration: 150 }}
->
-  <div 
-    class="w-[420px] bg-white h-full border-l border-border flex flex-col"
-    transition:fly={{ x: 420, duration: 240 }}
-  >
-    <!-- Header -->
-    <div class="px-6 py-4 border-b border-border flex items-center justify-between">
-      <div>
-        <h2 class="text-lg font-semibold text-text-primary">Deck Options</h2>
-        <p class="text-sm text-text-secondary">{deckName}</p>
+<NeuDialog {isOpen} {onClose} title="Deck Options" size="sm">
+  <div class="deck-options">
+    <p class="deck-name">{deckName}</p>
+
+    {#if isLoading}
+      <div class="loading-state">
+        {#each Array(5) as _}
+          <div class="skeleton-line"></div>
+        {/each}
       </div>
-      <button
-        onclick={onClose}
-        class="p-2 hover:bg-bg-subtle rounded-lg transition-colors"
-      >
-        <svg class="h-5 w-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto px-6 py-4">
-      {#if isLoading}
-        <div class="space-y-4">
-          {#each Array(5) as _}
-            <div class="h-12 bg-bg-subtle rounded-lg animate-pulse"></div>
-          {/each}
+    {:else if isFiltered}
+      <!-- Filtered Deck Options -->
+      <div class="filtered-deck-section">
+        <h3 class="section-title">Filtered Deck Actions</h3>
+        <p class="section-description">
+          This is a filtered deck. Use these actions to manage the cards in this deck.
+        </p>
+        <div class="action-buttons">
+          <button
+            onclick={rebuildFilteredDeck}
+            class="action-btn primary-btn"
+          >
+            Rebuild
+          </button>
+          <button
+            onclick={emptyFilteredDeck}
+            class="action-btn neu-subtle"
+          >
+            Empty
+          </button>
         </div>
-      {:else if isFiltered}
-        <!-- Filtered Deck Options -->
-        <div class="space-y-4">
-          <div class="bg-accent-soft/20 border border-accent/30 rounded-xl p-4">
-            <h3 class="font-medium text-text-primary mb-2">Filtered Deck Actions</h3>
-            <p class="text-sm text-text-secondary mb-4">
-              This is a filtered deck. Use these actions to manage the cards in this deck.
+      </div>
+    {:else}
+      <!-- New Cards -->
+      <div class="option-section">
+        <h3 class="section-title">New Cards</h3>
+        
+        <div class="option-row">
+          <label class="option-label">Cards per day</label>
+          <input
+            type="number"
+            bind:value={opts.newCardsPerDay}
+            min="0"
+            max="9999"
+            class="option-input neu-pressed"
+          />
+        </div>
+
+        <div class="option-row">
+          <label class="option-label">Learning steps (minutes)</label>
+          <div class="steps-container">
+            {#each opts.learningSteps as step, i}
+              <span class="step-pill neu-subtle">
+                {step}
+                <button onclick={() => removeLearningStep(i)} class="step-remove">
+                  <svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            {/each}
+          </div>
+          <div class="step-input-row">
+            <input
+              type="number"
+              bind:value={newLearningStep}
+              placeholder="Add step (minutes)"
+              class="step-input neu-pressed"
+              onkeydown={(e) => e.key === "Enter" && addLearningStep()}
+            />
+            <button onclick={addLearningStep} class="add-step-btn neu-subtle">Add</button>
+          </div>
+        </div>
+
+        <div class="option-row-grid">
+          <div class="option-row">
+            <label class="option-label">Graduating interval (days)</label>
+            <input
+              type="number"
+              bind:value={opts.graduatingInterval}
+              min="0"
+              class="option-input neu-pressed"
+            />
+          </div>
+          <div class="option-row">
+            <label class="option-label">Easy interval (days)</label>
+            <input
+              type="number"
+              bind:value={opts.easyInterval}
+              min="0"
+              class="option-input neu-pressed"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Reviews -->
+      <div class="option-section">
+        <h3 class="section-title">Reviews</h3>
+        
+        <div class="option-row">
+          <label class="option-label">Max reviews per day</label>
+          <input
+            type="number"
+            bind:value={opts.maxReviewsPerDay}
+            min="0"
+            class="option-input neu-pressed"
+          />
+        </div>
+
+        <div class="option-row-grid">
+          <div class="option-row">
+            <label class="option-label">Easy bonus</label>
+            <input
+              type="number"
+              bind:value={opts.easyBonus}
+              min="0"
+              step="0.01"
+              class="option-input neu-pressed"
+            />
+          </div>
+          <div class="option-row">
+            <label class="option-label">Interval modifier</label>
+            <input
+              type="number"
+              bind:value={opts.intervalModifier}
+              min="0"
+              step="0.01"
+              class="option-input neu-pressed"
+            />
+          </div>
+        </div>
+
+        <div class="option-row">
+          <label class="option-label">Maximum interval (days)</label>
+          <input
+            type="number"
+            bind:value={opts.maximumInterval}
+            min="0"
+            class="option-input neu-pressed"
+          />
+        </div>
+      </div>
+
+      <!-- FSRS -->
+      <div class="option-section">
+        <h3 class="section-title">FSRS</h3>
+        
+        <div class="option-row toggle-row">
+          <label class="option-label">Enable FSRS</label>
+          <button
+            onclick={() => opts.fsrsEnabled = !opts.fsrsEnabled}
+            class="toggle-btn {opts.fsrsEnabled ? 'active' : ''}"
+          >
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+
+        <div class="option-row">
+          <label class="option-label">Desired retention: {Math.round(opts.desiredRetention * 100)}%</label>
+          <input
+            type="range"
+            bind:value={opts.desiredRetention}
+            min="0.70"
+            max="0.97"
+            step="0.01"
+            class="range-slider"
+          />
+          <div class="range-labels">
+            <span>70%</span>
+            <span>97%</span>
+          </div>
+        </div>
+
+        <div class="option-row">
+          <label class="option-label">FSRS Weights</label>
+          <div class="weights-display neu-pressed">
+            <p class="weights-text">
+              {opts.fsrsWeights.length > 0 ? opts.fsrsWeights.join(", ") : "Using default weights"}
             </p>
-            <div class="flex gap-3">
+            {#if isOptimizing}
+              <p class="weights-status optimizing">Analyzing review history...</p>
+            {:else if optimizationResult}
+              {#if !optimizationResult.success}
+                <p class="weights-status warning">
+                  Need at least 400 reviews for reliable FSRS optimization. You have {optimizationResult.review_count}.
+                </p>
+              {:else}
+                <p class="weights-status success">
+                  Optimized! Current retention: {Math.round(optimizationResult.current_retention * 100)}% → Predicted: {Math.round(optimizationResult.predicted_retention * 100)}%
+                </p>
+              {/if}
+            {:else}
+              <p class="weights-status">
+                FSRS weights optimized from your review history.
+              </p>
+            {/if}
+            <div class="weights-actions">
               <button
-                onclick={rebuildFilteredDeck}
-                class="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
+                onclick={handleOptimizeFsrs}
+                disabled={isOptimizing}
+                class="optimize-btn neu-subtle"
               >
-                Rebuild
+                {isOptimizing ? 'Optimizing...' : 'Optimize'}
               </button>
-              <button
-                onclick={emptyFilteredDeck}
-                class="flex-1 px-4 py-2 bg-bg-subtle text-text-primary rounded-lg hover:bg-bg-subtle/80 transition-colors text-sm font-medium"
-              >
-                Empty
-              </button>
+              {#if opts.fsrsWeights.length > 0}
+                <button
+                  onclick={resetFsrsWeights}
+                  class="reset-btn neu-subtle"
+                >
+                  Reset
+                </button>
+              {/if}
             </div>
           </div>
         </div>
-      {:else}
-        <!-- New Cards -->
-        <details class="group mb-4" open>
-          <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-            <span>New Cards</span>
-            <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div class="space-y-4 pt-2">
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Cards per day</label>
-              <input
-                type="number"
-                bind:value={opts.newCardsPerDay}
-                min="0"
-                max="9999"
-                class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-              />
-            </div>
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Learning steps (minutes)</label>
-              <div class="flex flex-wrap gap-2 mb-2">
-                {#each opts.learningSteps as step, i}
-                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-bg-subtle rounded text-sm">
-                    {step}
-                    <button onclick={() => removeLearningStep(i)} class="text-text-secondary hover:text-danger">
-                      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                {/each}
-              </div>
-              <div class="flex gap-2">
-                <input
-                  type="number"
-                  bind:value={newLearningStep}
-                  placeholder="Add step (minutes)"
-                  class="flex-1 px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary text-sm"
-                  onkeydown={(e) => e.key === "Enter" && addLearningStep()}
-                />
-                <button onclick={addLearningStep} class="px-3 py-2 bg-accent text-white rounded-lg text-sm">Add</button>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm text-text-secondary mb-1">Graduating interval (days)</label>
-                <input
-                  type="number"
-                  bind:value={opts.graduatingInterval}
-                  min="0"
-                  class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-                />
-              </div>
-              <div>
-                <label class="block text-sm text-text-secondary mb-1">Easy interval (days)</label>
-                <input
-                  type="number"
-                  bind:value={opts.easyInterval}
-                  min="0"
-                  class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-                />
-              </div>
-            </div>
-          </div>
-        </details>
+      </div>
 
-        <!-- Reviews -->
-        <details class="group mb-4" open>
-          <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-            <span>Reviews</span>
-            <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div class="space-y-4 pt-2">
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Max reviews per day</label>
-              <input
-                type="number"
-                bind:value={opts.maxReviewsPerDay}
-                min="0"
-                class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-              />
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm text-text-secondary mb-1">Easy bonus</label>
-                <input
-                  type="number"
-                  bind:value={opts.easyBonus}
-                  min="0"
-                  step="0.01"
-                  class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-                />
-              </div>
-              <div>
-                <label class="block text-sm text-text-secondary mb-1">Interval modifier</label>
-                <input
-                  type="number"
-                  bind:value={opts.intervalModifier}
-                  min="0"
-                  step="0.01"
-                  class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-                />
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Maximum interval (days)</label>
-              <input
-                type="number"
-                bind:value={opts.maximumInterval}
-                min="0"
-                class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-              />
-            </div>
+      <!-- Lapses -->
+      <div class="option-section">
+        <h3 class="section-title">Lapses</h3>
+        
+        <div class="option-row">
+          <label class="option-label">Relearning steps (minutes)</label>
+          <div class="steps-container">
+            {#each opts.lapseSteps as step, i}
+              <span class="step-pill neu-subtle">
+                {step}
+                <button onclick={() => removeLapseStep(i)} class="step-remove">
+                  <svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            {/each}
           </div>
-        </details>
-
-        <!-- FSRS -->
-        <details class="group mb-4" open>
-          <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-            <span>FSRS</span>
-            <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div class="space-y-4 pt-2">
-            <div class="flex items-center justify-between">
-              <label class="text-sm text-text-secondary">Enable FSRS</label>
-              <button
-                onclick={() => opts.fsrsEnabled = !opts.fsrsEnabled}
-                class="relative w-11 h-6 rounded-full transition-colors {opts.fsrsEnabled ? 'bg-accent' : 'bg-bg-subtle'}"
-              >
-                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {opts.fsrsEnabled ? 'translate-x-5' : ''}"></span>
-              </button>
-            </div>
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Desired retention: {Math.round(opts.desiredRetention * 100)}%</label>
-              <input
-                type="range"
-                bind:value={opts.desiredRetention}
-                min="0.70"
-                max="0.97"
-                step="0.01"
-                class="w-full"
-              />
-              <div class="flex justify-between text-xs text-text-secondary mt-1">
-                <span>70%</span>
-                <span>97%</span>
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">FSRS Weights</label>
-              <div class="p-3 bg-bg-subtle rounded-lg">
-                <p class="text-xs font-mono text-text-secondary break-all">
-                  {opts.fsrsWeights.length > 0 ? opts.fsrsWeights.join(", ") : "Using default weights"}
-                </p>
-                {#if isOptimizing}
-                  <p class="text-xs text-accent mt-2">Analyzing review history...</p>
-                {:else if optimizationResult}
-                  {#if !optimizationResult.success}
-                    <p class="text-xs text-warning mt-2">
-                      Need at least 400 reviews for reliable FSRS optimization. You have {optimizationResult.review_count}.
-                    </p>
-                  {:else}
-                    <p class="text-xs text-success mt-2">
-                      Optimized! Current retention: {Math.round(optimizationResult.current_retention * 100)}% → Predicted: {Math.round(optimizationResult.predicted_retention * 100)}%
-                    </p>
-                  {/if}
-                {:else}
-                  <p class="text-xs text-text-secondary mt-2">
-                    FSRS weights optimized from your review history.
-                  </p>
-                {/if}
-                <div class="flex gap-2 mt-3">
-                  <button
-                    onclick={handleOptimizeFsrs}
-                    disabled={isOptimizing}
-                    class="px-3 py-1.5 bg-accent text-white rounded-lg text-xs hover:bg-accent/90 transition-colors disabled:opacity-50"
-                  >
-                    {isOptimizing ? 'Optimizing...' : 'Optimize'}
-                  </button>
-                  {#if opts.fsrsWeights.length > 0}
-                    <button
-                      onclick={resetFsrsWeights}
-                      class="px-3 py-1.5 bg-bg-card border border-border rounded-lg text-xs hover:bg-bg-subtle transition-colors"
-                    >
-                      Reset
-                    </button>
-                  {/if}
-                </div>
-              </div>
-            </div>
+          <div class="step-input-row">
+            <input
+              type="number"
+              bind:value={newLapseStep}
+              placeholder="Add step (minutes)"
+              class="step-input neu-pressed"
+              onkeydown={(e) => e.key === "Enter" && addLapseStep()}
+            />
+            <button onclick={addLapseStep} class="add-step-btn neu-subtle">Add</button>
           </div>
-        </details>
+        </div>
 
-        <!-- Lapses -->
-        <details class="group mb-4">
-          <summary class="flex items-center justify-between cursor-pointer list-none py-2 font-medium text-text-primary">
-            <span>Lapses</span>
-            <svg class="h-4 w-4 text-text-secondary transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div class="space-y-4 pt-2">
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Relearning steps (minutes)</label>
-              <div class="flex flex-wrap gap-2 mb-2">
-                {#each opts.lapseSteps as step, i}
-                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-bg-subtle rounded text-sm">
-                    {step}
-                    <button onclick={() => removeLapseStep(i)} class="text-text-secondary hover:text-danger">
-                      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                {/each}
-              </div>
-              <div class="flex gap-2">
-                <input
-                  type="number"
-                  bind:value={newLapseStep}
-                  placeholder="Add step (minutes)"
-                  class="flex-1 px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary text-sm"
-                  onkeydown={(e) => e.key === "Enter" && addLapseStep()}
-                />
-                <button onclick={addLapseStep} class="px-3 py-2 bg-accent text-white rounded-lg text-sm">Add</button>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm text-text-secondary mb-1">Minimum interval (days)</label>
-                <input
-                  type="number"
-                  bind:value={opts.lapseMinimumInterval}
-                  min="0"
-                  class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-                />
-              </div>
-              <div>
-                <label class="block text-sm text-text-secondary mb-1">Leech threshold (lapses)</label>
-                <input
-                  type="number"
-                  bind:value={opts.leechThreshold}
-                  min="0"
-                  class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-                />
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm text-text-secondary mb-1">Leech action</label>
-              <select
-                bind:value={leechAction}
-                class="w-full px-3 py-2 bg-bg-subtle border border-border rounded-lg text-text-primary"
-              >
-                <option value="suspend">Suspend card</option>
-                <option value="tag">Tag only</option>
-              </select>
-            </div>
+        <div class="option-row-grid">
+          <div class="option-row">
+            <label class="option-label">Minimum interval (days)</label>
+            <input
+              type="number"
+              bind:value={opts.lapseMinimumInterval}
+              min="0"
+              class="option-input neu-pressed"
+            />
           </div>
-        </details>
-      {/if}
-    </div>
+          <div class="option-row">
+            <label class="option-label">Leech threshold (lapses)</label>
+            <input
+              type="number"
+              bind:value={opts.leechThreshold}
+              min="0"
+              class="option-input neu-pressed"
+            />
+          </div>
+        </div>
 
-    <!-- Footer -->
-    <div class="sticky bottom-0 px-6 py-4 bg-white border-t border-border flex gap-3">
-      <button
-        onclick={onClose}
-        class="flex-1 px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-bg-subtle transition-colors"
-      >
-        Cancel
-      </button>
-      <button
-        onclick={saveOptions}
-        class="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors"
-      >
-        Save Options
-      </button>
-    </div>
+        <div class="option-row">
+          <label class="option-label">Leech action</label>
+          <select
+            bind:value={leechAction}
+            class="option-select neu-pressed"
+          >
+            <option value="suspend">Suspend card</option>
+            <option value="tag">Tag only</option>
+          </select>
+        </div>
+      </div>
+    {/if}
   </div>
-</div>
+
+  <div class="dialog-footer">
+    <button
+      onclick={onClose}
+      class="footer-btn cancel-btn neu-subtle"
+    >
+      Cancel
+    </button>
+    <button
+      onclick={saveOptions}
+      class="footer-btn save-btn"
+    >
+      Save Options
+    </button>
+  </div>
+</NeuDialog>
+
+<style>
+  .deck-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .deck-name {
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .skeleton-line {
+    height: 48px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .filtered-deck-section {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+    border-radius: var(--radius-md);
+    padding: 16px;
+  }
+
+  .section-title {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .section-description {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 16px 0;
+    line-height: 1.5;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 12px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 10px 16px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .primary-btn {
+    background: var(--accent);
+    color: white;
+  }
+
+  .primary-btn:hover {
+    background: color-mix(in srgb, var(--accent) 90%, black);
+  }
+
+  .option-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+
+  .option-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .option-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .option-row-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .option-label {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .option-input,
+  .option-select {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    outline: none;
+  }
+
+  .option-select {
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .toggle-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .toggle-btn {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--bg-deep);
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    box-shadow: var(--neu-down);
+  }
+
+  .toggle-btn.active {
+    background: var(--accent);
+  }
+
+  .toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    transition: left 0.2s ease;
+  }
+
+  .toggle-btn.active .toggle-knob {
+    left: 23px;
+  }
+
+  .range-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-deep);
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .range-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .steps-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .step-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+  }
+
+  .step-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0;
+    margin-left: 2px;
+  }
+
+  .step-remove:hover {
+    color: var(--danger);
+  }
+
+  .remove-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .step-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .step-input {
+    flex: 1;
+    padding: 8px 12px;
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    outline: none;
+  }
+
+  .add-step-btn {
+    padding: 8px 12px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .add-step-btn:hover {
+    background: var(--accent-soft);
+  }
+
+  .weights-display {
+    padding: 12px;
+    border-radius: var(--radius-sm);
+  }
+
+  .weights-text {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    word-break: break-all;
+    margin: 0 0 8px 0;
+  }
+
+  .weights-status {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0 0 12px 0;
+  }
+
+  .weights-status.optimizing {
+    color: var(--accent);
+  }
+
+  .weights-status.warning {
+    color: var(--warning);
+  }
+
+  .weights-status.success {
+    color: var(--success);
+  }
+
+  .weights-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .optimize-btn,
+  .reset-btn {
+    padding: 6px 12px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .optimize-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .reset-btn {
+    color: var(--text-secondary);
+  }
+
+  .dialog-footer {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+
+  .footer-btn {
+    flex: 1;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .cancel-btn {
+    color: var(--text-secondary);
+  }
+
+  .save-btn {
+    background: var(--accent);
+    color: white;
+  }
+
+  .save-btn:hover {
+    background: color-mix(in srgb, var(--accent) 90%, black);
+  }
+</style>

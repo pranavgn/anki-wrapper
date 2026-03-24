@@ -52,6 +52,9 @@ tauri-plugin-dialog = "2"
 # Tauri fs plugin for file system access
 tauri-plugin-fs = "2"
 
+# Tauri decorum plugin for frameless window with native controls
+tauri-plugin-decorum = "1"
+
 # Regex for HTML tag stripping
 regex = "1.10"
 

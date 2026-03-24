@@ -78,7 +78,7 @@ fn save_preferences(prefs: AppPreferences, _state: State<AppState>) -> Result<()
     
     Ok(())
 }
-use tauri::{command, State, AppHandle};
+use tauri::{command, State, AppHandle, Manager};
 use serde::{Deserialize, Serialize};
 use rusqlite::params;
 use serde_json;
@@ -92,6 +92,7 @@ use anki::tags::Tag;
 use anki::search::SortMode;
 use anki::browser_table::Column;
 use anki_proto::decks::DeckTreeNode;
+use tauri_plugin_decorum::WebviewWindowExt;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UndoResult {
@@ -1512,11 +1513,13 @@ fn search_notes(
             None => continue,
         };
 
-        // Get deck name from first card
+        // Get deck name and first card ID from first card
         let mut deck_name = "Default".to_string();
+        let mut first_card_id: i64 = 0;
         if let Ok(cards) = collection.storage.all_card_ids_of_note_in_template_order(*nid) {
-            if let Some(first_card_id) = cards.first() {
-                if let Ok(Some(card)) = collection.storage.get_card(*first_card_id) {
+            if let Some(fc_id) = cards.first() {
+                first_card_id = fc_id.0;
+                if let Ok(Some(card)) = collection.storage.get_card(*fc_id) {
                     if let Ok(Some(deck)) = collection.get_deck(card.deck_id()) {
                         deck_name = deck.human_name().to_string();
                     }
@@ -1529,15 +1532,21 @@ fn search_notes(
         let front_preview = fields.get(0).cloned().unwrap_or_default();
         let back_preview = fields.get(1).cloned().unwrap_or_default();
 
-        // Calculate created_days_ago
-        let created_days_ago = (note.id.0 / 86400000) as u32;
+        // Calculate created_days_ago from note ID (which is a timestamp in milliseconds)
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let created_days_ago = ((now_ms - nid.0) / 86400000).max(0) as u32;
 
-        // Get card count
-        let card_count = fields.len() as u32; // This is approximate
+        // Get actual card count for this note
+        let card_count = collection.storage.all_card_ids_of_note_in_template_order(*nid)
+            .map(|c| c.len() as u32)
+            .unwrap_or(1);
 
         results.push(NoteRow {
             note_id: nid.0,
-            first_card_id: 0, // Would need another query to get this accurately
+            first_card_id,
             notetype_name: notetype.name.clone(),
             deck_name,
             front_preview,
@@ -2065,9 +2074,22 @@ pub fn run() {
             .build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_decorum::init())
         .manage(app_state)
-        .setup(|_app| {
+        .setup(|app| {
             log::info!("Anki Wrapper starting up...");
+            
+            // Configure frameless window with overlay titlebar
+            let main_window = app.get_webview_window("main").unwrap();
+            main_window.create_overlay_titlebar().unwrap();
+
+            #[cfg(target_os = "macos")]
+            {
+                // Position traffic lights to align with our navbar
+                // x=16 insets from left edge, y=18 vertically centers in the 52px navbar
+                main_window.set_traffic_lights_inset(16.0, 18.0).unwrap();
+            }
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -2109,6 +2131,7 @@ pub fn run() {
             set_card_flag,
             // Deck management
             rename_deck,
+            reparent_deck,
             delete_deck,
             // Filtered deck commands
             get_filtered_deck_order_labels,
@@ -2309,6 +2332,39 @@ fn rename_deck(deck_id: i64, new_name: String, state: State<AppState>) -> Result
         params![trimmed_name, now, deck_id]
     ).map_err(|e| e.to_string())?;
     
+    Ok(())
+}
+
+#[command]
+fn reparent_deck(deck_id: i64, new_parent_id: Option<i64>, state: State<AppState>) -> Result<(), String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+
+    // Get the deck to reparent
+    let deck = collection.get_deck(DeckId(deck_id))
+        .map_err(|e| e.to_string())?
+        .ok_or("Deck not found")?;
+
+    let old_name = deck.human_name().to_string();
+    // Extract just the leaf name (last segment after ::)
+    let leaf_name = old_name.rsplit("::").next().unwrap_or(&old_name).to_string();
+
+    let new_name = if let Some(parent_id) = new_parent_id {
+        // Get parent deck name
+        let parent = collection.get_deck(DeckId(parent_id))
+            .map_err(|e| e.to_string())?
+            .ok_or("Parent deck not found")?;
+        let parent_name = parent.human_name().to_string();
+        format!("{}::{}", parent_name, leaf_name)
+    } else {
+        // Moving to root level
+        leaf_name
+    };
+
+    // Use the existing rename functionality
+    collection.rename_deck(DeckId(deck_id), &new_name)
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }
 

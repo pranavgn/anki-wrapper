@@ -19,7 +19,8 @@
   const sizeClasses: Record<string, string> = {
     sm: 'max-w-sm',
     md: 'max-w-md',
-    lg: 'max-w-lg'
+    lg: 'max-w-xl',
+    xl: 'max-w-2xl'
   };
 
   function handleKeydown(e: KeyboardEvent) {
@@ -44,8 +45,8 @@
     aria-labelledby="dialog-title"
   >
     <div
-      class="neu-raised w-full {sizeClasses[size]} mx-4 animate-modal-in"
-      style="background: var(--bg-card); box-shadow: var(--neu-up); border-radius: var(--radius-md);"
+      class="w-full {sizeClasses[size]} mx-4 animate-modal-in"
+      style="background: var(--bg-card-raised, var(--bg-card)); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px var(--border); border-radius: var(--radius-md);"
     >
       {#if title}
         <div class="flex items-center justify-between p-6 pb-4">

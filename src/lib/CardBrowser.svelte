@@ -21,26 +21,26 @@
   
   // Column definitions
   const CARD_COLUMNS = [
-    { key: 'select',    label: '',          width: '40px'  },
-    { key: 'front',     label: 'Front',     width: '1fr'   },
-    { key: 'deck',      label: 'Deck',      width: '140px' },
-    { key: 'due',       label: 'Due',       width: '100px' },
-    { key: 'interval',  label: 'Interval',  width: '80px'  },
-    { key: 'ease',      label: 'Ease',      width: '70px'  },
-    { key: 'lapses',    label: 'Lapses',    width: '70px'  },
-    { key: 'tags',      label: 'Tags',      width: '160px' },
-    { key: 'flag',      label: '',          width: '32px'  },
+    { key: 'select',    label: '',          width: '36px'  },
+    { key: 'front',     label: 'Front',     width: 'minmax(120px, 1fr)' },
+    { key: 'deck',      label: 'Deck',      width: 'minmax(80px, 120px)' },
+    { key: 'due',       label: 'Due',       width: '72px'  },
+    { key: 'interval',  label: 'Interval',  width: '64px'  },
+    { key: 'ease',      label: 'Ease',      width: '52px'  },
+    { key: 'lapses',    label: 'Lapses',    width: '52px'  },
+    { key: 'tags',      label: 'Tags',      width: 'minmax(80px, 140px)' },
+    { key: 'flag',      label: '',          width: '28px'  },
   ];
   
   const NOTE_COLUMNS = [
-    { key: 'select',    label: '',          width: '40px'  },
-    { key: 'front',     label: 'Front',     width: '1fr'   },
-    { key: 'back',      label: 'Back',      width: '200px' },
-    { key: 'notetype',  label: 'Note Type', width: '120px' },
-    { key: 'deck',      label: 'Deck',      width: '120px' },
-    { key: 'cards',     label: 'Cards',     width: '60px'  },
-    { key: 'tags',      label: 'Tags',      width: '160px' },
-    { key: 'created',   label: 'Created',   width: '90px'  },
+    { key: 'select',    label: '',          width: '36px'  },
+    { key: 'front',     label: 'Front',     width: 'minmax(100px, 1fr)' },
+    { key: 'back',      label: 'Back',      width: 'minmax(100px, 1fr)' },
+    { key: 'notetype',  label: 'Note Type', width: 'minmax(70px, 100px)' },
+    { key: 'deck',      label: 'Deck',      width: 'minmax(70px, 100px)' },
+    { key: 'cards',     label: 'Cards',     width: '48px'  },
+    { key: 'tags',      label: 'Tags',      width: 'minmax(80px, 130px)' },
+    { key: 'created',   label: 'Created',   width: '76px'  },
   ];
 
   // Search state
@@ -537,7 +537,7 @@
   <!-- Main Content -->
   <div class="flex-1 flex overflow-hidden">
     <!-- Table -->
-    <div class="flex-1 overflow-y-auto min-w-0">
+    <div class="flex-1 overflow-y-auto overflow-x-auto min-w-0">
       {#key mode}
         <div in:fade={{ duration: 150 }}>
           {#if loading}
@@ -582,22 +582,22 @@
           </div>
           
           <!-- Cards table -->
-          <div class="grid" style="grid-template-columns: 40px 1fr 140px 100px 80px 70px 70px 160px 32px;">
+          <div class="grid" style="grid-template-columns: {columns.map(c => c.width).join(' ')};">
             <!-- Header -->
-            <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-2">
-              <input 
-                type="checkbox" 
+            <div class="sticky top-0 z-10 flex items-center px-2 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">
+              <input
+                type="checkbox"
                 class="w-4 h-4 rounded cursor-pointer accent-accent"
                 checked={allSelected}
                 bind:this={headerCheckbox}
                 onclick={toggleSelectAll}
               />
             </div>
-            <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Front</div>
-            <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Deck</div>
-            <button 
+            <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Front</div>
+            <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Deck</div>
+            <button
               onclick={() => sortOrder = sortOrder === 'cardDue' ? 'cardDueDesc' : 'cardDue'}
-              class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center justify-between px-4 hover:text-text-primary"
+              class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Due
               {#if sortOrder.includes('Due')}
@@ -606,9 +606,9 @@
                 </svg>
               {/if}
             </button>
-            <button 
+            <button
               onclick={() => sortOrder = sortOrder === 'cardInterval' ? 'cardIntervalDesc' : 'cardInterval'}
-              class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center justify-between px-4 hover:text-text-primary"
+              class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Interval
               {#if sortOrder.includes('Interval')}
@@ -617,9 +617,9 @@
                 </svg>
               {/if}
             </button>
-            <button 
+            <button
               onclick={() => sortOrder = sortOrder === 'cardEase' ? 'cardEaseDesc' : 'cardEase'}
-              class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center justify-between px-4 hover:text-text-primary"
+              class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Ease
               {#if sortOrder.includes('Ease')}
@@ -628,9 +628,9 @@
                 </svg>
               {/if}
             </button>
-            <button 
+            <button
               onclick={() => sortOrder = sortOrder === 'cardLapses' ? 'cardLapsesDesc' : 'cardLapses'}
-              class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center justify-between px-4 hover:text-text-primary"
+              class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Lapses
               {#if sortOrder.includes('Lapses')}
@@ -639,8 +639,8 @@
                 </svg>
               {/if}
             </button>
-            <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Tags</div>
-            <div class="sticky top-0 z-10 bg-bg-subtle w-8"></div>
+            <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Tags</div>
+            <div class="sticky top-0 z-10 flex items-center justify-center h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);"></div>
             
             <!-- Rows -->
             {#each rows as row, i}
@@ -660,13 +660,13 @@
                     onclick={(e) => handleRowSelect(row.card_id, i, e)}
                   />
                 </div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''} {row.queue === -1 ? 'italic text-text-secondary' : ''} {row.queue < -1 ? 'line-through' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.due_days < 0 ? 'text-danger font-medium' : row.due_days === 0 ? 'text-accent font-medium' : 'text-text-secondary'}">{row.due_str}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.interval > 0 ? row.interval + 'd' : '—'}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.ease < 200 ? 'text-danger' : row.ease > 250 ? 'text-success' : 'text-text-secondary'}">{(row.ease / 10).toFixed(0)}%</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm {row.lapses > 7 ? 'text-danger font-medium' : 'text-text-secondary'}">{row.lapses}</span></div>
-                <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''} {row.queue === -1 ? 'italic text-text-secondary' : ''} {row.queue < -1 ? 'line-through' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate {row.due_days < 0 ? 'text-danger font-medium' : row.due_days === 0 ? 'text-accent font-medium' : 'text-text-secondary'}">{row.due_str}</span></div>
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.interval > 0 ? row.interval + 'd' : '—'}</span></div>
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate {row.ease < 200 ? 'text-danger' : row.ease > 250 ? 'text-success' : 'text-text-secondary'}">{(row.ease / 10).toFixed(0)}%</span></div>
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate {row.lapses > 7 ? 'text-danger font-medium' : 'text-text-secondary'}">{row.lapses}</span></div>
+                <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
                   {#if row.tags && row.tags.length > 0}
                     <div class="flex gap-1">
                       {#each row.tags.slice(0, 2) as tag}
@@ -678,7 +678,7 @@
                     </div>
                   {/if}
                 </div>
-                <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
+                <div class="h-11 flex items-center justify-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
                   {#if row.flag > 0}
                     <div class="w-3 h-3 rounded-full" style="background-color: {row.flag === 1 ? '#ef4444' : row.flag === 2 ? '#f97316' : row.flag === 3 ? '#eab308' : row.flag === 4 ? '#22c55e' : '#3b82f6'}"></div>
                   {/if}
@@ -703,24 +703,24 @@
         </div>
         
         <!-- Notes table -->
-        <div class="grid" style="grid-template-columns: 40px 1fr 200px 120px 120px 60px 160px 90px;">
+        <div class="grid" style="grid-template-columns: {columns.map(c => c.width).join(' ')};">
           <!-- Header -->
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-2">
-            <input 
-              type="checkbox" 
+          <div class="sticky top-0 z-10 flex items-center px-2 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">
+            <input
+              type="checkbox"
               class="w-4 h-4 rounded cursor-pointer accent-accent"
               checked={allSelected}
               bind:this={headerCheckbox}
               onclick={toggleSelectAll}
             />
           </div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Front</div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Back</div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Note Type</div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Deck</div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Cards</div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Tags</div>
-          <div class="sticky top-0 z-10 bg-bg-subtle text-xs uppercase tracking-wider text-text-secondary font-medium flex items-center px-4">Created</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Front</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Back</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Note Type</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Deck</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Cards</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Tags</div>
+          <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Created</div>
           
           <!-- Rows -->
           {#each noteRows as row, i}
@@ -740,12 +740,12 @@
                   onclick={(e) => handleNoteRowSelect(row.note_id, i, e)}
                 />
               </div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate max-w-xs">{row.front_preview}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate max-w-xs text-text-secondary">{row.back_preview}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.notetype_name}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.card_count}</span></div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}">
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate text-text-secondary">{row.back_preview}</span></div>
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.notetype_name}</span></div>
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.deck_name}</span></div>
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.card_count}</span></div>
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}">
                 {#if row.tags && row.tags.length > 0}
                   <div class="flex gap-1">
                     {#each row.tags.slice(0, 2) as tag}
@@ -757,7 +757,7 @@
                   </div>
                 {/if}
               </div>
-              <div class="h-11 flex items-center px-4 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary">{row.created_days_ago === 0 ? 'Today' : row.created_days_ago === 1 ? '1 day ago' : row.created_days_ago + ' days ago'}</span></div>
+              <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm text-text-secondary truncate">{row.created_days_ago === 0 ? 'Today' : row.created_days_ago === 1 ? '1 day ago' : row.created_days_ago + ' days ago'}</span></div>
             </div>
           {/each}
         </div>

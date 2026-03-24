@@ -157,7 +157,7 @@
   }
 </script>
 
-<NeuDialog {isOpen} {onClose} title="Settings" size="md">
+<NeuDialog {isOpen} {onClose} title="Settings" size="lg">
   <div class="settings-content">
     <!-- Appearance Section -->
     <div class="settings-section">

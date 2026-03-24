@@ -59,6 +59,11 @@
   let selectionMode = $state(false);
   let selectMode = $state(false);
   
+  // Drag-and-drop state
+  let draggedDeckId: number | null = $state(null);
+  let dragOverDeckId: number | null = $state(null);
+  let dragOverRoot: boolean = $state(false);
+  
   // Deck stats cache
   let lastDeckStatsTime = 0;
   const DECK_STATS_TTL = 3000; // 3 seconds
@@ -116,6 +121,80 @@
       if (e instanceof ImportError && e.isCancelled) return;
       addToast(e instanceof Error ? e.message : "Export failed", "error");
     }
+  }
+
+  // Drag-and-drop handlers
+  function handleDragStart(e: DragEvent, deckId: number) {
+    draggedDeckId = deckId;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(deckId));
+    }
+  }
+
+  function handleDragOver(e: DragEvent, targetDeckId: number) {
+    if (draggedDeckId === null || draggedDeckId === targetDeckId) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    dragOverDeckId = targetDeckId;
+  }
+
+  function handleDragLeave() {
+    dragOverDeckId = null;
+  }
+
+  async function handleDrop(e: DragEvent, targetDeckId: number) {
+    e.preventDefault();
+    dragOverDeckId = null;
+    if (draggedDeckId === null || draggedDeckId === targetDeckId) return;
+
+    try {
+      await invoke('reparent_deck', {
+        deckId: draggedDeckId,
+        newParentId: targetDeckId
+      });
+      addToast('Deck moved successfully', 'success');
+      await loadDeckStats(true);
+    } catch (err) {
+      addToast(`Failed to move deck: ${err}`, 'error');
+    } finally {
+      draggedDeckId = null;
+    }
+  }
+
+  function handleRootDragOver(e: DragEvent) {
+    if (draggedDeckId === null) return;
+    e.preventDefault();
+    dragOverRoot = true;
+  }
+
+  function handleRootDragLeave() {
+    dragOverRoot = false;
+  }
+
+  async function handleRootDrop(e: DragEvent) {
+    e.preventDefault();
+    dragOverRoot = false;
+    if (draggedDeckId === null) return;
+
+    try {
+      await invoke('reparent_deck', {
+        deckId: draggedDeckId,
+        newParentId: null
+      });
+      addToast('Deck moved to root', 'success');
+      await loadDeckStats(true);
+    } catch (err) {
+      addToast(`Failed to move deck: ${err}`, 'error');
+    } finally {
+      draggedDeckId = null;
+    }
+  }
+
+  function handleDragEnd() {
+    draggedDeckId = null;
+    dragOverDeckId = null;
+    dragOverRoot = false;
   }
 
   function handleClickOutside(event: MouseEvent) {
@@ -309,7 +388,7 @@
     
     isCreatingFilteredDeck = true;
     try {
-      await invoke("create_filtered_deck", {
+      const deckId = await invoke<number>("create_filtered_deck", {
         name: customStudyName.trim(),
         searchQuery: customStudyQuery.trim(),
         limit: customStudyLimit,
@@ -318,6 +397,8 @@
       await loadDeckStats();
       closeCustomStudyModal();
       addToast("Custom Study deck created", "success");
+      // Navigate to study the newly created filtered deck
+      onStudy(deckId, customStudyName.trim());
     } catch (error) {
       console.error("Error creating filtered deck:", error);
       addToast(error instanceof Error ? error.message : "Failed to create filtered deck", "error");
@@ -401,6 +482,12 @@
   </div>
 
   <!-- Deck Grid -->
+  <div
+    ondragover={handleRootDragOver}
+    ondragleave={handleRootDragLeave}
+    ondrop={handleRootDrop}
+    style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
+  >
   <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
     {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
       <div
@@ -412,9 +499,17 @@
           animation-delay: {index * 30}ms;
           {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
           {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
+          {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
+          {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
         "
         role="button"
         tabindex="0"
+        draggable="true"
+        ondragstart={(e) => handleDragStart(e, deck.id)}
+        ondragover={(e) => handleDragOver(e, deck.id)}
+        ondragleave={handleDragLeave}
+        ondrop={(e) => handleDrop(e, deck.id)}
+        ondragend={handleDragEnd}
         onclick={() => {
           if (selectMode) {
             toggleDeckSelection(deck.id);
@@ -471,7 +566,14 @@
         <div class="flex items-center gap-3 mb-4">
           <span style="font-size: 30px;">📚</span>
           <div>
-            <h3 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); line-clamp: 2;">{deck.short_name || deck.name}</h3>
+            <div class="flex items-center gap-2">
+              <h3 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); line-clamp: 2;">{deck.short_name || deck.name}</h3>
+              {#if deck.is_filtered}
+                <span class="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full" style="background: var(--accent-soft); color: var(--accent);">
+                  Filtered
+                </span>
+              {/if}
+            </div>
             <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">{deck.card_count} cards</p>
           </div>
         </div>
@@ -605,6 +707,7 @@
         </div>
       </div>
     {/if}
+  </div>
   </div>
 
   {#if optionsDeckId !== null}

@@ -96,6 +96,16 @@
 
   // Initialize on mount
   onMount(async () => {
+    // Detect platform for traffic light spacing
+    const nav = navigator.platform.toLowerCase();
+    if (nav.includes('mac')) {
+      document.documentElement.classList.add('platform-macos');
+    } else if (nav.includes('win')) {
+      document.documentElement.classList.add('platform-windows');
+    } else {
+      document.documentElement.classList.add('platform-linux');
+    }
+    
     // Expose function to open browser with query
     (window as any).openCardBrowser = (query: string) => {
       openBrowserWithQuery(query);
@@ -282,13 +292,13 @@
   <!-- App Shell -->
   <div class="min-h-screen bg-bg-base flex flex-col">
     <!-- Top Navigation -->
-    <nav class="flex items-center justify-between px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30;">
+    <nav data-tauri-drag-region class="app-navbar flex items-center justify-between px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30;">
 
       <!-- ═══ LEFT SECTION ═══ -->
-      <div class="flex items-center gap-2 min-w-[180px]">
+      <div class="flex items-center gap-2 min-w-[180px] ml-2">
         {#if currentPage === 'dashboard'}
           <!-- Logo -->
-          <svg class="h-7 w-7" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+          <svg class="h-7 w-7" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; margin-left: 8px;">
             <rect width="100" height="100" rx="22" fill="var(--accent)" />
             <path d="M30 70V32l20 24 20-24v38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           </svg>

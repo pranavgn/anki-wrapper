@@ -466,14 +466,7 @@
     // Add built-in widgets based on widget_order
     for (const widgetId of prefs.widget_order) {
       if (widgetId === 'decks') {
-        widgets.push({
-          id: 'decks',
-          type: 'decks',
-          title: 'Your Decks',
-          component: DecksGridWidget,
-          props: { onStudy },
-          order: widgets.length
-        });
+        continue; // Decks are rendered directly in the left column, not through WidgetContainer
       } else if (widgetId === 'upcoming') {
         widgets.push({
           id: 'upcoming',
@@ -481,7 +474,8 @@
           title: 'Upcoming Sessions',
           component: UpcomingSessionsWidget,
           props: {},
-          order: widgets.length
+          order: widgets.length,
+          gridHeight: 1
         });
       } else if (widgetId === 'stats') {
         widgets.push({
@@ -490,7 +484,8 @@
           title: 'Stats Snapshot',
           component: StatsSnapshotWidget,
           props: {},
-          order: widgets.length
+          order: widgets.length,
+          gridHeight: 1
         });
       } else if (widgetId === 'schedule') {
         widgets.push({
@@ -499,7 +494,8 @@
           title: 'Study Schedule',
           component: StudyScheduleWidget,
           props: {},
-          order: widgets.length
+          order: widgets.length,
+          gridHeight: 2
         });
       }
     }
@@ -513,7 +509,8 @@
         title: pluginWidget.title,
         component: { render: (props: any) => pluginWidget.render(props.container) },
         props: {},
-        order: pluginWidget.defaultOrder || widgets.length
+        order: pluginWidget.defaultOrder || widgets.length,
+        gridHeight: pluginWidget.gridHeight || 1
       });
     }
     
@@ -521,7 +518,7 @@
   });
 </script>
 
-<div class="max-w-[860px] mx-auto px-9 pt-13 pb-13" style="animation: fadeUp 0.4s ease-out;">
+<div class="max-w-[1100px] mx-auto px-9 pt-13 pb-13" style="animation: fadeUp 0.4s ease-out;">
   <!-- Header Row -->
   <div class="flex items-center justify-between mb-12">
     <div>
@@ -560,8 +557,21 @@
     </div>
   </div>
 
-  <!-- Widget Container -->
-  <WidgetContainer widgets={dashboardWidgets} />
+  <!-- Two-column dashboard layout -->
+  <div class="dashboard-layout">
+    <!-- Left: Decks column -->
+    <div class="decks-column">
+      <h2 style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Decks</h2>
+      <div class="decks-scroll">
+        <DecksGridWidget {onStudy} compact={true} />
+      </div>
+    </div>
+
+    <!-- Right: Other widgets -->
+    <div class="widgets-column">
+      <WidgetContainer widgets={dashboardWidgets} />
+    </div>
+  </div>
 
   {#if optionsDeckId !== null}
     {@const selectedDeck = decks.find(d => d.id === optionsDeckId)}
@@ -720,5 +730,49 @@
   .deck-card:hover {
     transform: translateY(-3px);
     box-shadow: var(--neu-up);
+  }
+
+  .dashboard-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .decks-column {
+    width: 280px;
+    min-width: 280px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    position: sticky;
+    top: 24px;
+    /* Thin scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .decks-column::-webkit-scrollbar {
+    width: 4px;
+  }
+  .decks-column::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .widgets-column {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Responsive: stack on narrow screens */
+  @media (max-width: 768px) {
+    .dashboard-layout {
+      flex-direction: column;
+    }
+    .decks-column {
+      width: 100%;
+      min-width: 100%;
+      max-height: none;
+      position: static;
+    }
   }
 </style>

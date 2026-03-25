@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { prefs } from '../prefs.svelte';
-
   interface Widget {
     id: string;
     type: string;
@@ -8,96 +6,40 @@
     component: any;
     props: Record<string, any>;
     order: number;
+    gridHeight?: number; // number of grid units (1 unit = 180px). Default 1.
   }
 
   let { widgets = [] }: { widgets?: Widget[] } = $props();
-
-  let draggedWidgetId: string | null = $state(null);
-  let dragOverWidgetId: string | null = $state(null);
-
-  function handleDragStart(e: DragEvent, widgetId: string) {
-    draggedWidgetId = widgetId;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', widgetId);
-    }
-  }
-
-  function handleDragOver(e: DragEvent, targetWidgetId: string) {
-    if (draggedWidgetId === null || draggedWidgetId === targetWidgetId) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    dragOverWidgetId = targetWidgetId;
-  }
-
-  function handleDragLeave() {
-    dragOverWidgetId = null;
-  }
-
-  async function handleDrop(e: DragEvent, targetWidgetId: string) {
-    e.preventDefault();
-    dragOverWidgetId = null;
-    if (draggedWidgetId === null || draggedWidgetId === targetWidgetId) return;
-
-    const draggedIndex = widgets.findIndex(w => w.id === draggedWidgetId);
-    const targetIndex = widgets.findIndex(w => w.id === targetWidgetId);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // Reorder widgets
-    const newWidgets = [...widgets];
-    const [draggedWidget] = newWidgets.splice(draggedIndex, 1);
-    newWidgets.splice(targetIndex, 0, draggedWidget);
-
-    // Update order property
-    newWidgets.forEach((widget, index) => {
-      widget.order = index;
-    });
-
-    // Persist order to prefs
-    const widgetOrder = newWidgets.map(w => w.id);
-    prefs.widget_order = widgetOrder;
-    await prefs.save();
-
-    // Update local state
-    widgets = newWidgets;
-
-    draggedWidgetId = null;
-  }
-
-  function handleDragEnd() {
-    draggedWidgetId = null;
-    dragOverWidgetId = null;
-  }
 
   // Sort widgets by order
   let sortedWidgets = $derived.by(() => {
     return [...widgets].sort((a, b) => a.order - b.order);
   });
+
+  // Map widget types to grid height units
+  function getGridHeight(widget: Widget): number {
+    if (widget.gridHeight) return widget.gridHeight;
+    // Default heights per widget type
+    switch (widget.type) {
+      case 'schedule': return 2;  // Study Schedule is taller (calendar + sessions)
+      case 'stats': return 1;
+      case 'upcoming': return 1;
+      default: return 1;         // Plugin widgets default to 1 unit
+    }
+  }
 </script>
 
-<div class="widget-container">
+<div class="widget-grid">
   {#each sortedWidgets as widget (widget.id)}
     <div
-      class="widget-wrapper"
-      draggable="true"
-      ondragstart={(e) => handleDragStart(e, widget.id)}
-      ondragover={(e) => handleDragOver(e, widget.id)}
-      ondragleave={handleDragLeave}
-      ondrop={(e) => handleDrop(e, widget.id)}
-      ondragend={handleDragEnd}
-      style="{dragOverWidgetId === widget.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''} {draggedWidgetId === widget.id ? 'opacity: 0.5;' : ''}"
+      class="widget-cell"
+      style="--grid-units: {getGridHeight(widget)};"
     >
-      <div class="neu-raised" style="background: var(--bg-card); border-radius: var(--radius-md); padding: 20px; overflow: hidden;">
-        <div class="flex items-center justify-between mb-3" style="cursor: grab;">
-          <h3 style="font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--text-primary);">{widget.title}</h3>
-          <svg class="w-4 h-4" style="color: var(--text-muted);" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
-            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-            <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
-          </svg>
+      <div class="widget-card neu-raised" style="background: var(--bg-card); border-radius: var(--radius-md); overflow: hidden;">
+        <div class="widget-header">
+          <h3 style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">{widget.title}</h3>
         </div>
-        <div>
+        <div class="widget-body">
           {@render widget.component(widget.props)}
         </div>
       </div>
@@ -106,13 +48,44 @@
 </div>
 
 <style>
-  .widget-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 24px;
+  .widget-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
 
-  .widget-wrapper {
-    transition: opacity 0.2s ease;
+  .widget-cell {
+    /* Each unit = 180px. Height is enforced by the --grid-units variable. */
+    height: calc(var(--grid-units) * 180px);
+    min-height: calc(var(--grid-units) * 180px);
+    max-height: calc(var(--grid-units) * 180px);
+  }
+
+  .widget-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 20px;
+  }
+
+  .widget-header {
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+
+  .widget-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .widget-body::-webkit-scrollbar {
+    width: 3px;
+  }
+  .widget-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
   }
 </style>

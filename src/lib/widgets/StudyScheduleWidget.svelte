@@ -264,7 +264,7 @@
   }
 </script>
 
-<div class="study-schedule-widget">
+<div class="study-schedule-widget" style="height: 100%; display: flex; flex-direction: column;">
   <!-- Mini Calendar -->
   <div class="mini-calendar">
     <div class="cal-header">
@@ -471,6 +471,7 @@
 
 <style>
   .study-schedule-widget {
+    height: 100%;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -481,6 +482,8 @@
     display: flex;
     flex-direction: column;
     gap: 0;
+    flex-shrink: 0;
+    height: 180px;
   }
 
   .cal-header {
@@ -595,6 +598,9 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .section-header {
@@ -641,6 +647,19 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .session-list::-webkit-scrollbar {
+    width: 3px;
+  }
+  .session-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
   }
 
   .session-item {

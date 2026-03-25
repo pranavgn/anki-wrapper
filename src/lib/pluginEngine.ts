@@ -28,6 +28,7 @@ export interface WidgetConfig {
   render: (container: HTMLElement) => void | (() => void);
   locations?: ('dashboard' | 'deckOverview')[];
   defaultOrder?: number;
+  gridHeight?: number;  // Height in grid units (1 unit = 180px). Default: 1
 }
 
 /**
@@ -246,7 +247,8 @@ class PluginEngine {
       ...config,
       id: widgetId,
       locations: config.locations || ['dashboard'],
-      defaultOrder: config.defaultOrder || 100
+      defaultOrder: config.defaultOrder || 100,
+      gridHeight: config.gridHeight || 1
     });
   }
 

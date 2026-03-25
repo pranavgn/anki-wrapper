@@ -54,13 +54,13 @@
   }
 </script>
 
-<div class="upcoming-sessions-widget">
+<div class="upcoming-sessions-widget" style="height: 100%; display: flex; flex-direction: column;">
   {#if isLoading}
-    <div class="flex items-center justify-center py-8">
+    <div class="flex items-center justify-center" style="flex: 1;">
       <div class="loading-spinner"></div>
     </div>
   {:else if upcoming.length === 0}
-    <div class="text-center py-8">
+    <div class="flex flex-col items-center justify-center" style="flex: 1;">
       <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
@@ -68,7 +68,7 @@
       <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin-top: 4px;">Schedule a study session to get started</p>
     </div>
   {:else}
-    <div class="space-y-3">
+    <div class="sessions-list">
       {#each upcoming as session (session.id)}
         <div class="session-item p-3 rounded-xl" style="background: var(--bg-subtle);">
           <div class="flex items-center justify-between mb-2">
@@ -115,6 +115,31 @@
 </div>
 
 <style>
+  .upcoming-sessions-widget {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sessions-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sessions-list::-webkit-scrollbar {
+    width: 3px;
+  }
+  .sessions-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
   .loading-spinner {
     width: 24px;
     height: 24px;

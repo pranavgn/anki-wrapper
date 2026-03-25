@@ -49,17 +49,17 @@
   }
 </script>
 
-<div class="stats-snapshot-widget">
+<div class="stats-snapshot-widget" style="height: 100%; overflow: hidden;">
   {#if isLoading}
-    <div class="flex items-center justify-center py-8">
+    <div class="flex items-center justify-center" style="height: 100%;">
       <div class="loading-spinner"></div>
     </div>
   {:else if !stats}
-    <div class="text-center py-8">
+    <div class="flex items-center justify-center" style="height: 100%;">
       <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">No statistics available</p>
     </div>
   {:else}
-    <div class="grid grid-cols-3 gap-3">
+    <div class="stats-grid">
       <!-- Today's Reviews -->
       <div class="metric-card p-3 rounded-xl text-center" style="background: var(--bg-subtle);">
         <div class="metric-value" style="font-family: var(--serif); font-size: 24px; font-weight: 600; color: var(--text-primary);">
@@ -94,6 +94,19 @@
 </div>
 
 <style>
+  .stats-snapshot-widget {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    height: 100%;
+    align-content: center;
+  }
+
   .loading-spinner {
     width: 24px;
     height: 24px;

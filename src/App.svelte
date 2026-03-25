@@ -716,7 +716,6 @@
             </div>
           {/if}
         {/key}
-      {/if}
     </main>
 
     <!-- Toast Notifications -->

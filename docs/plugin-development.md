@@ -280,8 +280,48 @@ interface WidgetConfig {
   render: (container: HTMLElement) => void | (() => void);
   locations?: ('dashboard' | 'deckOverview')[];  // default: ['dashboard']
   defaultOrder?: number;         // default: 100, lower = appears first
+  gridHeight?: number;           // Height in grid units (1 unit = 180px). default: 1
 }
 ```
+
+#### Widget Grid Layout
+
+Dashboard widgets are rendered in a fixed-height grid system. Each widget occupies a number of "grid units" where 1 unit = 180px tall. The `gridHeight` property controls how many units your widget spans:
+
+- `gridHeight: 1` — 180px tall (default). Good for: stat summaries, quick-glance info, small lists.
+- `gridHeight: 2` — 360px tall. Good for: calendars, charts, longer lists.
+- `gridHeight: 3` — 540px tall. Use sparingly; good for: complex interactive widgets.
+
+Your widget's `render` container will have a fixed height. If your content might overflow, add `overflow-y: auto` to your inner content area:
+
+```javascript
+api.registerWidget({
+  id: 'long-list-widget',
+  title: 'Recent Activity',
+  gridHeight: 2,
+  render: function(container) {
+    container.style.height = '100%';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    
+    const header = document.createElement('div');
+    header.textContent = '50 most recent actions';
+    header.style.marginBottom = '8px';
+    container.appendChild(header);
+    
+    const list = document.createElement('div');
+    list.style.flex = '1';
+    list.style.minHeight = '0';
+    list.style.overflowY = 'auto';
+    // ... populate list items
+    container.appendChild(list);
+  },
+  locations: ['dashboard'],
+  defaultOrder: 50
+});
+```
+
+**Important:** The decks list is rendered in a dedicated left column on the dashboard, separate from the widget grid. Plugin widgets always appear in the right-side widget column. Widgets cannot be manually reordered by dragging — their display order is determined by `defaultOrder` and the user's `widget_order` preference array.
 
 #### Render Function
 

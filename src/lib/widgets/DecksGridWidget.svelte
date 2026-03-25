@@ -16,7 +16,13 @@
     children?: DeckStat[];
   }
 
-  let { onStudy = (deckId: number, deckName: string) => {} }: { onStudy?: (deckId: number, deckName: string) => void } = $props();
+  let {
+    onStudy = (deckId: number, deckName: string) => {},
+    compact = false
+  }: {
+    onStudy?: (deckId: number, deckName: string) => void;
+    compact?: boolean;
+  } = $props();
 
   let decks: DeckStat[] = $state([]);
   let expandedDecks: Set<number> = $state(new Set());
@@ -289,180 +295,259 @@
     onkeydown={handleGridKeydown}
     style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
   >
-    <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));" role="grid" aria-label="Deck grid">
-      {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
-        <div
-          data-deck-id={deck.id}
-          class="deck-card bg-bg-card rounded-2xl p-6 cursor-pointer relative"
-          style="
-            box-shadow: var(--neu-subtle);
-            border: 1px solid var(--border);
-            animation-delay: {index * 30}ms;
-            {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
-            {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
-            {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
-            {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
-          "
-          role="button"
-          tabindex="0"
-          aria-label="Deck: {deck.short_name || deck.name}. {deck.card_count} cards total. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due for review."
-          draggable="true"
-          ondragstart={(e) => handleDragStart(e, deck.id)}
-          ondragover={(e) => handleDragOver(e, deck.id)}
-          ondragleave={handleDragLeave}
-          ondrop={(e) => handleDrop(e, deck.id)}
-          ondragend={handleDragEnd}
-          onclick={() => {
-            if (selectMode) {
-              toggleDeckSelection(deck.id);
-            } else {
-              handleDeckClick(deck.id, deck.name);
-            }
-          }}
-          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
-        >
-          <!-- Selection checkbox -->
-          {#if selectMode}
-            <div
-              class="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
-              style="
-                background: {selectedDecks.has(deck.id) ? 'var(--accent)' : 'var(--bg-card)'};
-                box-shadow: var(--neu-subtle);
-              "
-              role="checkbox"
-              aria-checked={selectedDecks.has(deck.id)}
-              aria-label="Select {deck.short_name || deck.name}"
-              tabindex="0"
-              onclick={(e) => { e.stopPropagation(); toggleDeckSelection(deck.id); }}
-              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleDeckSelection(deck.id)}
-            >
-              {#if selectedDecks.has(deck.id)}
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                </svg>
-              {/if}
-            </div>
-          {/if}
-
-          <!-- Expand/Collapse button for nested decks -->
-          {#if deck.level > 0}
-            <button
-              class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center cursor-pointer"
-              style="color: var(--text-secondary);"
-              aria-label={expandedDecks.has(deck.id) ? "Collapse {deck.short_name || deck.name}" : "Expand {deck.short_name || deck.name}"}
-              aria-expanded={expandedDecks.has(deck.id)}
-              onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {#if expandedDecks.has(deck.id)}
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-                {:else}
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                {/if}
-              </svg>
-            </button>
-          {/if}
-
-          <!-- Streak badge -->
+    {#if compact}
+      <!-- Compact mode: Single-column list layout -->
+      <div class="decks-list-compact" role="list" aria-label="Deck list">
+        {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
           <div
-            class="absolute top-4 right-4 neu-subtle px-2 py-1 rounded-lg"
-            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-          >
-            <span style="font-family: var(--sans); font-size: 12px; color: var(--success);">🔥 {deck.card_count}d</span>
-          </div>
-
-          <!-- Deck content -->
-          <div class="flex items-center gap-3 mb-4">
-            <span style="font-size: 30px;">📚</span>
-            <div>
-              <div class="flex items-center gap-2">
-                <h3 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); line-clamp: 2;">{deck.short_name || deck.name}</h3>
-                {#if deck.is_filtered}
-                  <span class="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full" style="background: var(--accent-soft); color: var(--accent);">
-                    Filtered
-                  </span>
-                {/if}
-              </div>
-              <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">{deck.card_count} cards</p>
-            </div>
-          </div>
-
-          <!-- Stats row -->
-          <div class="flex items-center gap-4">
-            {#if deck.new_count > 0}
-              <div class="flex items-center gap-1.5">
-                <div class="w-[7px] h-[7px] rounded-full" style="background: #3B82F6;"></div>
-                <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.new_count} new</span>
-              </div>
-            {/if}
-            {#if deck.learn_count > 0}
-              <div class="flex items-center gap-1.5">
-                <div class="w-[7px] h-[7px] rounded-full" style="background: #EC4899;"></div>
-                <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.learn_count} due</span>
-              </div>
-            {/if}
-            {#if deck.review_count > 0}
-              <div class="flex items-center gap-1.5">
-                <div class="w-[7px] h-[7px] rounded-full" style="background: #10B981;"></div>
-                <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.review_count} due</span>
-              </div>
-            {/if}
-          </div>
-        </div>
-      {/each}
-
-      <!-- Loading skeletons -->
-      {#if isLoading}
-        {#each Array(3) as _, index}
-          <div
-            class="neu-raised"
+            data-deck-id={deck.id}
+            class="deck-card-compact"
             style="
               background: var(--bg-card);
-              box-shadow: var(--neu-up);
-              border-radius: var(--radius-md);
-              padding: 30px 32px;
-              animation: fadeUp 0.4s ease-out backwards;
-              animation-delay: {index * 40}ms;
+              box-shadow: var(--neu-subtle);
+              border: 1px solid var(--border);
+              border-radius: 10px;
+              padding: 12px 14px;
+              cursor: pointer;
+              animation-delay: {index * 20}ms;
+              {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
+              {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 16}px;` : ''}
+              {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
+              {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
             "
+            role="listitem"
+            tabindex="0"
+            aria-label="Deck: {deck.short_name || deck.name}. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due for review."
+            draggable="true"
+            ondragstart={(e) => handleDragStart(e, deck.id)}
+            ondragover={(e) => handleDragOver(e, deck.id)}
+            ondragleave={handleDragLeave}
+            ondrop={(e) => handleDrop(e, deck.id)}
+            ondragend={handleDragEnd}
+            onclick={() => {
+              if (selectMode) {
+                toggleDeckSelection(deck.id);
+              } else {
+                handleDeckClick(deck.id, deck.name);
+              }
+            }}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
           >
-            <div class="skeleton h-6 w-3/4 mb-4"></div>
-            <div class="flex gap-2 mb-6">
-              <div class="skeleton h-6 w-12 rounded-full"></div>
-              <div class="skeleton h-6 w-16 rounded-full"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
+                {deck.short_name || deck.name}
+              </span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                {#if deck.new_count > 0}
+                  <span style="font-size: 11px; color: #3B82F6; font-family: var(--sans);">{deck.new_count}</span>
+                {/if}
+                {#if deck.learn_count > 0}
+                  <span style="font-size: 11px; color: #EC4899; font-family: var(--sans);">{deck.learn_count}</span>
+                {/if}
+                {#if deck.review_count > 0}
+                  <span style="font-size: 11px; color: #10B981; font-family: var(--sans);">{deck.review_count}</span>
+                {/if}
+              </div>
             </div>
-            <div class="skeleton h-10 w-full rounded-xl"></div>
           </div>
         {/each}
-      {/if}
 
-      <!-- New Deck Card -->
-      {#if !isLoading}
-        <button
-          aria-label="Create new deck"
-          onclick={() => {
-            // This would need to be handled by parent component
-            // For now, just show a toast
-            addToast("Create deck functionality moved to parent", "info");
-          }}
-          class="flex flex-col items-center justify-center cursor-pointer"
-          style="
-            background: var(--bg-base);
-            box-shadow: var(--neu-down);
-            border: 2px dashed var(--border);
-            border-radius: var(--radius-md);
-            padding: 30px 32px;
-            min-height: 200px;
-            animation: fadeUp 0.4s ease-out backwards;
-            animation-delay: {decks.filter(d => shouldShowDeck(d)).length * 40}ms;
-          "
-        >
-          <svg class="h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          <span style="font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--text-primary);">New Deck</span>
-        </button>
-      {/if}
-    </div>
+        <!-- Loading skeletons for compact mode -->
+        {#if isLoading}
+          {#each Array(3) as _, index}
+            <div
+              class="neu-raised"
+              style="
+                background: var(--bg-card);
+                box-shadow: var(--neu-up);
+                border-radius: 10px;
+                padding: 12px 14px;
+                animation: fadeUp 0.4s ease-out backwards;
+                animation-delay: {index * 20}ms;
+              "
+            >
+              <div class="skeleton h-4 w-3/4"></div>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    {:else}
+      <!-- Non-compact mode: Grid layout (original) -->
+      <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));" role="grid" aria-label="Deck grid">
+        {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
+          <div
+            data-deck-id={deck.id}
+            class="deck-card bg-bg-card rounded-2xl p-6 cursor-pointer relative"
+            style="
+              box-shadow: var(--neu-subtle);
+              border: 1px solid var(--border);
+              animation-delay: {index * 30}ms;
+              {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
+              {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
+              {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
+              {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
+            "
+            role="button"
+            tabindex="0"
+            aria-label="Deck: {deck.short_name || deck.name}. {deck.card_count} cards total. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due for review."
+            draggable="true"
+            ondragstart={(e) => handleDragStart(e, deck.id)}
+            ondragover={(e) => handleDragOver(e, deck.id)}
+            ondragleave={handleDragLeave}
+            ondrop={(e) => handleDrop(e, deck.id)}
+            ondragend={handleDragEnd}
+            onclick={() => {
+              if (selectMode) {
+                toggleDeckSelection(deck.id);
+              } else {
+                handleDeckClick(deck.id, deck.name);
+              }
+            }}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
+          >
+            <!-- Selection checkbox -->
+            {#if selectMode}
+              <div
+                class="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                style="
+                  background: {selectedDecks.has(deck.id) ? 'var(--accent)' : 'var(--bg-card)'};
+                  box-shadow: var(--neu-subtle);
+                "
+                role="checkbox"
+                aria-checked={selectedDecks.has(deck.id)}
+                aria-label="Select {deck.short_name || deck.name}"
+                tabindex="0"
+                onclick={(e) => { e.stopPropagation(); toggleDeckSelection(deck.id); }}
+                onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleDeckSelection(deck.id)}
+              >
+                {#if selectedDecks.has(deck.id)}
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                {/if}
+              </div>
+            {/if}
+
+            <!-- Expand/Collapse button for nested decks -->
+            {#if deck.level > 0}
+              <button
+                class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center cursor-pointer"
+                style="color: var(--text-secondary);"
+                aria-label={expandedDecks.has(deck.id) ? "Collapse {deck.short_name || deck.name}" : "Expand {deck.short_name || deck.name}"}
+                aria-expanded={expandedDecks.has(deck.id)}
+                onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {#if expandedDecks.has(deck.id)}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  {:else}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  {/if}
+                </svg>
+              </button>
+            {/if}
+
+            <!-- Streak badge -->
+            <div
+              class="absolute top-4 right-4 neu-subtle px-2 py-1 rounded-lg"
+              style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+            >
+              <span style="font-family: var(--sans); font-size: 12px; color: var(--success);">🔥 {deck.card_count}d</span>
+            </div>
+
+            <!-- Deck content -->
+            <div class="flex items-center gap-3 mb-4">
+              <span style="font-size: 30px;">📚</span>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); line-clamp: 2;">{deck.short_name || deck.name}</h3>
+                  {#if deck.is_filtered}
+                    <span class="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full" style="background: var(--accent-soft); color: var(--accent);">
+                      Filtered
+                    </span>
+                  {/if}
+                </div>
+                <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">{deck.card_count} cards</p>
+              </div>
+            </div>
+
+            <!-- Stats row -->
+            <div class="flex items-center gap-4">
+              {#if deck.new_count > 0}
+                <div class="flex items-center gap-1.5">
+                  <div class="w-[7px] h-[7px] rounded-full" style="background: #3B82F6;"></div>
+                  <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.new_count} new</span>
+                </div>
+              {/if}
+              {#if deck.learn_count > 0}
+                <div class="flex items-center gap-1.5">
+                  <div class="w-[7px] h-[7px] rounded-full" style="background: #EC4899;"></div>
+                  <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.learn_count} due</span>
+                </div>
+              {/if}
+              {#if deck.review_count > 0}
+                <div class="flex items-center gap-1.5">
+                  <div class="w-[7px] h-[7px] rounded-full" style="background: #10B981;"></div>
+                  <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.review_count} due</span>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/each}
+
+        <!-- Loading skeletons -->
+        {#if isLoading}
+          {#each Array(3) as _, index}
+            <div
+              class="neu-raised"
+              style="
+                background: var(--bg-card);
+                box-shadow: var(--neu-up);
+                border-radius: var(--radius-md);
+                padding: 30px 32px;
+                animation: fadeUp 0.4s ease-out backwards;
+                animation-delay: {index * 40}ms;
+              "
+            >
+              <div class="skeleton h-6 w-3/4 mb-4"></div>
+              <div class="flex gap-2 mb-6">
+                <div class="skeleton h-6 w-12 rounded-full"></div>
+                <div class="skeleton h-6 w-16 rounded-full"></div>
+              </div>
+              <div class="skeleton h-10 w-full rounded-xl"></div>
+            </div>
+          {/each}
+        {/if}
+
+        <!-- New Deck Card -->
+        {#if !isLoading}
+          <button
+            aria-label="Create new deck"
+            onclick={() => {
+              // This would need to be handled by parent component
+              // For now, just show a toast
+              addToast("Create deck functionality moved to parent", "info");
+            }}
+            class="flex flex-col items-center justify-center cursor-pointer"
+            style="
+              background: var(--bg-base);
+              box-shadow: var(--neu-down);
+              border: 2px dashed var(--border);
+              border-radius: var(--radius-md);
+              padding: 30px 32px;
+              min-height: 200px;
+              animation: fadeUp 0.4s ease-out backwards;
+              animation-delay: {decks.filter(d => shouldShowDeck(d)).length * 40}ms;
+            "
+          >
+            <svg class="h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--text-primary);">New Deck</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <!-- Floating Export Bar -->
@@ -522,6 +607,23 @@
 
   .deck-card:hover {
     transform: translateY(-3px);
+    box-shadow: var(--neu-up);
+  }
+
+  .decks-list-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .deck-card-compact {
+    opacity: 0;
+    animation: deckFadeIn 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .deck-card-compact:hover {
+    transform: translateY(-2px);
     box-shadow: var(--neu-up);
   }
 

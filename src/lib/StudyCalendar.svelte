@@ -269,7 +269,7 @@
            </div>
 
           <div class="cal-form-row">
-            <label class="cal-form-label">Deck</label>
+            <span class="cal-form-label">Deck</span>
             <NeuSelect
               options={[
                 { value: null, label: 'All decks' },
@@ -282,8 +282,9 @@
           </div>
 
           <div class="cal-form-row">
-            <label class="cal-form-label">Card goal</label>
+            <label for="form-card-goal" class="cal-form-label">Card goal</label>
             <input
+              id="form-card-goal"
               type="number"
               class="cal-form-input neu-pressed"
               placeholder="Optional"
@@ -294,8 +295,9 @@
           </div>
 
           <div class="cal-form-row">
-            <label class="cal-form-label">Note</label>
+            <label for="form-note" class="cal-form-label">Note</label>
             <input
+              id="form-note"
               type="text"
               class="cal-form-input neu-pressed"
               placeholder="e.g. Focus on kanji"
@@ -304,8 +306,8 @@
           </div>
 
           <div class="cal-form-row">
-            <label class="cal-form-label">Notify me</label>
-            <input type="checkbox" bind:checked={formNotify} />
+            <label for="form-notify" class="cal-form-label">Notify me</label>
+            <input id="form-notify" type="checkbox" bind:checked={formNotify} />
           </div>
 
           <div class="cal-form-actions">

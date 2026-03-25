@@ -477,7 +477,7 @@
 
        {#if recurrence === 'weekly'}
          <div class="cal-form-row">
-           <label id="recur-days-label" class="cal-form-label">On days</label>
+           <span id="recur-days-label" class="cal-form-label">On days</span>
            <div role="group" aria-labelledby="recur-days-label" style="display: flex; gap: 4px;">
              {#each ['S','M','T','W','T','F','S'] as day, i}
                <button

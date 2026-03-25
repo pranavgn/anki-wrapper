@@ -287,13 +287,14 @@
 </script>
 
 <div class="decks-grid-widget">
-  <div
+  <section
     bind:this={gridEl}
     ondragover={handleRootDragOver}
     ondragleave={handleRootDragLeave}
     ondrop={handleRootDrop}
     onkeydown={handleGridKeydown}
-    role="region"
+    role="application"
+    tabindex="-1"
     aria-label="Deck grid"
     style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
   >

@@ -26,9 +26,17 @@ export async function initMathJax(): Promise<void> {
       startup: { typeset: false }, // manual control
     };
     
-    // Load MathJax components dynamically
-    await import('mathjax/tex-svg.js');
-    mjInitialized = true;
+    // Load MathJax with a timeout to prevent hanging
+    try {
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('MathJax load timeout')), 5000)
+      );
+      await Promise.race([import('mathjax/tex-svg.js'), timeoutPromise]);
+      mjInitialized = true;
+    } catch (e) {
+      console.warn('MathJax initialization failed (non-critical):', e);
+      // App continues to work — MathJax rendering will be skipped
+    }
   })();
   
   return mjInitializing;

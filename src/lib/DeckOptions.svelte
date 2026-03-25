@@ -265,7 +265,7 @@
              {#each opts.learningSteps as step, i}
                <span class="step-pill neu-subtle">
                  {step}
-                 <button onclick={() => removeLearningStep(i)} class="step-remove">
+                 <button onclick={() => removeLearningStep(i)} class="step-remove" aria-label="Remove learning step {step}">
                    <svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                    </svg>

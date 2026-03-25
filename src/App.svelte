@@ -160,10 +160,20 @@
       console.error("Non-critical init error:", e);
     }
     try {
-      await invoke("init_standalone_collection");
+      console.debug("Initializing collection...");
+      // Add timeout to prevent hanging
+      const initPromise = invoke("init_standalone_collection");
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Collection initialization timed out")), 30000)
+      );
+      await Promise.race([initPromise, timeoutPromise]);
+      console.debug("Collection initialized, setting status to ready");
       collectionStatus = 'ready';
       isCollectionOpen = true;
-      getDeckStats();
+      // Small delay to ensure collection is fully ready before loading decks
+      await new Promise(resolve => setTimeout(resolve, 50));
+      // Don't await this - let it load in background
+      getDeckStats().catch(e => console.error("Background deck stats load failed:", e));
 
       // Dev-only: seed test deck if env flag is set
       if (import.meta.env.DEV) {

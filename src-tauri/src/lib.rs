@@ -774,7 +774,7 @@ async fn optimize_fsrs_weights(
 }
 
 #[command]
-async fn init_standalone_collection(_app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+fn init_standalone_collection(_app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     // Check if already initialized
     {
         let col = state.collection.lock().map_err(|_| "Failed to lock collection")?;
@@ -846,18 +846,15 @@ async fn init_standalone_collection(_app_handle: AppHandle, state: State<'_, App
         }
     };
 
-    // Store in state
+    // Store in state and initialize FSRS in a single lock
     {
         let mut col = state.collection.lock().map_err(|_| "Failed to lock collection")?;
         *col = Some(collection);
         let mut media_path = state.media_path.lock().map_err(|_| "Failed to lock media path")?;
         *media_path = Some(media_dir);
-    }
-
-    // Initialize FSRS
-    {
-        let mut col_guard = state.collection.lock().map_err(|_| "Failed to lock collection")?;
-        if let Some(col) = col_guard.as_mut() {
+        
+        // Initialize FSRS while we have the lock
+        if let Some(col) = col.as_mut() {
             if let Err(e) = col.set_config_bool(BoolKey::Sched2021, true, false) {
                 log::warn!("FSRS init: Failed to enable Sched2021: {}", e);
             }
@@ -892,7 +889,7 @@ fn get_scheduler_info(state: State<AppState>) -> Result<SchedulerInfo, String> {
 }
 
 #[command]
-fn get_deck_stats(state: State<AppState>) -> Result<Vec<DeckInfo>, String> {
+async fn get_deck_stats(state: State<'_, AppState>) -> Result<Vec<DeckInfo>, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = match collection.as_mut() {
         Some(c) => c,
@@ -961,7 +958,7 @@ pub struct DeckListItem {
 }
 
 #[command]
-fn get_all_decks(state: State<AppState>) -> Result<Vec<DeckListItem>, String> {
+async fn get_all_decks(state: State<'_, AppState>) -> Result<Vec<DeckListItem>, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = match collection.as_mut() {
         Some(c) => c,

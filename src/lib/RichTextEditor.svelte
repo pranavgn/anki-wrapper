@@ -79,7 +79,7 @@
   // Initialize editor content on mount
   $effect(() => {
     if (editorEl && value !== editorEl.innerHTML) {
-      editorEl.innerHTML = value;
+      editorEl.innerHTML = value || '';
     }
   });
 
@@ -118,6 +118,9 @@
 
   function format(command: string, cmdValue?: string) {
     editorEl.focus();
+    // TODO: document.execCommand is deprecated. Consider migrating to
+    // the Clipboard API and manual DOM manipulation for formatting commands.
+    // For now, it works reliably in Tauri's embedded webview.
     document.execCommand(command, false, cmdValue);
     value = editorEl.innerHTML;
     onchange?.(value);
@@ -266,21 +269,21 @@
 
 <div class="rich-text-editor-container">
   <!-- Permanent toolbar -->
-  <div class="editor-toolbar">
-    <button onclick={pickImageFile} title="Insert image">
+  <div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+    <button onclick={pickImageFile} aria-label="Insert image" title="Insert image">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
       </svg>
     </button>
     
     <!-- List buttons -->
-    <button onclick={commands.unorderedList} title="Bullet list">
+    <button onclick={commands.unorderedList} aria-label="Bullet list" title="Bullet list">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
         <circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>
       </svg>
     </button>
-    <button onclick={commands.orderedList} title="Numbered list">
+    <button onclick={commands.orderedList} aria-label="Numbered list" title="Numbered list">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/>
         <text x="3" y="7" font-size="6" fill="currentColor">1</text><text x="3" y="13" font-size="6" fill="currentColor">2</text><text x="3" y="19" font-size="6" fill="currentColor">3</text>
@@ -290,19 +293,21 @@
     <div class="toolbar-divider"></div>
     
     <!-- MathJax buttons -->
-    <button onclick={() => insertMath('inline')} title="Insert inline math (\\(...\\))">
+    <button onclick={() => insertMath('inline')} aria-label="Insert inline math" title="Insert inline math (\\(...\\))">
       <span style="font-family: serif; font-style: italic; font-weight: bold;">x²</span>
     </button>
-    <button onclick={() => insertMath('display')} title="Insert display math (\\[...\\])">
+    <button onclick={() => insertMath('display')} aria-label="Insert display math" title="Insert display math (\\[...\\])">
       <span style="font-family: serif; font-weight: bold;">∑</span>
     </button>
     
     <div class="toolbar-spacer"></div>
     
     <!-- HTML Source toggle -->
-    <button 
-      onclick={toggleHtmlSource} 
+    <button
+      onclick={toggleHtmlSource}
       class={showHtmlSource ? 'active' : ''}
+      aria-label="Toggle HTML source"
+      aria-pressed={showHtmlSource}
       title="Toggle HTML source"
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -331,49 +336,53 @@
     onkeyup={updateToolbar}
     onpaste={handlePaste}
     role="textbox"
+    aria-multiline="true"
+    aria-label="Card content editor"
   ></div>
   {/if}
 
   {#if toolbarVisible && !showHtmlSource}
-    <div 
+    <div
       class="floating-toolbar"
       style="left: {toolbarX}px; top: {toolbarY}px; transform: translateX(-50%)"
       onmousedown={(e) => e.preventDefault()}
+      role="toolbar"
+      aria-label="Text formatting"
     >
-      <button class:active={activeFormats.bold} onclick={commands.bold} title="Bold (Ctrl+B)">
+      <button class:active={activeFormats.bold} onclick={commands.bold} aria-label="Bold" aria-pressed={activeFormats.bold} title="Bold (Ctrl+B)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
           <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
         </svg>
       </button>
-      <button class:active={activeFormats.italic} onclick={commands.italic} title="Italic (Ctrl+I)">
+      <button class:active={activeFormats.italic} onclick={commands.italic} aria-label="Italic" aria-pressed={activeFormats.italic} title="Italic (Ctrl+I)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="4" x2="10" y2="4"/>
           <line x1="14" y1="20" x2="5" y2="20"/>
           <line x1="15" y1="4" x2="9" y2="20"/>
         </svg>
       </button>
-      <button class:active={activeFormats.underline} onclick={commands.underline} title="Underline (Ctrl+U)">
+      <button class:active={activeFormats.underline} onclick={commands.underline} aria-label="Underline" aria-pressed={activeFormats.underline} title="Underline (Ctrl+U)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 4v6a6 6 0 0 0 12 0V4"/>
           <line x1="4" y1="20" x2="20" y2="20"/>
         </svg>
       </button>
       <div class="divider"></div>
-      <button onclick={commands.code} title="Code">
+      <button onclick={commands.code} aria-label="Code" title="Code">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="16 18 22 12 16 6"/>
           <polyline points="8 6 2 12 8 18"/>
         </svg>
       </button>
-      <button onclick={commands.superscript} title="Superscript">
+      <button onclick={commands.superscript} aria-label="Superscript" title="Superscript">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="5" x2="5" y2="5"/>
           <line x1="12" y1="5" x2="12" y2="19"/>
           <polyline points="9 9 12 6 15 9"/>
         </svg>
       </button>
-      <button onclick={commands.subscript} title="Subscript">
+      <button onclick={commands.subscript} aria-label="Subscript" title="Subscript">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="19" x2="5" y2="19"/>
           <line x1="12" y1="5" x2="12" y2="19"/>

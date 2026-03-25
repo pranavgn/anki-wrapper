@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { addToast } from "../toast";
+  import { tick } from "svelte";
 
   interface DeckStat {
     id: number;
@@ -23,6 +24,10 @@
   let selectionMode = $state(false);
   let selectedDecks: Set<number> = $state(new Set());
   let selectMode = $state(false);
+  
+  // Keyboard navigation state
+  let focusedDeckIndex = $state(-1);
+  let gridEl: HTMLDivElement;
 
   // Drag-and-drop state
   let draggedDeckId: number | null = $state(null);
@@ -225,16 +230,66 @@
       onStudy(deckId, deckName);
     }
   }
+
+  // Keyboard navigation for deck grid
+  function handleGridKeydown(e: KeyboardEvent) {
+    const visibleDecks = decks.filter(d => shouldShowDeck(d));
+    if (visibleDecks.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowRight':
+        e.preventDefault();
+        focusedDeckIndex = Math.min(focusedDeckIndex + 1, visibleDecks.length - 1);
+        focusDeck(focusedDeckIndex);
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        focusedDeckIndex = Math.max(focusedDeckIndex - 1, 0);
+        focusDeck(focusedDeckIndex);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        // Move to next row (assuming 3 columns)
+        focusedDeckIndex = Math.min(focusedDeckIndex + 3, visibleDecks.length - 1);
+        focusDeck(focusedDeckIndex);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        // Move to previous row (assuming 3 columns)
+        focusedDeckIndex = Math.max(focusedDeckIndex - 3, 0);
+        focusDeck(focusedDeckIndex);
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedDeckIndex >= 0 && focusedDeckIndex < visibleDecks.length) {
+          const deck = visibleDecks[focusedDeckIndex];
+          handleDeckClick(deck.id, deck.name);
+        }
+        break;
+    }
+  }
+
+  function focusDeck(index: number) {
+    if (gridEl) {
+      const deckCards = gridEl.querySelectorAll('[data-deck-id]');
+      if (deckCards[index]) {
+        (deckCards[index] as HTMLElement).focus();
+      }
+    }
+  }
 </script>
 
 <div class="decks-grid-widget">
   <div
+    bind:this={gridEl}
     ondragover={handleRootDragOver}
     ondragleave={handleRootDragLeave}
     ondrop={handleRootDrop}
+    onkeydown={handleGridKeydown}
     style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
   >
-    <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+    <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));" role="grid" aria-label="Deck grid">
       {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
         <div
           data-deck-id={deck.id}
@@ -250,6 +305,7 @@
           "
           role="button"
           tabindex="0"
+          aria-label="Deck: {deck.short_name || deck.name}. {deck.card_count} cards total. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due for review."
           draggable="true"
           ondragstart={(e) => handleDragStart(e, deck.id)}
           ondragover={(e) => handleDragOver(e, deck.id)}
@@ -273,7 +329,12 @@
                 background: {selectedDecks.has(deck.id) ? 'var(--accent)' : 'var(--bg-card)'};
                 box-shadow: var(--neu-subtle);
               "
+              role="checkbox"
+              aria-checked={selectedDecks.has(deck.id)}
+              aria-label="Select {deck.short_name || deck.name}"
+              tabindex="0"
               onclick={(e) => { e.stopPropagation(); toggleDeckSelection(deck.id); }}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleDeckSelection(deck.id)}
             >
               {#if selectedDecks.has(deck.id)}
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;">
@@ -288,6 +349,8 @@
             <button
               class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center cursor-pointer"
               style="color: var(--text-secondary);"
+              aria-label={expandedDecks.has(deck.id) ? "Collapse {deck.short_name || deck.name}" : "Expand {deck.short_name || deck.name}"}
+              aria-expanded={expandedDecks.has(deck.id)}
               onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,6 +438,7 @@
       <!-- New Deck Card -->
       {#if !isLoading}
         <button
+          aria-label="Create new deck"
           onclick={() => {
             // This would need to be handled by parent component
             // For now, just show a toast
@@ -438,6 +502,7 @@
         onclick={() => { clearSelection(); selectMode = false; }}
         class="neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
         style="background: var(--bg-subtle); border: none;"
+        aria-label="Clear selection"
         title="Clear selection"
       >
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">

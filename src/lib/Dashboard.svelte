@@ -219,27 +219,38 @@
   onMount(async () => {
     await loadDeckStats();
     window.addEventListener('refresh-decks', () => loadDeckStats(true));
+    window.addEventListener('click', handleClickOutside);
     return () => {
       window.removeEventListener('refresh-decks', () => loadDeckStats(true));
+      window.removeEventListener('click', handleClickOutside);
     };
   });
+
+  let loadingPromise: Promise<void> | null = null;
 
   async function loadDeckStats(force = false) {
     const now = Date.now();
     if (!force && now - lastDeckStatsTime < DECK_STATS_TTL && decks.length > 0) return;
     
+    // Guard against concurrent calls
+    if (loadingPromise) return loadingPromise;
+    
     isLoading = true;
-    try {
-      const result = await invoke<DeckStat[]>("get_deck_stats");
-      decks = result;
-      lastDeckStatsTime = Date.now();
-    } catch (error) {
-      console.error("Error loading deck stats:", error);
-      addToast(error instanceof Error ? error.message : "Failed to load decks", "error");
-      decks = [];
-    } finally {
-      isLoading = false;
-    }
+    loadingPromise = (async () => {
+      try {
+        const result = await invoke<DeckStat[]>("get_deck_stats");
+        decks = result;
+        lastDeckStatsTime = Date.now();
+      } catch (error) {
+        console.error("Error loading deck stats:", error);
+        addToast(error instanceof Error ? error.message : "Failed to load decks", "error");
+        decks = [];
+      } finally {
+        isLoading = false;
+        loadingPromise = null;
+      }
+    })();
+    return loadingPromise;
   }
 
   function toggleDeckExpanded(deckId: number) {

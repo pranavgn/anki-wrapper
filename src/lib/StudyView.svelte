@@ -10,6 +10,13 @@
   import { studyNav } from "./studyNav.svelte.ts";
   import { sendMilestoneNotification } from "./notifications";
 
+  // XSS sanitizer for card HTML
+  function sanitizeCardHtml(html: string): string {
+    return html
+      .replace(/javascript:/gi, 'blocked:')
+      .replace(/on\w+\s*=/gi, 'data-blocked=');
+  }
+
   // Props using Svelte 5 runes
   interface Props {
     deckId: number;
@@ -53,6 +60,9 @@
   // MathJax refs
   let frontEl: HTMLElement;
   let backEl: HTMLElement;
+  
+  // Focus management
+  let cardContainerRef: HTMLElement;
 
   // Load deck stats
   async function loadDeckStats() {
@@ -91,6 +101,10 @@
       // Preprocess math notation
       frontHtml = preprocessAnkiMath(frontHtml);
       backHtml = preprocessAnkiMath(backHtml);
+      
+      // Sanitize against XSS
+      frontHtml = sanitizeCardHtml(frontHtml);
+      backHtml = sanitizeCardHtml(backHtml);
       
       currentCard = { ...card, front: frontHtml, back: backHtml };
       currentFlag = card.flag;
@@ -254,19 +268,27 @@
   // MathJax rendering via $effect
   $effect(() => {
     if (currentCard && frontEl) {
+      let cancelled = false;
       tick().then(() => {
-        clearMathJaxCache(frontEl);
-        renderMath(frontEl);
+        if (!cancelled) {
+          clearMathJaxCache(frontEl);
+          renderMath(frontEl);
+        }
       });
+      return () => { cancelled = true; };
     }
   });
 
   $effect(() => {
     if (currentCard && isFlipped && backEl) {
+      let cancelled = false;
       tick().then(() => {
-        clearMathJaxCache(backEl);
-        renderMath(backEl);
+        if (!cancelled) {
+          clearMathJaxCache(backEl);
+          renderMath(backEl);
+        }
       });
+      return () => { cancelled = true; };
     }
   });
 
@@ -316,6 +338,12 @@
     studyNav.activate(deckName, onExit);
     studyNav.setFlag = setFlag;
     studyNav.undo = undoLastAction;
+    
+    // Focus card container on mount
+    await tick();
+    if (cardContainerRef) {
+      cardContainerRef.focus();
+    }
   });
 
   onDestroy(() => {
@@ -441,9 +469,14 @@
 
       {:else}
         <!-- THE CARD -->
-        <div 
+        <div
+          bind:this={cardContainerRef}
           class="card-flip-container relative"
+          role="button"
+          tabindex="0"
+          aria-label={isFlipped ? "Click to flip card back to front" : "Click to reveal answer"}
           onclick={toggleFlip}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleFlip()}
           style="cursor: pointer;"
         >
           <!-- Ghost cards behind -->
@@ -552,6 +585,7 @@
             <button
               onclick={() => answerCard(1)}
               disabled={isAnswering}
+              aria-label="Answer Again. {prefs.show_intervals_on_buttons ? 'Interval: ' + getIntervalText(1) : ''}"
               class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
@@ -575,6 +609,7 @@
             <button
               onclick={() => answerCard(2)}
               disabled={isAnswering}
+              aria-label="Answer Hard. {prefs.show_intervals_on_buttons ? 'Interval: ' + getIntervalText(2) : ''}"
               class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
@@ -598,6 +633,7 @@
             <button
               onclick={() => answerCard(3)}
               disabled={isAnswering}
+              aria-label="Answer Good. {prefs.show_intervals_on_buttons ? 'Interval: ' + getIntervalText(3) : ''}"
               class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);
@@ -621,6 +657,7 @@
             <button
               onclick={() => answerCard(4)}
               disabled={isAnswering}
+              aria-label="Answer Easy. {prefs.show_intervals_on_buttons ? 'Interval: ' + getIntervalText(4) : ''}"
               class="flex-1 neu-raised neu-btn cursor-pointer"
               style="
                 background: var(--bg-card);

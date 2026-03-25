@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
 
   interface DropdownItem {
     label: string;
@@ -14,13 +14,22 @@
 
   let isOpen = false;
   let dropdown: HTMLDivElement;
+  let menuEl: HTMLDivElement;
+  let focusedIndex = -1;
 
   function toggle() {
     isOpen = !isOpen;
+    if (isOpen) {
+      focusedIndex = 0;
+      tick().then(() => {
+        focusItem(0);
+      });
+    }
   }
 
   function close() {
     isOpen = false;
+    focusedIndex = -1;
   }
 
   function handleItemClick(item: DropdownItem) {
@@ -34,6 +43,43 @@
     }
   }
 
+  function handleKeydown(e: KeyboardEvent) {
+    if (!isOpen) return;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        focusedIndex = Math.min(focusedIndex + 1, items.length - 1);
+        focusItem(focusedIndex);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        focusedIndex = Math.max(focusedIndex - 1, 0);
+        focusItem(focusedIndex);
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < items.length) {
+          handleItemClick(items[focusedIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        close();
+        break;
+    }
+  }
+
+  function focusItem(index: number) {
+    if (menuEl) {
+      const buttons = menuEl.querySelectorAll('button');
+      if (buttons[index]) {
+        (buttons[index] as HTMLElement).focus();
+      }
+    }
+  }
+
   onMount(() => {
     document.addEventListener('click', handleClickOutside);
   });
@@ -43,14 +89,17 @@
   });
 </script>
 
-<div bind:this={dropdown} class="relative inline-block">
-  <div on:click={toggle}>
+<div bind:this={dropdown} class="relative inline-block" onkeydown={handleKeydown}>
+  <div onclick={toggle}>
     <slot />
   </div>
 
   {#if isOpen}
     <div
+      bind:this={menuEl}
       class="absolute top-[calc(100%+6px)] {align === 'right' ? 'right-0' : 'left-0'} z-50 min-w-[180px]"
+      role="menu"
+      aria-orientation="vertical"
       style="
         background: var(--bg-card);
         box-shadow: var(--neu-up);
@@ -59,17 +108,19 @@
         animation: scaleIn 0.15s ease-out;
       "
     >
-      {#each items as item}
+      {#each items as item, index}
         <button
-          on:click={() => handleItemClick(item)}
+          onclick={() => handleItemClick(item)}
+          role="menuitem"
+          tabindex={focusedIndex === index ? 0 : -1}
           class="w-full text-left px-3.5 py-2.5 rounded-lg transition-colors"
           style="
-            background: transparent;
+            background: {focusedIndex === index ? 'var(--accent-soft)' : 'transparent'};
             border: none;
             cursor: pointer;
           "
-          on:mouseenter={(e) => (e.target as HTMLElement).style.background = 'var(--accent-soft)'}
-          on:mouseleave={(e) => (e.target as HTMLElement).style.background = 'transparent'}
+          onmouseenter={(e) => { (e.target as HTMLElement).style.background = 'var(--accent-soft)'; focusedIndex = index; }}
+          onmouseleave={(e) => { if (focusedIndex === index) (e.target as HTMLElement).style.background = 'transparent'; }}
         >
           <div
             class="text-sm font-medium"

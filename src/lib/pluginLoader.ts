@@ -35,14 +35,14 @@ export async function loadAllPlugins(): Promise<void> {
     return;
   }
 
-  console.log(`Found ${manifests.length} plugins`);
+  console.debug(`Found ${manifests.length} plugins`);
 
   const enabledPlugins = manifests.filter(m => m.enabled && !m.load_error);
   
   // Log disabled plugins
   for (const manifest of manifests) {
     if (!manifest.enabled) {
-      console.log(`Plugin "${manifest.name}" is disabled, skipping`);
+      console.debug(`Plugin "${manifest.name}" is disabled, skipping`);
     } else if (manifest.load_error) {
       console.warn(`Plugin "${manifest.id}" has load error: ${manifest.load_error}`);
       pluginEngine.recordError?.(manifest.id, manifest.load_error);
@@ -75,7 +75,7 @@ export async function unloadPlugin(pluginId: string): Promise<void> {
   // Remove injected CSS
   removePluginCSS(pluginId);
 
-  console.log(`Plugin unloaded: ${pluginId}`);
+  console.debug(`Plugin unloaded: ${pluginId}`);
 }
 
 /**
@@ -83,7 +83,7 @@ export async function unloadPlugin(pluginId: string): Promise<void> {
  */
 export async function enablePlugin(pluginId: string): Promise<void> {
   await invoke("enable_plugin", { pluginId });
-  console.log(`Plugin enabled: ${pluginId}`);
+  console.debug(`Plugin enabled: ${pluginId}`);
 }
 
 /**
@@ -95,7 +95,7 @@ export async function disablePlugin(pluginId: string): Promise<void> {
   
   // Then disable it in the backend
   await invoke("disable_plugin", { pluginId });
-  console.log(`Plugin disabled: ${pluginId}`);
+  console.debug(`Plugin disabled: ${pluginId}`);
 }
 
 /**
@@ -144,7 +144,7 @@ export async function loadSinglePlugin(manifest: PluginManifest): Promise<void> 
     // Clear loading context
     clearCurrentLoadingPlugin();
 
-    console.log(`Plugin reloaded: ${manifest.name} v${manifest.version}`);
+    console.debug(`Plugin reloaded: ${manifest.name} v${manifest.version}`);
 
   } catch (e) {
     clearCurrentLoadingPlugin();
@@ -169,7 +169,7 @@ function injectPluginCSS(pluginId: string, css: string): void {
   style.textContent = css;
   document.head.appendChild(style);
   
-  console.log(`Plugin CSS injected: ${pluginId}`);
+  console.debug(`Plugin CSS injected: ${pluginId}`);
 }
 
 /**

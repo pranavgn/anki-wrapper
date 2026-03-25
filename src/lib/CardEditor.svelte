@@ -387,7 +387,7 @@
   });
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="card-editor-container animate-slide-left">
   <!-- Title -->

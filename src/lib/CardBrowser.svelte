@@ -453,14 +453,20 @@
   <!-- Header -->
   <div class="flex items-center gap-4 p-4 border-b border-border/30">
     <!-- Mode Toggle -->
-    <div class="flex bg-bg-subtle rounded-xl p-1">
+    <div class="flex bg-bg-subtle rounded-xl p-1" role="tablist" aria-label="View mode">
       <button
+        role="tab"
+        aria-selected={mode === 'cards'}
+        aria-controls="card-browser-content"
         onclick={() => switchMode('cards')}
         class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'cards' ? 'neu-raised neu-btn text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
       >
         Cards
       </button>
       <button
+        role="tab"
+        aria-selected={mode === 'notes'}
+        aria-controls="card-browser-content"
         onclick={() => switchMode('notes')}
         class="px-4 py-2 rounded-lg text-sm font-medium transition-all {mode === 'notes' ? 'neu-raised neu-btn text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
       >
@@ -480,11 +486,13 @@
         type="text"
         bind:value={query}
         placeholder="Search cards...  Try: deck:French  tag:vocab  is:due"
+        aria-label="Search cards"
         class="w-full h-12 pl-12 pr-10 bg-bg-card rounded-2xl text-sm font-mono focus:outline-none focus:ring-3 focus:ring-accent-soft"
       />
       {#if query}
         <button
           onclick={clearSearch}
+          aria-label="Clear search"
           class="absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -497,6 +505,7 @@
     <!-- Close Button -->
     <button
       onclick={onClose}
+      aria-label="Close browser"
       class="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -535,7 +544,7 @@
   {/if}
 
   <!-- Main Content -->
-  <div class="flex-1 flex overflow-hidden">
+  <div id="card-browser-content" class="flex-1 flex overflow-hidden" role="tabpanel">
     <!-- Table -->
     <div class="flex-1 overflow-y-auto overflow-x-auto min-w-0">
       {#key mode}
@@ -591,12 +600,15 @@
                 checked={allSelected}
                 bind:this={headerCheckbox}
                 onclick={toggleSelectAll}
+                aria-label="Select all cards"
               />
             </div>
             <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Front</div>
             <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Deck</div>
             <button
               onclick={() => sortOrder = sortOrder === 'cardDue' ? 'cardDueDesc' : 'cardDue'}
+              aria-label="Sort by due date"
+              aria-sort={sortOrder === 'cardDue' ? 'ascending' : sortOrder === 'cardDueDesc' ? 'descending' : 'none'}
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Due
@@ -608,6 +620,8 @@
             </button>
             <button
               onclick={() => sortOrder = sortOrder === 'cardInterval' ? 'cardIntervalDesc' : 'cardInterval'}
+              aria-label="Sort by interval"
+              aria-sort={sortOrder === 'cardInterval' ? 'ascending' : sortOrder === 'cardIntervalDesc' ? 'descending' : 'none'}
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Interval
@@ -619,6 +633,8 @@
             </button>
             <button
               onclick={() => sortOrder = sortOrder === 'cardEase' ? 'cardEaseDesc' : 'cardEase'}
+              aria-label="Sort by ease"
+              aria-sort={sortOrder === 'cardEase' ? 'ascending' : sortOrder === 'cardEaseDesc' ? 'descending' : 'none'}
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Ease
@@ -630,6 +646,8 @@
             </button>
             <button
               onclick={() => sortOrder = sortOrder === 'cardLapses' ? 'cardLapsesDesc' : 'cardLapses'}
+              aria-label="Sort by lapses"
+              aria-sort={sortOrder === 'cardLapses' ? 'ascending' : sortOrder === 'cardLapsesDesc' ? 'descending' : 'none'}
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Lapses
@@ -649,6 +667,7 @@
                 onkeydown={(e) => e.key === 'Enter' && selectCard(row.card_id)}
                 role="button"
                 tabindex="0"
+                aria-label="Card: {row.front_preview}. Deck: {row.deck_name}. Due: {row.due_str}."
                 class="group cursor-pointer"
                 style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
               >
@@ -658,6 +677,7 @@
                     class="w-4 h-4 rounded cursor-pointer accent-accent"
                     checked={selectedIds.has(row.card_id)}
                     onclick={(e) => handleRowSelect(row.card_id, i, e)}
+                    aria-label="Select card"
                   />
                 </div>
                 <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''} {row.queue === -1 ? 'italic text-text-secondary' : ''} {row.queue < -1 ? 'line-through' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>

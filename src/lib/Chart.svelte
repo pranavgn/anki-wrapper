@@ -1,20 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import {
-    Chart as ChartJS,
-    Title, Tooltip, Legend,
-    BarElement, CategoryScale, LinearScale,
-    PointElement, LineElement, ArcElement,
-    BarController, LineController, DoughnutController, PieController, Filler
-  } from "chart.js";
   import type { ChartType, ChartData, ChartOptions } from "chart.js";
-
-  ChartJS.register(
-    Title, Tooltip, Legend,
-    BarElement, CategoryScale, LinearScale,
-    PointElement, LineElement, ArcElement,
-    BarController, LineController, DoughnutController, PieController, Filler
-  );
 
   interface Props {
     type: ChartType;
@@ -25,7 +11,8 @@
   let { type, data, options = {} }: Props = $props();
 
   let canvas: HTMLCanvasElement;
-  let chart: ChartJS | null = null;
+  let chart: any = null;
+  let ChartJS: any = null;
 
   function resolveCSS(value: any): any {
     if (typeof value === 'string' && value.startsWith('var(')) {
@@ -53,7 +40,19 @@
     return resolveCSS(JSON.parse(JSON.stringify(o)));
   }
 
-  onMount(() => {
+  onMount(async () => {
+    // Lazy-load Chart.js only when component mounts
+    if (!ChartJS) {
+      const chartModule = await import("chart.js");
+      ChartJS = chartModule.Chart;
+      chartModule.Chart.register(
+        chartModule.Title, chartModule.Tooltip, chartModule.Legend,
+        chartModule.BarElement, chartModule.CategoryScale, chartModule.LinearScale,
+        chartModule.PointElement, chartModule.LineElement, chartModule.ArcElement,
+        chartModule.BarController, chartModule.LineController, chartModule.DoughnutController, chartModule.PieController, chartModule.Filler
+      );
+    }
+    
     if (canvas) {
       chart = new ChartJS(canvas, {
         type,

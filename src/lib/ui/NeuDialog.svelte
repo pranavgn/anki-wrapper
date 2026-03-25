@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import type { Snippet } from 'svelte';
 
   let {
@@ -23,13 +23,60 @@
     xl: 'max-w-2xl'
   };
 
+  let dialogEl: HTMLElement;
+  let previousActiveElement: HTMLElement | null = null;
+
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && isOpen) onClose();
+    if (e.key === 'Escape' && isOpen) {
+      onClose();
+      return;
+    }
+    
+    // Focus trap
+    if (e.key === 'Tab' && isOpen && dialogEl) {
+      const focusableElements = dialogEl.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0] as HTMLElement;
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+      
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    }
   }
 
   function handleBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
+
+  // Focus management
+  $effect(() => {
+    if (isOpen) {
+      previousActiveElement = document.activeElement as HTMLElement;
+      tick().then(() => {
+        // Focus first focusable element in dialog
+        const focusableElements = dialogEl?.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements && focusableElements.length > 0) {
+          (focusableElements[0] as HTMLElement).focus();
+        }
+      });
+    } else if (previousActiveElement) {
+      // Restore focus when dialog closes
+      previousActiveElement.focus();
+      previousActiveElement = null;
+    }
+  });
 
   onMount(() => window.addEventListener('keydown', handleKeydown));
   onDestroy(() => window.removeEventListener('keydown', handleKeydown));
@@ -37,6 +84,7 @@
 
 {#if isOpen}
   <div
+    bind:this={dialogEl}
     class="fixed inset-0 z-50 flex items-center justify-center"
     style="background: var(--overlay);"
     onclick={handleBackdropClick}

@@ -13,10 +13,15 @@
 <div
   class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
   style="pointer-events: none;"
+  role="status"
+  aria-live="polite"
+  aria-atomic="false"
 >
   {#each $toasts as toast (toast.id)}
     <div
       class="neu-raised flex items-stretch overflow-hidden"
+      role={toast.type === 'error' ? 'alert' : 'status'}
+      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
       style="
         background: var(--bg-card);
         box-shadow: var(--neu-up);

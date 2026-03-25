@@ -1,25 +1,15 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount, onDestroy } from "svelte";
-  import { isTauri } from "@tauri-apps/api/core";
-  import { fade, fly } from "svelte/transition";
-  import StudyView from "./lib/StudyView.svelte";
-  import CardEditor from "./lib/CardEditor.svelte";
+  import { onMount, onDestroy, tick } from "svelte";
+  import { fly } from "svelte/transition";
   import Dashboard from "./lib/Dashboard.svelte";
   import DeckOverview from "./lib/DeckOverview.svelte";
-  import StatsView from "./lib/StatsView.svelte";
   import NeuToast from "./lib/ui/NeuToast.svelte";
-  import KeyboardShortcuts from "./lib/KeyboardShortcuts.svelte";
-  import ImportModal from "./lib/ImportModal.svelte";
   import { exportCollectionColpkg, ImportError } from "./lib/importer";
   import { prefs } from "./lib/prefs.svelte.ts";
   import { addToast } from "./lib/toast";
   import { fly_if_enabled } from "./lib/animate.svelte.ts";
-  import CardBrowser from "./lib/CardBrowser.svelte";
-  import NotetypeManager from "./lib/NotetypeManager.svelte";
-  import Settings from "./lib/Settings.svelte";
-  import ImageOcclusion from "./lib/ImageOcclusion.svelte";
-  import { pluginEngine, setCurrentLoadingPlugin, clearCurrentLoadingPlugin } from "./lib/pluginEngine";
+  import { pluginEngine } from "./lib/pluginEngine";
   import { loadAllPlugins } from "./lib/pluginLoader";
   import { studyNav } from "./lib/studyNav.svelte.ts";
   import {
@@ -33,13 +23,14 @@
   import "./lib/statsAPI";
   import { loadCustomTheme } from "./lib/customTheme";
 
-  import PluginManager from "./lib/PluginManager.svelte";
-
   // Page state
   type Page = 'dashboard' | 'deckOverview' | 'study' | 'editor' | 'stats' | 'browser';
   let currentPage: Page = $state('dashboard');
   let previousPage: Page = $state('dashboard');
   let browserQuery = $state('');
+  
+  // Focus management
+  let mainContentRef: HTMLElement;
   
   // Page order for determining animation direction
   const pageOrder: Page[] = ['dashboard', 'deckOverview', 'study', 'editor', 'stats', 'browser'];
@@ -57,12 +48,18 @@
   }
 
   // Navigation function
-  function navigate(page: Page) {
+  async function navigate(page: Page) {
     const prevIdx = pageOrder.indexOf(currentPage);
     const nextIdx = pageOrder.indexOf(page);
     navDirection = nextIdx >= prevIdx ? 'forward' : 'back';
     previousPage = currentPage;
     currentPage = page;
+    
+    // Focus main content after navigation
+    await tick();
+    if (mainContentRef) {
+      mainContentRef.focus();
+    }
   }
 
   // Function to open browser with a specific query (e.g., from leech toast)
@@ -106,8 +103,6 @@
     }
   }
 
-  let isCollectionOpen = $state(false);
-
   // Study view state
   let currentDeckId: number | null = $state(null);
   let currentDeckName = $state("");
@@ -136,8 +131,8 @@
       openBrowserWithQuery(query);
     };
     
-    const tauriCheck = await isTauri();
-    if (!tauriCheck) {
+    // Synchronous Tauri detection (no IPC round-trip)
+    if (!('__TAURI_INTERNALS__' in window)) {
       isRunningInBrowser = true;
       browserCheckComplete = true;
       collectionStatus = 'error';
@@ -147,25 +142,14 @@
     
     browserCheckComplete = true;
     
-    // Load prefs (non-critical)
-    try {
-      await prefs.load();
-    } catch (e) {
-      console.error("Non-critical init error:", e);
-    }
-
-    // Load custom theme (non-critical)
-    try {
-      await loadCustomTheme();
-    } catch (e) {
-      console.error("Failed to load custom theme:", e);
-    }
+    // Fire and forget - don't block UI on these
+    prefs.load().catch(e => console.error("Prefs load error:", e));
+    loadCustomTheme().catch(e => console.error("Failed to load custom theme:", e));
 
     // Initialize collection — this is the critical path
     try {
       await invoke("init_standalone_collection");
       collectionStatus = 'ready';
-      isCollectionOpen = true;
 
       // Dev-only: seed test deck if env flag is set
       if (import.meta.env.DEV) {
@@ -194,7 +178,7 @@
             for (const card of testCards) {
               await invoke("add_basic_card", { deckId: deckId, front: card.front, back: card.back, tags: [] });
             }
-            console.log("🧪 Test deck seeded with", testCards.length, "cards");
+            console.debug("🧪 Test deck seeded with", testCards.length, "cards");
             window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
           } else {
             // Check if existing deck needs cards
@@ -226,7 +210,7 @@
                 for (const card of testCards) {
                   await invoke("add_basic_card", { deckId: deckId, front: card.front, back: card.back, tags: [] });
                 }
-                console.log("🧪 Test deck re-seeded with", testCards.length, "cards (deck was empty)");
+                console.debug("🧪 Test deck re-seeded with", testCards.length, "cards (deck was empty)");
                 window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
               }
             }
@@ -236,11 +220,10 @@
         }
       }
 
-      // Load all plugins
-      await loadAllPlugins();
-      
-      // Fire the app:ready hook now that plugins are loaded
-      await pluginEngine.runAction('app:ready', {});
+      // Load plugins in background, don't block UI
+      loadAllPlugins().then(() => {
+        pluginEngine.runAction('app:ready', {});
+      }).catch(e => console.error("Plugin load error:", e));
 
       // Start notification systems if enabled
       if (prefs.notifications_enabled) {
@@ -271,11 +254,11 @@
   });
 
   function startReview(deckId: number, deckName: string) {
-    console.log("startReview called with deckId:", deckId, "deckName:", deckName);
+    console.debug("startReview called with deckId:", deckId, "deckName:", deckName);
     currentDeckId = deckId;
     currentDeckName = deckName;
     navigate('study');
-    console.log("State after startReview: currentPage=", currentPage, ", currentDeckId=", currentDeckId);
+    console.debug("State after startReview: currentPage=", currentPage, ", currentDeckId=", currentDeckId);
   }
 
   function openDeckOverview(deckId: number, deckName: string) {
@@ -325,7 +308,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleGlobalKeydown} onclick={() => { if (studyNav.showFlagPicker) studyNav.showFlagPicker = false; }} />
+<svelte:window onkeydown={handleGlobalKeydown} onclick={() => { if (studyNav.showFlagPicker) studyNav.showFlagPicker = false; }} />
 
 <!-- Browser Error Message -->
 {#if browserCheckComplete && isRunningInBrowser}
@@ -359,8 +342,13 @@
 {:else}
   <!-- App Shell -->
   <div class="h-screen bg-bg-base flex flex-col overflow-hidden">
+    <!-- Skip to main content link for keyboard users -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-bg-card focus:text-text-primary focus:rounded-lg focus:shadow-warm">
+      Skip to main content
+    </a>
+    
     <!-- Top Navigation -->
-    <nav data-tauri-drag-region class="app-navbar flex items-center px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30; flex-shrink: 0;">
+    <nav data-tauri-drag-region class="app-navbar flex items-center px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30; flex-shrink: 0;" aria-label="Main navigation">
 
       <!-- Traffic light gutter (macOS only — the class is added in onMount) -->
       <div class="traffic-light-gutter"></div>
@@ -667,34 +655,15 @@
     {/if}
 
     <!-- Main Content -->
-    <main class="{studyNav.active ? 'flex-1 min-h-0 overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto p-6 lg:p-10'}">
-      <!-- Loading State - show skeleton in Dashboard -->
-      {#if collectionStatus === 'loading'}
-        <div class="max-w-6xl mx-auto">
-          <!-- Skeleton Header -->
-          <div class="mb-8">
-            <div class="skeleton h-8 w-48 mb-2"></div>
-            <div class="skeleton h-4 w-64"></div>
+    <main id="main-content" bind:this={mainContentRef} tabindex="-1" class="{studyNav.active ? 'flex-1 min-h-0 overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto p-6 lg:p-10'}">
+      <!-- Page Router -->
+      {#key currentPage}
+        {#if currentPage === 'dashboard'}
+          <div
+            in:fly={fly_if_enabled({ x: -20, duration: 150 })}
+          >
+            <Dashboard collectionStatus={collectionStatus} onStudy={openDeckOverview} />
           </div>
-          <!-- Skeleton Deck Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {#each Array(3) as _, i}
-              <div class="bg-bg-card border border-border rounded-2xl p-6 animate-pulse">
-                <div class="skeleton h-6 w-3/4 mb-4"></div>
-                <div class="skeleton h-4 w-1/2"></div>
-              </div>
-            {/each}
-          </div>
-        </div>
-      {:else}
-        <!-- Page Router -->
-        {#key currentPage}
-          {#if currentPage === 'dashboard'}
-            <div
-              in:fly={fly_if_enabled({ x: -20, duration: 150 })}
-            >
-              <Dashboard collectionStatus={collectionStatus} onStudy={openDeckOverview} />
-            </div>
           {:else if currentPage === 'deckOverview' && activeDeck}
             <div
               in:fly={fly_if_enabled({ x: 20, duration: 150 })}
@@ -708,35 +677,42 @@
             </div>
           {:else if currentPage === 'study' && currentDeckId}
             <div class="h-full">
-              {console.log("Rendering StudyView with deckId:", currentDeckId)}
-              <StudyView
-                deckId={currentDeckId}
-                deckName={currentDeckName}
-                onExit={exitReviewMode}
-              />
+              {#await import('./lib/StudyView.svelte') then mod}
+                <mod.default
+                  deckId={currentDeckId}
+                  deckName={currentDeckName}
+                  onExit={exitReviewMode}
+                />
+              {/await}
             </div>
           {:else if currentPage === 'editor'}
             <div
               in:fly={fly_if_enabled({ x: 20, duration: 150 })}
               class="max-w-2xl mx-auto"
             >
-              <CardEditor
-                onBack={() => { navigate(previousPage); editingCard = null; }}
-                editCard={editingCard}
-              />
+              {#await import('./lib/CardEditor.svelte') then mod}
+                <mod.default
+                  onBack={() => { navigate(previousPage); editingCard = null; }}
+                  editCard={editingCard}
+                />
+              {/await}
             </div>
           {:else if currentPage === 'stats'}
             <div
               in:fly={fly_if_enabled({ x: 20, duration: 150 })}
             >
-              <StatsView />
+              {#await import('./lib/StatsView.svelte') then mod}
+                <mod.default />
+              {/await}
             </div>
           {:else if currentPage === 'browser'}
             <div class="h-full">
-              <CardBrowser
-                initialQuery={browserQuery}
-                onClose={() => { navigate(previousPage); browserQuery = ''; }}
-              />
+              {#await import('./lib/CardBrowser.svelte') then mod}
+                <mod.default
+                  initialQuery={browserQuery}
+                  onClose={() => { navigate(previousPage); browserQuery = ''; }}
+                />
+              {/await}
             </div>
           {/if}
         {/key}
@@ -747,22 +723,30 @@
     <NeuToast />
 
     <!-- Keyboard Shortcuts Modal -->
-    <KeyboardShortcuts isOpen={showKeyboardShortcuts} onClose={() => showKeyboardShortcuts = false} />
+    {#if showKeyboardShortcuts}
+      {#await import('./lib/KeyboardShortcuts.svelte') then mod}
+        <mod.default isOpen={showKeyboardShortcuts} onClose={() => showKeyboardShortcuts = false} />
+      {/await}
+    {/if}
 
     <!-- Import Modal -->
-    <ImportModal 
-      isOpen={showImportModal} 
-      collectionStatus={collectionStatus}
-      onClose={() => showImportModal = false}
-      onImportComplete={() => {
-        // Trigger deck reload in Dashboard
-        window.dispatchEvent(new CustomEvent('refresh-decks'));
-      }}
-    />
+    {#if showImportModal}
+      {#await import('./lib/ImportModal.svelte') then mod}
+        <mod.default
+          isOpen={showImportModal}
+          collectionStatus={collectionStatus}
+          onClose={() => showImportModal = false}
+          onImportComplete={() => {
+            // Trigger deck reload in Dashboard
+            window.dispatchEvent(new CustomEvent('refresh-decks'));
+          }}
+        />
+      {/await}
+    {/if}
 
     <!-- Notetype Manager Modal -->
     {#if showNotetypeManager}
-      <div 
+      <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
         onclick={() => showNotetypeManager = false}
         onkeydown={(e) => e.key === 'Escape' && (showNotetypeManager = false)}
@@ -770,26 +754,38 @@
         aria-modal="true"
         aria-labelledby="notetype-manager-title"
       >
-        <div 
+        <div
           class="bg-bg-card border border-border rounded-2xl shadow-xl w-full max-w-4xl h-[80vh]"
           onclick={(e) => e.stopPropagation()}
           onkeydown={(e) => e.stopPropagation()}
           role="document"
         >
-          <NotetypeManager />
+          {#await import('./lib/NotetypeManager.svelte') then mod}
+            <mod.default />
+          {/await}
         </div>
       </div>
     {/if}
 
     <!-- Settings Panel -->
-    <Settings isOpen={showSettings} onClose={() => showSettings = false} />
+    {#if showSettings}
+      {#await import('./lib/Settings.svelte') then mod}
+        <mod.default isOpen={showSettings} onClose={() => showSettings = false} />
+      {/await}
+    {/if}
     
     <!-- Plugin Manager Modal -->
-    <PluginManager isOpen={showPluginManager} onClose={() => showPluginManager = false} />
+    {#if showPluginManager}
+      {#await import('./lib/PluginManager.svelte') then mod}
+        <mod.default isOpen={showPluginManager} onClose={() => showPluginManager = false} />
+      {/await}
+    {/if}
     
     <!-- Image Occlusion Modal -->
     {#if showImageOcclusion}
-      <ImageOcclusion onClose={() => showImageOcclusion = false} />
+      {#await import('./lib/ImageOcclusion.svelte') then mod}
+        <mod.default onClose={() => showImageOcclusion = false} />
+      {/await}
     {/if}
   </div>
 {/if}

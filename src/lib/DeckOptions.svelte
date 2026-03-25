@@ -207,6 +207,11 @@
 <NeuDialog {isOpen} {onClose} title="Deck Options" size="sm">
   <div class="deck-options">
     <p class="deck-name">{deckName}</p>
+    
+    <!-- Warning about stub implementation -->
+    <p class="text-xs text-warning mb-4" style="color: var(--warning);">
+      Note: Deck option changes are not yet persisted. This feature is under development.
+    </p>
 
     {#if isLoading}
       <div class="loading-state">

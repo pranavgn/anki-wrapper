@@ -49,11 +49,16 @@ impl Default for AppPreferences {
 }
 
 fn get_prefs_path() -> Result<std::path::PathBuf, String> {
+    let app_data_dir = get_app_data_dir()?;
+    Ok(app_data_dir.join("prefs.json"))
+}
+
+fn get_app_data_dir() -> Result<std::path::PathBuf, String> {
     let app_data_dir = dirs::data_local_dir()
         .ok_or("Could not find local data directory")?
         .join("anki-wrapper");
     std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
-    Ok(app_data_dir.join("prefs.json"))
+    Ok(app_data_dir)
 }
 
 #[command]
@@ -476,6 +481,53 @@ fn list_backups() -> Result<Vec<BackupInfo>, String> {
     backups.sort_by(|a, b| b.created.cmp(&a.created));
     
     Ok(backups)
+}
+
+// ============ CUSTOM THEME ============
+
+#[command]
+fn save_custom_theme_css(css: String) -> Result<(), String> {
+    let path = get_app_data_dir()?.join("custom_theme.css");
+    std::fs::write(&path, css).map_err(|e| e.to_string())
+}
+
+#[command]
+fn save_custom_theme_js(js: String) -> Result<(), String> {
+    let path = get_app_data_dir()?.join("custom_theme.js");
+    std::fs::write(&path, js).map_err(|e| e.to_string())
+}
+
+#[command]
+fn load_custom_theme_css() -> Result<Option<String>, String> {
+    let path = get_app_data_dir()?.join("custom_theme.css");
+    if path.exists() {
+        std::fs::read_to_string(&path).map(Some).map_err(|e| e.to_string())
+    } else {
+        Ok(None)
+    }
+}
+
+#[command]
+fn load_custom_theme_js() -> Result<Option<String>, String> {
+    let path = get_app_data_dir()?.join("custom_theme.js");
+    if path.exists() {
+        std::fs::read_to_string(&path).map(Some).map_err(|e| e.to_string())
+    } else {
+        Ok(None)
+    }
+}
+
+#[command]
+fn remove_custom_theme() -> Result<(), String> {
+    let css_path = get_app_data_dir()?.join("custom_theme.css");
+    let js_path = get_app_data_dir()?.join("custom_theme.js");
+    if css_path.exists() {
+        std::fs::remove_file(&css_path).map_err(|e| e.to_string())?;
+    }
+    if js_path.exists() {
+        std::fs::remove_file(&js_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[command]
@@ -1512,9 +1564,10 @@ fn search_cards(
                 c.id as card_id,
                 c.nid as note_id,
                 d.name as deck_name,
-                CASE WHEN INSTR(n.flds, CHAR(0)) > 0
-                     THEN SUBSTR(n.flds, 1, INSTR(n.flds, CHAR(0)) - 1)
-                     ELSE n.flds
+                CASE
+                  WHEN INSTR(n.flds, CHAR(31)) > 0
+                  THEN SUBSTR(n.flds, 1, INSTR(n.flds, CHAR(31)) - 1)
+                  ELSE n.flds
                 END as front_preview,
                 c.due,
                 c.ivl,
@@ -2286,7 +2339,13 @@ pub fn run() {
             get_notetype_detail,
             update_notetype_detail,
             rename_notetype,
-            delete_notetype
+            delete_notetype,
+            // Custom theme commands
+            save_custom_theme_css,
+            save_custom_theme_js,
+            load_custom_theme_css,
+            load_custom_theme_js,
+            remove_custom_theme
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

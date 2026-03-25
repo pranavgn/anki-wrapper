@@ -22,9 +22,17 @@ export interface PluginManifest {
   homepage?: string;
 }
 
+export interface WidgetConfig {
+  id: string;
+  title: string;
+  render: (container: HTMLElement) => void | (() => void);
+  locations?: ('dashboard' | 'deckOverview')[];
+  defaultOrder?: number;
+}
+
 /**
  * PluginEngine - Core runtime for plugin hook system
- * 
+ *
  * Manages registration and execution of filter and action hooks.
  * Ensures complete error isolation - a plugin crash never breaks the app.
  */
@@ -33,6 +41,7 @@ class PluginEngine {
   private actionHooks: Map<string, PluginRegistration[]> = new Map();
   private loadedPlugins: Map<string, PluginManifest> = new Map();
   private pluginErrors: Map<string, string[]> = new Map();
+  private widgetRegistry: Map<string, WidgetConfig> = new Map();
 
   /**
    * Register a filter hook - transforms data through a pipeline
@@ -225,6 +234,39 @@ class PluginEngine {
   }
 
   /**
+   * Register a widget for the dashboard or deck overview
+   */
+  registerWidget(config: WidgetConfig): void {
+    if (!currentLoadingPluginId) {
+      throw new Error('No plugin is currently loading. Cannot register widget.');
+    }
+    
+    const widgetId = `${currentLoadingPluginId}:${config.id}`;
+    this.widgetRegistry.set(widgetId, {
+      ...config,
+      id: widgetId,
+      locations: config.locations || ['dashboard'],
+      defaultOrder: config.defaultOrder || 100
+    });
+  }
+
+  /**
+   * Get all registered widgets for a specific location
+   */
+  getWidgets(location: 'dashboard' | 'deckOverview'): WidgetConfig[] {
+    return Array.from(this.widgetRegistry.values())
+      .filter(widget => widget.locations?.includes(location))
+      .sort((a, b) => (a.defaultOrder || 100) - (b.defaultOrder || 100));
+  }
+
+  /**
+   * Get a specific widget by ID
+   */
+  getWidget(widgetId: string): WidgetConfig | undefined {
+    return this.widgetRegistry.get(widgetId);
+  }
+
+  /**
    * Internal: Log an error for a plugin
    */
   private logError(pluginId: string, message: string): void {
@@ -287,14 +329,24 @@ const pluginPublicAPI = {
    * Register an action hook for the currently loading plugin
    */
   registerAction: (
-    hookName: string, 
-    callback: (data: any) => void, 
+    hookName: string,
+    callback: (data: any) => void,
     priority?: number
   ): void => {
     if (!currentLoadingPluginId) {
       throw new Error('No plugin is currently loading. Cannot register action hook.');
     }
     engine.registerAction(currentLoadingPluginId, hookName, callback, priority);
+  },
+
+  /**
+   * Register a widget for the currently loading plugin
+   */
+  registerWidget: (config: WidgetConfig): void => {
+    if (!currentLoadingPluginId) {
+      throw new Error('No plugin is currently loading. Cannot register widget.');
+    }
+    engine.registerWidget(config);
   },
 
   /**

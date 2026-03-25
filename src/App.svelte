@@ -31,6 +31,7 @@
     sendStudyReminder,
   } from "./lib/notifications";
   import "./lib/statsAPI";
+  import { loadCustomTheme } from "./lib/customTheme";
 
   import PluginManager from "./lib/PluginManager.svelte";
 
@@ -151,6 +152,13 @@
       await prefs.load();
     } catch (e) {
       console.error("Non-critical init error:", e);
+    }
+
+    // Load custom theme (non-critical)
+    try {
+      await loadCustomTheme();
+    } catch (e) {
+      console.error("Failed to load custom theme:", e);
     }
 
     // Initialize collection — this is the critical path
@@ -371,6 +379,7 @@
         {:else if studyNav.active}
           <!-- Study mode: End + Undo -->
           <button
+            type="button"
             onclick={() => studyNav.exit?.()}
             class="neu-subtle neu-btn flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -382,6 +391,7 @@
           </button>
           {#if studyNav.canUndo}
             <button
+              type="button"
               onclick={() => studyNav.undo?.()}
               class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
               style="background: var(--bg-card);"
@@ -396,6 +406,7 @@
         {:else}
           <!-- All other pages: Back -->
           <button
+            type="button"
             onclick={goToDashboard}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -456,6 +467,7 @@
           <!-- Study: minimal — just flag + settings -->
           <div class="relative">
             <button
+              type="button"
               onclick={() => { studyNav.showFlagPicker = !studyNav.showFlagPicker; }}
               class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
               style="background: var(--bg-card);"
@@ -474,6 +486,7 @@
               >
                 {#each [0,1,2,3,4,5,6,7] as flagIdx}
                   <button
+                    type="button"
                     onclick={() => { studyNav.setFlag?.(flagIdx); studyNav.showFlagPicker = false; }}
                     class="w-7 h-7 rounded-full cursor-pointer flex items-center justify-center"
                     style="background: {studyNav.FLAG_COLORS[flagIdx]}; {flagIdx === 0 ? 'border: 2px solid var(--border);' : ''}"
@@ -491,6 +504,7 @@
           </div>
           <div class="nav-divider"></div>
           <button
+            type="button"
             onclick={() => showSettings = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -506,6 +520,7 @@
         {:else if currentPage === 'dashboard'}
           <!-- Dashboard: full toolbar -->
           <button
+            type="button"
             onclick={() => navigate('editor')}
             class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -517,6 +532,7 @@
           </button>
           <div class="nav-divider"></div>
           <button
+            type="button"
             onclick={() => showImportModal = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -528,6 +544,7 @@
             </svg>
           </button>
           <button
+            type="button"
             onclick={handleExportCollection}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -540,6 +557,7 @@
           </button>
           <div class="nav-divider"></div>
           <button
+            type="button"
             onclick={() => showPluginManager = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -551,6 +569,7 @@
             </svg>
           </button>
           <button
+            type="button"
             onclick={() => showSettings = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -566,6 +585,7 @@
         {:else if currentPage === 'deckOverview'}
           <!-- Deck overview: Add + utilities -->
           <button
+            type="button"
             onclick={() => navigate('editor')}
             class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -577,6 +597,7 @@
           </button>
           <div class="nav-divider"></div>
           <button
+            type="button"
             onclick={() => showPluginManager = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -588,6 +609,7 @@
             </svg>
           </button>
           <button
+            type="button"
             onclick={() => showSettings = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -603,6 +625,7 @@
         {:else}
           <!-- Editor, Stats, Browser: just utilities -->
           <button
+            type="button"
             onclick={() => showPluginManager = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
@@ -614,6 +637,7 @@
             </svg>
           </button>
           <button
+            type="button"
             onclick={() => showSettings = true}
             class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"

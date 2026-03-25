@@ -11,6 +11,13 @@
     exportDeckApkg,
     ImportError,
   } from "./importer";
+  import { prefs } from "./prefs.svelte";
+  import WidgetContainer from "./widgets/WidgetContainer.svelte";
+  import DecksGridWidget from "./widgets/DecksGridWidget.svelte";
+  import UpcomingSessionsWidget from "./widgets/UpcomingSessionsWidget.svelte";
+  import StatsSnapshotWidget from "./widgets/StatsSnapshotWidget.svelte";
+  import StudyScheduleWidget from "./widgets/StudyScheduleWidget.svelte";
+  import { pluginEngine } from "./pluginEngine";
 
   // Collection status prop
   type CollectionStatus = "loading" | "ready" | "error";
@@ -440,6 +447,67 @@
       onClick: handleImportText
     }
   ];
+
+  // Build widgets array
+  let dashboardWidgets = $derived.by(() => {
+    const widgets = [];
+    
+    // Add built-in widgets based on widget_order
+    for (const widgetId of prefs.widget_order) {
+      if (widgetId === 'decks') {
+        widgets.push({
+          id: 'decks',
+          type: 'decks',
+          title: 'Your Decks',
+          component: DecksGridWidget,
+          props: { onStudy },
+          order: widgets.length
+        });
+      } else if (widgetId === 'upcoming') {
+        widgets.push({
+          id: 'upcoming',
+          type: 'upcoming',
+          title: 'Upcoming Sessions',
+          component: UpcomingSessionsWidget,
+          props: {},
+          order: widgets.length
+        });
+      } else if (widgetId === 'stats') {
+        widgets.push({
+          id: 'stats',
+          type: 'stats',
+          title: 'Stats Snapshot',
+          component: StatsSnapshotWidget,
+          props: {},
+          order: widgets.length
+        });
+      } else if (widgetId === 'schedule') {
+        widgets.push({
+          id: 'schedule',
+          type: 'schedule',
+          title: 'Study Schedule',
+          component: StudyScheduleWidget,
+          props: {},
+          order: widgets.length
+        });
+      }
+    }
+    
+    // Add plugin widgets
+    const pluginWidgets = pluginEngine.getWidgets('dashboard');
+    for (const pluginWidget of pluginWidgets) {
+      widgets.push({
+        id: pluginWidget.id,
+        type: 'plugin',
+        title: pluginWidget.title,
+        component: { render: (props: any) => pluginWidget.render(props.container) },
+        props: {},
+        order: pluginWidget.defaultOrder || widgets.length
+      });
+    }
+    
+    return widgets;
+  });
 </script>
 
 <div class="max-w-[860px] mx-auto px-9 pt-13 pb-13" style="animation: fadeUp 0.4s ease-out;">
@@ -481,234 +549,8 @@
     </div>
   </div>
 
-  <!-- Deck Grid -->
-  <div
-    ondragover={handleRootDragOver}
-    ondragleave={handleRootDragLeave}
-    ondrop={handleRootDrop}
-    style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
-  >
-  <div class="grid gap-7" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
-    {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
-      <div
-        data-deck-id={deck.id}
-        class="deck-card bg-bg-card rounded-2xl p-6 cursor-pointer relative"
-        style="
-          box-shadow: var(--neu-subtle);
-          border: 1px solid var(--border);
-          animation-delay: {index * 30}ms;
-          {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
-          {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
-          {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
-          {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
-        "
-        role="button"
-        tabindex="0"
-        draggable="true"
-        ondragstart={(e) => handleDragStart(e, deck.id)}
-        ondragover={(e) => handleDragOver(e, deck.id)}
-        ondragleave={handleDragLeave}
-        ondrop={(e) => handleDrop(e, deck.id)}
-        ondragend={handleDragEnd}
-        onclick={() => {
-          if (selectMode) {
-            toggleDeckSelection(deck.id);
-          } else {
-            handleDeckClick(deck.id, deck.name);
-          }
-        }}
-        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
-      >
-        <!-- Selection checkbox -->
-        {#if selectMode}
-          <div
-            class="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
-            style="
-              background: {selectedDecks.has(deck.id) ? 'var(--accent)' : 'var(--bg-card)'};
-              box-shadow: var(--neu-subtle);
-            "
-            onclick={(e) => { e.stopPropagation(); toggleDeckSelection(deck.id); }}
-          >
-            {#if selectedDecks.has(deck.id)}
-              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-              </svg>
-            {/if}
-          </div>
-        {/if}
-
-        <!-- Expand/Collapse button for nested decks -->
-        {#if deck.level > 0}
-          <button
-            class="absolute top-4 left-2 w-6 h-6 flex items-center justify-center cursor-pointer"
-            style="color: var(--text-secondary);"
-            onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {#if expandedDecks.has(deck.id)}
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-              {:else}
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              {/if}
-            </svg>
-          </button>
-        {/if}
-
-        <!-- Streak badge -->
-        <div
-          class="absolute top-4 right-4 neu-subtle px-2 py-1 rounded-lg"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-        >
-          <span style="font-family: var(--sans); font-size: 12px; color: var(--success);">🔥 {deck.card_count}d</span>
-        </div>
-
-        <!-- Deck content -->
-        <div class="flex items-center gap-3 mb-4">
-          <span style="font-size: 30px;">📚</span>
-          <div>
-            <div class="flex items-center gap-2">
-              <h3 style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); line-clamp: 2;">{deck.short_name || deck.name}</h3>
-              {#if deck.is_filtered}
-                <span class="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full" style="background: var(--accent-soft); color: var(--accent);">
-                  Filtered
-                </span>
-              {/if}
-            </div>
-            <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">{deck.card_count} cards</p>
-          </div>
-        </div>
-
-        <!-- Stats row -->
-        <div class="flex items-center gap-4">
-          {#if deck.new_count > 0}
-            <div class="flex items-center gap-1.5">
-              <div class="w-[7px] h-[7px] rounded-full" style="background: #3B82F6;"></div>
-              <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.new_count} new</span>
-            </div>
-          {/if}
-          {#if deck.learn_count > 0}
-            <div class="flex items-center gap-1.5">
-              <div class="w-[7px] h-[7px] rounded-full" style="background: #EC4899;"></div>
-              <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.learn_count} due</span>
-            </div>
-          {/if}
-          {#if deck.review_count > 0}
-            <div class="flex items-center gap-1.5">
-              <div class="w-[7px] h-[7px] rounded-full" style="background: #10B981;"></div>
-              <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.review_count} due</span>
-            </div>
-          {/if}
-        </div>
-      </div>
-    {/each}
-
-    <!-- Loading skeletons -->
-    {#if isLoading}
-      {#each Array(3) as _, index}
-        <div
-          class="neu-raised"
-          style="
-            background: var(--bg-card);
-            box-shadow: var(--neu-up);
-            border-radius: var(--radius-md);
-            padding: 30px 32px;
-            animation: fadeUp 0.4s ease-out backwards;
-            animation-delay: {index * 40}ms;
-          "
-        >
-          <div class="skeleton h-6 w-3/4 mb-4"></div>
-          <div class="flex gap-2 mb-6">
-            <div class="skeleton h-6 w-12 rounded-full"></div>
-            <div class="skeleton h-6 w-16 rounded-full"></div>
-          </div>
-          <div class="skeleton h-10 w-full rounded-xl"></div>
-        </div>
-      {/each}
-    {/if}
-
-    <!-- New Deck Card -->
-    {#if !isCreatingDeck && !isLoading}
-      <button
-        onclick={handleCreateDeckClick}
-        class="flex flex-col items-center justify-center cursor-pointer"
-        style="
-          background: var(--bg-base);
-          box-shadow: var(--neu-down);
-          border: 2px dashed var(--border);
-          border-radius: var(--radius-md);
-          padding: 30px 32px;
-          min-height: 200px;
-          animation: fadeUp 0.4s ease-out backwards;
-          animation-delay: {decks.filter(d => shouldShowDeck(d)).length * 40}ms;
-        "
-      >
-        <svg class="h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        <span style="font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--text-primary);">New Deck</span>
-      </button>
-    {:else if isCreatingDeck}
-      <div
-        class="flex flex-col items-center justify-center"
-        style="
-          background: var(--bg-card);
-          box-shadow: var(--neu-down);
-          border: 2px dashed var(--accent);
-          border-radius: var(--radius-md);
-          padding: 30px 32px;
-          min-height: 200px;
-          animation: fadeUp 0.4s ease-out;
-        "
-      >
-        <div class="w-full mb-4">
-          <input
-            type="text"
-            bind:value={newDeckName}
-            onkeydown={handleKeyDown}
-            class="w-full px-4 py-2 rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none"
-            style="
-              background: var(--bg-subtle);
-              box-shadow: var(--neu-down);
-              border: none;
-              font-family: var(--sans);
-            "
-            placeholder="Deck name..."
-          />
-        </div>
-        <div class="flex gap-3 w-full">
-          <button
-            onclick={handleCreateDeckSubmit}
-            class="flex-1 px-4 py-2 rounded-xl cursor-pointer"
-            style="
-              background: var(--accent);
-              color: white;
-              font-family: var(--sans);
-              font-size: 14px;
-              font-weight: 500;
-              border: none;
-            "
-          >
-            Create
-          </button>
-          <button
-            onclick={handleCancelCreateDeck}
-            class="px-4 py-2 rounded-xl cursor-pointer"
-            style="
-              background: var(--bg-subtle);
-              color: var(--text-primary);
-              font-family: var(--sans);
-              font-size: 14px;
-              font-weight: 500;
-              border: none;
-            "
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    {/if}
-  </div>
-  </div>
+  <!-- Widget Container -->
+  <WidgetContainer widgets={dashboardWidgets} />
 
   {#if optionsDeckId !== null}
     {@const selectedDeck = decks.find(d => d.id === optionsDeckId)}

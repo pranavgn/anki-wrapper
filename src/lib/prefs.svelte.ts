@@ -26,6 +26,13 @@ export interface AppPreferences {
   
   // Notifications
   notifications_enabled: boolean;
+  
+  // Dashboard widgets
+  widget_order: string[];
+  
+  // Custom theme indicators (read-only, derived from disk)
+  custom_theme_css: boolean;
+  custom_theme_js: boolean;
 }
 
 // Global state using Svelte 5 runes
@@ -50,6 +57,12 @@ class PreferencesState {
   
   notifications_enabled = $state(false);
   
+  widget_order = $state<string[]>(['decks', 'schedule', 'upcoming', 'stats']);
+  
+  // Custom theme indicators (read-only, derived from disk)
+  custom_theme_css = $state(false);
+  custom_theme_js = $state(false);
+  
   async load() {
     try {
       const p = await invoke<AppPreferences>('get_preferences');
@@ -68,6 +81,17 @@ class PreferencesState {
       this.auto_backup = p.auto_backup;
       this.backup_count = p.backup_count;
       if ('notifications_enabled' in p) this.notifications_enabled = p.notifications_enabled;
+      if ('widget_order' in p && Array.isArray(p.widget_order)) this.widget_order = p.widget_order;
+      
+      // Load custom theme indicators
+      try {
+        const css = await invoke<string | null>('load_custom_theme_css');
+        const js = await invoke<string | null>('load_custom_theme_js');
+        this.custom_theme_css = css !== null;
+        this.custom_theme_js = js !== null;
+      } catch (e) {
+        console.error('Failed to load custom theme indicators:', e);
+      }
       
       // Apply theme immediately
       this.applyTheme();
@@ -96,6 +120,7 @@ class PreferencesState {
           auto_backup: this.auto_backup,
           backup_count: this.backup_count,
           notifications_enabled: this.notifications_enabled,
+          widget_order: this.widget_order,
         }
       });
     } catch (e) {

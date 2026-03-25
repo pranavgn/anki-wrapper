@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { addToast } from "./toast";
   import { getChartColors } from "./chartTheme";
+  import StudyScheduleWidget from "./widgets/StudyScheduleWidget.svelte";
 
   interface DeckStat {
     id: number;
@@ -231,6 +232,8 @@
       {/if}
     </div>
 
+    <!-- Study Schedule Widget -->
+    <StudyScheduleWidget deckId={deck.id} deckName={deck.name} />
   </div>
 
   <!-- Card Types Doughnut -->

@@ -115,14 +115,23 @@
   transition: box-shadow 0.1s ease, transform 0.1s ease;
   cursor: pointer;
   user-select: none;
+  position: relative;
+  min-height: 32px;
+  min-width: 32px;
 }
 .neu-btn:hover {
   box-shadow: 7px 7px 16px rgba(0,0,0,0.09), -5px -5px 12px rgba(255,255,255,0.88);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 .neu-btn:active {
   box-shadow: var(--neu-down);
   transform: translateY(0);
+}
+
+/* Prevent SVG icons and spans inside buttons from intercepting pointer events */
+.neu-btn > svg,
+.neu-btn > span {
+  pointer-events: none;
 }
 
 /* ── Transitions — scoped to interactive elements only ── */

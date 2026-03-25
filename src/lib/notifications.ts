@@ -76,6 +76,10 @@ export interface StudySession {
   note: string;
   completed: boolean;
   notify: boolean;
+  schedule_type?: 'exact' | 'hour' | 'day';
+  recurrence?: 'none' | 'weekly' | 'daily';
+  recur_days?: number[];
+  base_session_id?: string;
 }
 
 async function checkScheduledSessions() {

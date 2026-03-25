@@ -65,3 +65,48 @@ export function upcomingSessions(sessions: StudySession[]): StudySession[] {
       return a.time.localeCompare(b.time);
     });
 }
+
+/** Generate recurring sessions based on a base session */
+export async function generateRecurringSessions(
+  baseSession: StudySession,
+  weeksToGenerate: number = 4
+): Promise<void> {
+  if (!baseSession.recurrence || baseSession.recurrence === 'none') return;
+
+  const baseDate = new Date(baseSession.date);
+  
+  for (let week = 1; week <= weeksToGenerate; week++) {
+    if (baseSession.recurrence === 'daily') {
+      // Generate for each day
+      for (let day = 1; day <= 7; day++) {
+        const newDate = new Date(baseDate);
+        newDate.setDate(newDate.getDate() + (week * 7) + day - 1);
+        
+        const recurringSession = createSession({
+          ...baseSession,
+          id: `ss_${Date.now()}_${week}_${day}`,
+          date: newDate.toISOString().split("T")[0],
+          base_session_id: baseSession.id,
+        });
+        
+        await saveSession(recurringSession);
+      }
+    } else if (baseSession.recurrence === 'weekly' && baseSession.recur_days && baseSession.recur_days.length > 0) {
+      // Generate for specific days of the week
+      for (const dayOfWeek of baseSession.recur_days) {
+        const newDate = new Date(baseDate);
+        const daysUntilNext = (dayOfWeek - newDate.getDay() + 7) % 7;
+        newDate.setDate(newDate.getDate() + (week * 7) + daysUntilNext);
+        
+        const recurringSession = createSession({
+          ...baseSession,
+          id: `ss_${Date.now()}_${week}_${dayOfWeek}`,
+          date: newDate.toISOString().split("T")[0],
+          base_session_id: baseSession.id,
+        });
+        
+        await saveSession(recurringSession);
+      }
+    }
+  }
+}

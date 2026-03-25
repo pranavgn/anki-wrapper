@@ -6,6 +6,8 @@
   import NeuToggle from "./ui/NeuToggle.svelte";
   import { DESIGN_PRESETS, ACCENT_PRESETS } from './themes';
   import { save, open } from "@tauri-apps/plugin-dialog";
+  import { readTextFile } from "@tauri-apps/plugin-fs";
+  import { loadCustomTheme, removeCustomTheme } from "./customTheme";
 
   interface Props {
     isOpen: boolean;
@@ -65,6 +67,46 @@
     prefs.accent_color = color;
     prefs.applyTheme();
     prefs.save();
+  }
+
+  // Custom theme handlers
+  async function handleUploadCSS() {
+    try {
+      const selected = await open({ filters: [{ name: "CSS", extensions: ["css"] }] });
+      if (!selected) return;
+      const contents = await readTextFile(selected.path);
+      await invoke("save_custom_theme_css", { css: contents });
+      await loadCustomTheme();
+      prefs.custom_theme_css = true;
+      addToast("Custom CSS theme applied", "success");
+    } catch (e) {
+      addToast(`Failed to upload CSS: ${e}`, "error");
+    }
+  }
+
+  async function handleUploadJS() {
+    try {
+      const selected = await open({ filters: [{ name: "JavaScript", extensions: ["js"] }] });
+      if (!selected) return;
+      const contents = await readTextFile(selected.path);
+      await invoke("save_custom_theme_js", { js: contents });
+      await loadCustomTheme();
+      prefs.custom_theme_js = true;
+      addToast("Custom JS theme applied", "success");
+    } catch (e) {
+      addToast(`Failed to upload JS: ${e}`, "error");
+    }
+  }
+
+  async function handleRemoveCustomTheme() {
+    try {
+      await removeCustomTheme();
+      prefs.custom_theme_css = false;
+      prefs.custom_theme_js = false;
+      addToast("Custom theme removed", "success");
+    } catch (e) {
+      addToast(`Failed to remove custom theme: ${e}`, "error");
+    }
   }
 
   // Auto-save on toggle change
@@ -277,7 +319,7 @@
       <!-- Design Style -->
       <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
         <span class="setting-label">Design Style</span>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; margin: 2px;">
           {#each DESIGN_PRESETS as preset}
             <button
               onclick={() => handleDesignPresetChange(preset.id)}
@@ -305,7 +347,7 @@
       <!-- Accent Color -->
       <div class="setting-row">
         <span class="setting-label">Accent Color</span>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; margin: 2px;">
           {#each ACCENT_PRESETS as preset}
             <button
               onclick={() => handleAccentColorChange(preset.color)}
@@ -324,6 +366,47 @@
             ></button>
           {/each}
         </div>
+      </div>
+
+      <!-- Custom Theme -->
+      <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+        <span class="setting-label">Custom Theme</span>
+        <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin: 0;">
+          Upload CSS/JS files to override design tokens and add custom elements.
+          Your files can use all CSS variables defined in the core API (--bg-base, --accent, --neu-up, etc).
+        </p>
+        <div style="display: flex; gap: 8px;">
+          <button
+            onclick={handleUploadCSS}
+            class="neu-subtle neu-btn"
+            type="button"
+            style="flex: 1; padding: 10px; text-align: center; font-family: var(--sans); font-size: 13px; color: var(--text-primary); cursor: pointer;"
+          >
+            Upload CSS
+          </button>
+          <button
+            onclick={handleUploadJS}
+            class="neu-subtle neu-btn"
+            type="button"
+            style="flex: 1; padding: 10px; text-align: center; font-family: var(--sans); font-size: 13px; color: var(--text-primary); cursor: pointer;"
+          >
+            Upload JS
+          </button>
+        </div>
+        {#if prefs.custom_theme_css || prefs.custom_theme_js}
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="font-family: var(--sans); font-size: 12px; color: var(--success);">
+              Custom theme active: {prefs.custom_theme_css ? 'CSS' : ''}{prefs.custom_theme_css && prefs.custom_theme_js ? ' + ' : ''}{prefs.custom_theme_js ? 'JS' : ''}
+            </span>
+            <button
+              onclick={handleRemoveCustomTheme}
+              type="button"
+              style="font-family: var(--sans); font-size: 12px; color: var(--danger); background: none; border: none; cursor: pointer; text-decoration: underline;"
+            >
+              Remove
+            </button>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -556,7 +639,7 @@
     gap: 24px;
     max-height: 60vh;
     overflow-y: auto;
-    padding-right: 8px;
+    padding: 4px 8px 4px 4px;
   }
 
   .settings-section {

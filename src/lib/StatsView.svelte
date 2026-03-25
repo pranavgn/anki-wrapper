@@ -883,6 +883,8 @@
     padding: 20px;
     box-shadow: var(--neu-up);
     border: 1px solid var(--border);
+    overflow: hidden;
+    min-width: 0;
   }
 
   .error-card {
@@ -963,21 +965,9 @@
 
   .metrics-row {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 16px;
     margin-bottom: 24px;
-  }
-
-  @media (min-width: 640px) {
-    .metrics-row {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  @media (min-width: 900px) {
-    .metrics-row {
-      grid-template-columns: repeat(5, 1fr);
-    }
   }
 
   .metric-card {
@@ -1015,6 +1005,8 @@
   .heatmap-card {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
   }
 
   .card-title {
@@ -1044,6 +1036,7 @@
     height: 12px;
     border-radius: 2px;
     flex-shrink: 0;
+    min-width: 0;
   }
 
   .heatmap-legend {
@@ -1183,12 +1176,16 @@
   .chart-card {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
   }
 
   .chart-container {
     flex: 1;
-    min-height: 200px;
+    min-height: 150px;
+    max-height: 280px;
     position: relative;
+    overflow: hidden;
   }
 
   .chart-short {
@@ -1253,6 +1250,8 @@
   .streak-strip {
     display: flex;
     gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .streak-day {
@@ -1282,6 +1281,7 @@
   .retention-card {
     display: flex;
     flex-direction: column;
+    min-width: 0;
   }
 
   .retention-bars {

@@ -293,7 +293,7 @@
     ondragleave={handleRootDragLeave}
     ondrop={handleRootDrop}
     onkeydown={handleGridKeydown}
-    role="application"
+    role="grid"
     tabindex="-1"
     aria-label="Deck grid"
     style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"

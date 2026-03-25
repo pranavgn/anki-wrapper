@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount, onDestroy, tick } from "svelte";
+  import { onMount, tick } from "svelte";
   import { fly } from "svelte/transition";
   import Dashboard from "./lib/Dashboard.svelte";
   import DeckOverview from "./lib/DeckOverview.svelte";
@@ -153,128 +153,29 @@
     
     browserCheckComplete = true;
     
-    // Sequential initialization
+    // Load prefs and MathJax in parallel (non-critical)
     try {
       await Promise.all([prefs.load(), initMathJax()]);
     } catch (e) {
       console.error("Non-critical init error:", e);
     }
+
+    // Initialize collection — this is the critical path
     try {
-      console.debug("Initializing collection...");
-      // Add timeout to prevent hanging
-      const initPromise = invoke("init_standalone_collection");
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Collection initialization timed out")), 30000)
-      );
-      await Promise.race([initPromise, timeoutPromise]);
-      console.debug("Collection initialized, setting status to ready");
+      await invoke("init_standalone_collection");
       collectionStatus = 'ready';
       isCollectionOpen = true;
-      // Small delay to ensure collection is fully ready before loading decks
-      await new Promise(resolve => setTimeout(resolve, 50));
-      // Don't await this - let it load in background
-      getDeckStats().catch(e => console.error("Background deck stats load failed:", e));
+      getDeckStats();
 
-      // Dev-only: seed test deck if env flag is set
-      if (import.meta.env.DEV) {
-        try {
-          const decks = await invoke<Array<{id: number; name: string}>>("get_all_decks");
-          const hasTestDeck = decks.some(d => d.name === "🧪 Test Deck (Dev)");
-          if (!hasTestDeck) {
-            // Create test deck
-            const deckId = await invoke<number>("create_deck", { name: "🧪 Test Deck (Dev)" });
-            // Seed with sample cards across difficulty levels
-            const testCards = [
-              { front: "What is spaced repetition?", back: "A learning technique that incorporates increasing intervals of time between subsequent review of previously learned material." },
-              { front: "What does FSRS stand for?", back: "Free Spaced Repetition Scheduler — an open-source, modern algorithm for scheduling flashcard reviews." },
-              { front: "What is the forgetting curve?", back: "A mathematical model showing how information is lost over time when there is no attempt to retain it. First described by Hermann Ebbinghaus in 1885." },
-              { front: "What is active recall?", back: "A principle of efficient learning that involves actively stimulating memory during the learning process, rather than passively reviewing material." },
-              { front: "What is the minimum information principle?", back: "The idea that flashcards should be as simple and atomic as possible — each card should test exactly one piece of knowledge." },
-              { front: "What is interleaving?", back: "A learning strategy where you mix different topics or types of problems during study, rather than focusing on one topic at a time (blocking)." },
-              { front: "Who created Anki?", back: "Damien Elmes. Anki was first released in 2006 and is open source." },
-              { front: "What is a leech in SRS?", back: "A card that has been failed many times (typically 8+ lapses). Leeches are automatically suspended to prevent wasting time on poorly-formed cards." },
-              { front: "What is the spacing effect?", back: "The phenomenon where learning is more effective when study sessions are spaced out over time rather than concentrated in a single session (massed practice)." },
-              { front: "What is retrieval practice?", back: "A learning strategy that involves recalling information from memory rather than simply re-reading it. Testing yourself strengthens long-term retention more than passive review." },
-              { front: "What does 'desired retention' mean in FSRS?", back: "The target probability (e.g., 0.9 = 90%) that you will remember a card when it comes up for review. Higher retention means shorter intervals and more reviews." },
-              { front: "What is the difference between recognition and recall?", back: "Recognition is identifying previously learned information when presented with it (e.g., multiple choice). Recall is retrieving information from memory without cues (e.g., flashcards). Recall produces stronger learning." },
-              { front: "What is the testing effect?", back: "The finding that taking a test on material produces better long-term retention than spending the same amount of time restudying. Also known as retrieval practice effect." },
-            ];
-            for (const card of testCards) {
-              await invoke("add_basic_card", { deckId: deckId, front: card.front, back: card.back, tags: [] });
-            }
-            console.debug("🧪 Test deck seeded with", testCards.length, "cards");
-            window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
-          } else {
-            // Check if existing deck needs cards
-            const testDeck = decks.find(d => d.name === "🧪 Test Deck (Dev)");
-            if (testDeck) {
-              const cards = await invoke<any[]>("search_cards", {
-                query: `deck:"🧪 Test Deck (Dev)"`,
-                order: "cardDue",
-                limit: 1
-              });
-              if (cards.length === 0) {
-                // Re-seed if deck exists but is empty
-                const deckId = testDeck.id;
-                const testCards = [
-                  { front: "What is spaced repetition?", back: "A learning technique that incorporates increasing intervals of time between subsequent review of previously learned material." },
-                  { front: "What does FSRS stand for?", back: "Free Spaced Repetition Scheduler — an open-source, modern algorithm for scheduling flashcard reviews." },
-                  { front: "What is the forgetting curve?", back: "A mathematical model showing how information is lost over time when there is no attempt to retain it. First described by Hermann Ebbinghaus in 1885." },
-                  { front: "What is active recall?", back: "A principle of efficient learning that involves actively stimulating memory during the learning process, rather than passively reviewing material." },
-                  { front: "What is the minimum information principle?", back: "The idea that flashcards should be as simple and atomic as possible — each card should test exactly one piece of knowledge." },
-                  { front: "What is interleaving?", back: "A learning strategy where you mix different topics or types of problems during study, rather than focusing on one topic at a time (blocking)." },
-                  { front: "Who created Anki?", back: "Damien Elmes. Anki was first released in 2006 and is open source." },
-                  { front: "What is a leech in SRS?", back: "A card that has been failed many times (typically 8+ lapses). Leeches are automatically suspended to prevent wasting time on poorly-formed cards." },
-                  { front: "What is the spacing effect?", back: "The phenomenon where learning is more effective when study sessions are spaced out over time rather than concentrated in a single session (massed practice)." },
-                  { front: "What is retrieval practice?", back: "A learning strategy that involves recalling information from memory rather than simply re-reading it. Testing yourself strengthens long-term retention more than passive review." },
-                  { front: "What does 'desired retention' mean in FSRS?", back: "The target probability (e.g., 0.9 = 90%) that you will remember a card when it comes up for review. Higher retention means shorter intervals and more reviews." },
-                  { front: "What is the difference between recognition and recall?", back: "Recognition is identifying previously learned information when presented with it (e.g., multiple choice). Recall is retrieving information from memory without cues (e.g., flashcards). Recall produces stronger learning." },
-                  { front: "What is the testing effect?", back: "The finding that taking a test on material produces better long-term retention than spending the same amount of time restudying. Also known as retrieval practice effect." },
-                ];
-                for (const card of testCards) {
-                  await invoke("add_basic_card", { deckId: deckId, front: card.front, back: card.back, tags: [] });
-                }
-                console.debug("🧪 Test deck re-seeded with", testCards.length, "cards (deck was empty)");
-                window.dispatchEvent(new CustomEvent('refresh-decks')); // Refresh dashboard
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("Test deck seeding failed (non-critical):", e);
-        }
-      }
-
-      // Load plugins in background, don't block UI
-      loadAllPlugins().then(() => {
-        pluginEngine.runAction('app:ready', {});
-      }).catch(e => console.error("Plugin load error:", e));
-
-      // Start notification systems if enabled
-      if (prefs.notifications_enabled) {
-        initNotifications().then((granted) => {
-          if (granted) {
-            // Check for due cards and send reminder if any
-            getDueCardCount().then(count => {
-              if (count > 10) sendStudyReminder(count);
-            });
-
-            // Due-card reminders every 2 hours
-            startDailyReminderCheck(getDueCardCount, 7200000);
-
-            // Scheduled session checker every 60s
-            startScheduleChecker();
-          }
-        });
-      }
+      // Load all plugins after collection is ready
+      await loadAllPlugins();
+      
+      // Fire the app:ready hook now that plugins are loaded
+      await pluginEngine.runAction('app:ready', {});
     } catch (error) {
       collectionStatus = 'error';
       collectionError = error instanceof Error ? error.message : String(error);
     }
-  });
-
-  // Cleanup notifications on destroy
-  onDestroy(() => {
-    stopAll();
   });
 
   function startReview(deckId: number, deckName: string) {

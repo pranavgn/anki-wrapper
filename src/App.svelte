@@ -23,6 +23,68 @@
   import "./lib/statsAPI";
   import { loadCustomTheme } from "./lib/customTheme";
   import { initMathJax } from "./lib/mathjax";
+  import { loader } from "./lib/loadingTracker.svelte";
+
+  // Lazy-loaded components — only fetched when first needed
+  const LazyStatsView     = () => import("./lib/StatsView.svelte");
+  const LazyCardBrowser   = () => import("./lib/CardBrowser.svelte");
+  const LazyNotetypeManager = () => import("./lib/NotetypeManager.svelte");
+  const LazySettings      = () => import("./lib/Settings.svelte");
+  const LazyImageOcclusion = () => import("./lib/ImageOcclusion.svelte");
+  const LazyPluginManager = () => import("./lib/PluginManager.svelte");
+
+  // Resolved component references (populated on first use)
+  let StatsViewComponent: any = $state(null);
+  let CardBrowserComponent: any = $state(null);
+  let NotetypeManagerComponent: any = $state(null);
+  let SettingsComponent: any = $state(null);
+  let ImageOcclusionComponent: any = $state(null);
+  let PluginManagerComponent: any = $state(null);
+
+  // Helper: resolve a lazy component
+  async function loadComponent(
+    loader: () => Promise<any>,
+    setter: (mod: any) => void
+  ) {
+    const mod = await loader();
+    setter(mod.default);
+  }
+
+  // Load StatsView when navigating to stats page
+  $effect(() => {
+    if (currentPage === 'stats' && !StatsViewComponent) {
+      loadComponent(LazyStatsView, (c) => StatsViewComponent = c);
+    }
+  });
+
+  // Load CardBrowser when navigating to browser page
+  $effect(() => {
+    if (currentPage === 'browser' && !CardBrowserComponent) {
+      loadComponent(LazyCardBrowser, (c) => CardBrowserComponent = c);
+    }
+  });
+
+  // Load modals when opened
+  $effect(() => {
+    if (showNotetypeManager && !NotetypeManagerComponent) {
+      loadComponent(LazyNotetypeManager, (c) => NotetypeManagerComponent = c);
+    }
+  });
+  $effect(() => {
+    if (showSettings && !SettingsComponent) {
+      loadComponent(LazySettings, (c) => SettingsComponent = c);
+    }
+  });
+  $effect(() => {
+    if (showImageOcclusion && !ImageOcclusionComponent) {
+      loadComponent(LazyImageOcclusion, (c) => ImageOcclusionComponent = c);
+    }
+  });
+  $effect(() => {
+    if (showPluginManager && !PluginManagerComponent) {
+      loadComponent(LazyPluginManager, (c) => PluginManagerComponent = c);
+    }
+  });
 
   // Page state
   type Page = 'dashboard' | 'deckOverview' | 'study' | 'editor' | 'stats' | 'browser';
@@ -127,7 +189,12 @@
 
   // Initialize on mount
   onMount(async () => {
-    // Detect platform for traffic light spacing
+    // Expose function to open browser with query
+    (window as any).openCardBrowser = (query: string) => {
+      openBrowserWithQuery(query);
+    };
+
+    // Platform detection for traffic light spacing (sync, instant)
     const nav = navigator.platform.toLowerCase();
     if (nav.includes('mac')) {
       document.documentElement.classList.add('platform-macos');
@@ -136,45 +203,76 @@
     } else {
       document.documentElement.classList.add('platform-linux');
     }
-    
-    // Expose function to open browser with query
-    (window as any).openCardBrowser = (query: string) => {
-      openBrowserWithQuery(query);
-    };
-    
-    // Synchronous Tauri detection (no IPC round-trip)
-    if (!('__TAURI_INTERNALS__' in window)) {
+
+    // ── Tauri check (fast, synchronous-ish) ──
+    // Use sync detection: __TAURI_INTERNALS__ exists immediately
+    if (!(window as any).__TAURI_INTERNALS__) {
       isRunningInBrowser = true;
       browserCheckComplete = true;
       collectionStatus = 'error';
       collectionError = 'Tauri desktop environment required';
       return;
     }
-    
     browserCheckComplete = true;
-    
-    // Load prefs and MathJax in parallel (non-critical)
-    try {
-      await Promise.all([prefs.load(), initMathJax()]);
-    } catch (e) {
-      console.error("Non-critical init error:", e);
-    }
 
-    // Initialize collection — this is the critical path
-    try {
-      await invoke("init_standalone_collection");
-      collectionStatus = 'ready';
-      isCollectionOpen = true;
+    // ── Register loading steps ──
+    loader.register([
+      { name: 'Preferences',  weight: 1 },
+      { name: 'Collection',   weight: 3 }, // heaviest
+      { name: 'MathJax',      weight: 1 },
+      { name: 'Plugins',      weight: 1 },
+    ]);
+
+    // ── Run first 3 in parallel ──
+    const prefsPromise = (async () => {
+      loader.start('Preferences');
+      try { await prefs.load(); } catch(e) { console.error('Prefs error:', e); }
+      loader.finish('Preferences');
+    })();
+
+    const mathPromise = (async () => {
+      loader.start('MathJax');
+      try { await initMathJax(); } catch(e) { console.error('MathJax error:', e); }
+      loader.finish('MathJax');
+    })();
+
+    const collectionPromise = (async () => {
+      loader.start('Collection');
+      try {
+        await invoke("init_standalone_collection");
+        collectionStatus = 'ready';
+        isCollectionOpen = true;
+      } catch (error) {
+        collectionStatus = 'error';
+        collectionError = error instanceof Error ? error.message : String(error);
+        loader.fail('Collection', collectionError);
+        return; // don't finish — it failed
+      }
+      loader.finish('Collection');
+    })();
+
+    // Wait for the critical path (collection) + non-critical in parallel
+    await Promise.all([prefsPromise, mathPromise, collectionPromise]);
+
+    // ── Plugins — deferred, non-blocking ──
+    if (collectionStatus === 'ready') {
       getDeckStats();
 
-      // Load all plugins after collection is ready
-      await loadAllPlugins();
-      
-      // Fire the app:ready hook now that plugins are loaded
-      await pluginEngine.runAction('app:ready', {});
-    } catch (error) {
-      collectionStatus = 'error';
-      collectionError = error instanceof Error ? error.message : String(error);
+      // Use requestIdleCallback to load plugins without blocking the UI
+      const loadPlugins = async () => {
+        loader.start('Plugins');
+        try {
+          await loadAllPlugins();
+          await pluginEngine.runAction('app:ready', {});
+        } catch(e) { console.error('Plugin error:', e); }
+        loader.finish('Plugins');
+      };
+
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => loadPlugins());
+      } else {
+        setTimeout(() => loadPlugins(), 0);
+      }
     }
   });
 
@@ -588,22 +686,30 @@
     <!-- Loading State -->
     {#if collectionStatus === 'loading'}
       <div class="flex-1 flex items-center justify-center">
-        <div class="w-48">
+        <div class="w-48 flex flex-col items-center gap-3">
           <div
-            class="h-1 rounded-full overflow-hidden"
+            class="w-full h-1 rounded-full overflow-hidden"
             style="background: var(--bg-subtle);"
             role="progressbar"
-            aria-label="Loading collection"
-            aria-valuetext="Loading"
+            aria-label="Loading: {loader.progress}%"
+            aria-valuenow={loader.progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
           >
             <div
               class="h-full rounded-full"
               style="
                 background: var(--accent);
-                animation: loading-bar 1.8s ease-in-out infinite;
+                width: {loader.progress}%;
+                transition: width 0.25s ease-out;
               "
             ></div>
           </div>
+          <span
+            style="font-family: var(--sans); font-size: 11px; color: var(--text-tertiary, var(--text-secondary)); letter-spacing: 0.02em;"
+          >
+            {loader.progress}%
+          </span>
         </div>
       </div>
     {:else}
@@ -654,18 +760,26 @@
             <div
               in:fly={fly_if_enabled({ x: 20, duration: 150 })}
             >
-              {#await import('./lib/StatsView.svelte') then mod}
-                <mod.default />
-              {/await}
+              {#if StatsViewComponent}
+                <StatsViewComponent />
+              {:else}
+                <div class="flex items-center justify-center p-12">
+                  <div class="animate-spin rounded-full h-6 w-6 border-2" style="border-color: var(--accent); border-top-color: transparent;"></div>
+                </div>
+              {/if}
             </div>
           {:else if currentPage === 'browser'}
             <div class="h-full">
-              {#await import('./lib/CardBrowser.svelte') then mod}
-                <mod.default
+              {#if CardBrowserComponent}
+                <CardBrowserComponent
                   initialQuery={browserQuery}
-                  onClose={() => { navigate(previousPage); browserQuery = ''; }}
+                  onClose={() => { currentPage = 'dashboard'; browserQuery = ''; }}
                 />
-              {/await}
+              {:else}
+                <div class="flex items-center justify-center p-12">
+                  <div class="animate-spin rounded-full h-6 w-6 border-2" style="border-color: var(--accent); border-top-color: transparent;"></div>
+                </div>
+              {/if}
             </div>
           {/if}
         {/key}
@@ -711,41 +825,38 @@
           class="bg-bg-card border border-border rounded-2xl shadow-xl w-full max-w-4xl h-[80vh]"
           role="document"
         >
-          {#await import('./lib/NotetypeManager.svelte') then mod}
-            <mod.default />
-          {/await}
+          {#if NotetypeManagerComponent}
+            <NotetypeManagerComponent />
+          {:else}
+            <div class="flex items-center justify-center h-full">
+              <div class="animate-spin rounded-full h-6 w-6 border-2" style="border-color: var(--accent); border-top-color: transparent;"></div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
 
     <!-- Settings Panel -->
     {#if showSettings}
-      {#await import('./lib/Settings.svelte') then mod}
-        <mod.default isOpen={showSettings} onClose={() => showSettings = false} />
-      {/await}
+      {#if SettingsComponent}
+        <SettingsComponent onClose={() => showSettings = false} />
+      {/if}
     {/if}
     
     <!-- Plugin Manager Modal -->
     {#if showPluginManager}
-      {#await import('./lib/PluginManager.svelte') then mod}
-        <mod.default isOpen={showPluginManager} onClose={() => showPluginManager = false} />
-      {/await}
+      {#if PluginManagerComponent}
+        <PluginManagerComponent onClose={() => showPluginManager = false} />
+      {/if}
     {/if}
     
     <!-- Image Occlusion Modal -->
     {#if showImageOcclusion}
-      {#await import('./lib/ImageOcclusion.svelte') then mod}
-        <mod.default onClose={() => showImageOcclusion = false} />
-      {/await}
+      {#if ImageOcclusionComponent}
+        <ImageOcclusionComponent onClose={() => showImageOcclusion = false} />
+      {/if}
     {/if}
     {/if}
   </div>
 {/if}
 
-<style>
-  @keyframes loading-bar {
-    0% { transform: translateX(-100%); }
-    50% { transform: translateX(150%); }
-    100% { transform: translateX(-100%); }
-  }
-</style>

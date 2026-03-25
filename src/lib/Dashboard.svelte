@@ -19,13 +19,9 @@
   import StudyScheduleWidget from "./widgets/StudyScheduleWidget.svelte";
   import { pluginEngine } from "./pluginEngine";
 
-  // Collection status prop
-  type CollectionStatus = "loading" | "ready" | "error";
-  let { 
-    collectionStatus = "loading",
-    onStudy = (deckId: number, deckName: string) => {} 
-  }: { 
-    collectionStatus?: CollectionStatus;
+  let {
+    onStudy = (deckId: number, deckName: string) => {}
+  }: {
     onStudy?: (deckId: number, deckName: string) => void;
   } = $props();
 
@@ -56,7 +52,7 @@
   let expandedDecks: Set<number> = $state(new Set());
   let isCreatingDeck = $state(false);
   let newDeckName = $state("");
-  let isLoading = $state(true);
+  let isLoading = $state(false);
   let isImporting = $state(false);
   let showImportMenu = $state(false);
   let importMenuRef: HTMLDivElement | null = $state(null);
@@ -483,7 +479,7 @@
           type: 'stats',
           title: 'Stats Snapshot',
           component: StatsSnapshotWidget,
-          props: { collectionStatus },
+          props: {},
           order: widgets.length,
           gridHeight: 1
         });

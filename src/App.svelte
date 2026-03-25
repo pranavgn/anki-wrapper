@@ -721,7 +721,7 @@
           <div
             in:fly={fly_if_enabled({ x: -20, duration: 150 })}
           >
-            <Dashboard collectionStatus={collectionStatus} onStudy={openDeckOverview} />
+            <Dashboard onStudy={openDeckOverview} />
           </div>
           {:else if currentPage === 'deckOverview' && activeDeck}
             <div

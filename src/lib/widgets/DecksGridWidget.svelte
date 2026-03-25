@@ -26,7 +26,7 @@
 
   let decks: DeckStat[] = $state([]);
   let expandedDecks: Set<number> = $state(new Set());
-  let isLoading = $state(true);
+  let isLoading = $state(false);
   let selectionMode = $state(false);
   let selectedDecks: Set<number> = $state(new Set());
   let selectMode = $state(false);
@@ -355,24 +355,6 @@
           </div>
         {/each}
 
-        <!-- Loading skeletons for compact mode -->
-        {#if isLoading}
-          {#each {length: 3} as _, index}
-            <div
-              class="neu-raised"
-              style="
-                background: var(--bg-card);
-                box-shadow: var(--neu-up);
-                border-radius: 10px;
-                padding: 12px 14px;
-                animation: fadeUp 0.4s ease-out backwards;
-                animation-delay: {index * 20}ms;
-              "
-            >
-              <div class="skeleton h-4 w-3/4"></div>
-            </div>
-          {/each}
-        {/if}
       </div>
     {:else}
       <!-- Non-compact mode: Grid layout (original) -->
@@ -498,32 +480,7 @@
           </div>
         {/each}
 
-        <!-- Loading skeletons -->
-        {#if isLoading}
-          {#each {length: 3} as _, index}
-            <div
-              class="neu-raised"
-              style="
-                background: var(--bg-card);
-                box-shadow: var(--neu-up);
-                border-radius: var(--radius-md);
-                padding: 30px 32px;
-                animation: fadeUp 0.4s ease-out backwards;
-                animation-delay: {index * 40}ms;
-              "
-            >
-              <div class="skeleton h-6 w-3/4 mb-4"></div>
-              <div class="flex gap-2 mb-6">
-                <div class="skeleton h-6 w-12 rounded-full"></div>
-                <div class="skeleton h-6 w-16 rounded-full"></div>
-              </div>
-              <div class="skeleton h-10 w-full rounded-xl"></div>
-            </div>
-          {/each}
-        {/if}
-
         <!-- New Deck Card -->
-        {#if !isLoading}
           <button
             aria-label="Create new deck"
             onclick={() => {
@@ -548,7 +505,6 @@
             </svg>
             <span style="font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--text-primary);">New Deck</span>
           </button>
-        {/if}
       </div>
     {/if}
   </div>

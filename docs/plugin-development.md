@@ -391,6 +391,10 @@ The app uses CSS custom properties for all colors. Themes override these in `:ro
 }
 ```
 
+**NeuSelect Dropdowns:**
+
+NeuSelect dropdowns respect all theme variables (`--bg-card`, `--neu-up`, `--accent-soft`, etc.) and work automatically in both light and dark modes. Plugin CSS can target `.neu-select-popup` for custom dropdown styling.
+
 **Dark Theme:**
 ```css
 :root.dark {

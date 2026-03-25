@@ -338,6 +338,7 @@
     role="textbox"
     aria-multiline="true"
     aria-label="Card content editor"
+    tabindex="0"
   ></div>
   {/if}
 
@@ -348,6 +349,7 @@
       onmousedown={(e) => e.preventDefault()}
       role="toolbar"
       aria-label="Text formatting"
+      tabindex="0"
     >
       <button class:active={activeFormats.bold} onclick={commands.bold} aria-label="Bold" aria-pressed={activeFormats.bold} title="Bold (Ctrl+B)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">

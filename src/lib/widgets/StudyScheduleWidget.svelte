@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { addToast } from "../toast";
+  import NeuSelect from "../ui/NeuSelect.svelte";
   import {
     loadSessions,
     saveSession,
@@ -24,6 +25,7 @@
   let selectedDate = $state<string | null>(null);
   let sessions = $state<StudySession[]>([]);
   let showAddForm = $state(false);
+  let decks = $state<Array<{id: number; name: string}>>([]);
 
   // Form state for new session
   let formTime = $state("09:00");
@@ -77,6 +79,17 @@
     loadSessions()
       .then((s) => (sessions = s))
       .catch((e) => console.error("Failed to load sessions:", e));
+  });
+
+  // Load decks on mount
+  import { onMount } from "svelte";
+  onMount(async () => {
+    try {
+      const result = await invoke<Array<{id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean}>>("get_all_decks");
+      decks = result.map(d => ({ id: d.id, name: d.name }));
+    } catch (e) {
+      console.error("Failed to load decks for scheduler:", e);
+    }
   });
 
   function changeMonth(dir: number) {
@@ -360,12 +373,17 @@
   {#if showAddForm}
     <div class="add-form">
       <div class="cal-form-row">
-        <label class="cal-form-label">Schedule type</label>
-        <select class="cal-form-input neu-pressed" bind:value={scheduleType}>
-          <option value="exact">Exact time (e.g. 2:30 PM)</option>
-          <option value="hour">Hour block (e.g. 2 PM - 3 PM)</option>
-          <option value="day">Full day</option>
-        </select>
+        <label for="schedule-type" class="cal-form-label">Schedule type</label>
+        <NeuSelect
+          id="schedule-type"
+          options={[
+            { value: 'exact', label: 'Exact time (e.g. 2:30 PM)' },
+            { value: 'hour', label: 'Hour block (e.g. 2 PM - 3 PM)' },
+            { value: 'day', label: 'Full day' }
+          ]}
+          bind:value={scheduleType}
+          size="sm"
+        />
       </div>
 
       {#if scheduleType === 'exact'}
@@ -376,39 +394,51 @@
       {:else if scheduleType === 'hour'}
         <div class="cal-form-row">
           <label class="cal-form-label">Hour</label>
-          <select class="cal-form-input neu-pressed" bind:value={formHour}>
-            {#each Array.from({length: 24}, (_, i) => i) as h}
-              <option value={h}>{h === 0 ? '12 AM' : h < 12 ? h + ' AM' : h === 12 ? '12 PM' : (h-12) + ' PM'}</option>
-            {/each}
-          </select>
+          <NeuSelect
+            options={Array.from({length: 24}, (_, i) => ({
+              value: i,
+              label: i === 0 ? '12 AM' : i < 12 ? i + ' AM' : i === 12 ? '12 PM' : (i-12) + ' PM'
+            }))}
+            bind:value={formHour}
+            size="sm"
+          />
         </div>
       {/if}
 
       <div class="cal-form-row">
         <label class="cal-form-label">Duration</label>
-        <select class="cal-form-input neu-pressed" bind:value={formDuration}>
-          <option value={15}>15 min</option>
-          <option value={30}>30 min</option>
-          <option value={45}>45 min</option>
-          <option value={60}>1 hour</option>
-          <option value={90}>1.5 hours</option>
-          <option value={120}>2 hours</option>
-        </select>
+        <NeuSelect
+          options={[
+            { value: 15, label: '15 min' },
+            { value: 30, label: '30 min' },
+            { value: 45, label: '45 min' },
+            { value: 60, label: '1 hour' },
+            { value: 90, label: '1.5 hours' },
+            { value: 120, label: '2 hours' }
+          ]}
+          bind:value={formDuration}
+          size="sm"
+        />
       </div>
 
       <div class="cal-form-row">
-        <label class="cal-form-label">Deck</label>
-        <select class="cal-form-input neu-pressed" bind:value={formDeckId}>
-          <option value={null}>All decks</option>
-          {#each decks as deck}
-            <option value={deck.id}>{deck.name}</option>
-          {/each}
-        </select>
+        <label for="form-deck" class="cal-form-label">Deck</label>
+        <NeuSelect
+          id="form-deck"
+          options={[
+            { value: null, label: 'All decks' },
+            ...decks.map(d => ({ value: d.id, label: d.name }))
+          ]}
+          bind:value={formDeckId}
+          size="sm"
+          searchable={true}
+        />
       </div>
 
       <div class="cal-form-row">
-        <label class="cal-form-label">Card goal</label>
+        <label for="form-card-goal" class="cal-form-label">Card goal</label>
         <input
+          id="form-card-goal"
           type="number"
           class="cal-form-input neu-pressed"
           placeholder="Optional"
@@ -419,8 +449,9 @@
       </div>
 
       <div class="cal-form-row">
-        <label class="cal-form-label">Note</label>
+        <label for="form-note" class="cal-form-label">Note</label>
         <input
+          id="form-note"
           type="text"
           class="cal-form-input neu-pressed"
           placeholder="e.g. Focus on kanji"
@@ -429,12 +460,17 @@
       </div>
 
       <div class="cal-form-row">
-        <label class="cal-form-label">Repeat</label>
-        <select class="cal-form-input neu-pressed" bind:value={recurrence}>
-          <option value="none">One-time</option>
-          <option value="weekly">Weekly</option>
-          <option value="daily">Daily</option>
-        </select>
+        <label for="form-recurrence" class="cal-form-label">Repeat</label>
+        <NeuSelect
+          id="form-recurrence"
+          options={[
+            { value: 'none', label: 'One-time' },
+            { value: 'weekly', label: 'Weekly' },
+            { value: 'daily', label: 'Daily' }
+          ]}
+          bind:value={recurrence}
+          size="sm"
+        />
       </div>
 
       {#if recurrence === 'weekly'}
@@ -455,8 +491,8 @@
       {/if}
 
       <div class="cal-form-row">
-        <label class="cal-form-label">Notify me</label>
-        <input type="checkbox" bind:checked={formNotify} />
+        <label for="form-notify" class="cal-form-label">Notify me</label>
+        <input id="form-notify" type="checkbox" bind:checked={formNotify} />
       </div>
 
       <div class="cal-form-actions">

@@ -5,6 +5,7 @@
   import Chart from "./Chart.svelte";
   import type { ChartData, ChartOptions } from "chart.js";
   import { addToast } from "./toast";
+  import NeuSelect from "./ui/NeuSelect.svelte";
   import { getChartColors, baseBarOptions, baseDoughnutOptions, type ChartColorPalette } from "./chartTheme";
 
   // Types
@@ -518,20 +519,15 @@
   {#if isTauriAvailable && scope === "deck"}
     <div class="deck-filter">
       <label for="deck-select" class="filter-label">Deck:</label>
-      <div class="filter-select-wrapper neu-pressed">
-        <select
-          id="deck-select"
-          class="filter-select"
+      <div class="filter-select-wrapper">
+        <NeuSelect
+          options={decks.filter(d => !d.is_filtered).map(d => ({ value: d.id.toString(), label: d.name }))}
           value={selectedDeckId?.toString() ?? ""}
-          onchange={handleDeckChange}
-        >
-          {#each decks.filter(d => !d.is_filtered) as deck}
-            <option value={deck.id.toString()}>{deck.name}</option>
-          {/each}
-        </select>
-        <svg class="select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
+          onchange={(v) => handleDeckChange({ target: { value: v } })}
+          size="sm"
+          searchable={true}
+          id="deck-select"
+        />
       </div>
     </div>
   {/if}

@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { addToast } from "./toast";
   import DeckOptions from "./DeckOptions.svelte";
-  import NeuDropdown from "./ui/NeuDropdown.svelte";
+  import NeuSelect from "./ui/NeuSelect.svelte";
   import {
     pickAndImportApkg,
     pickAndImportColpkg,
@@ -238,7 +238,7 @@
     isLoading = true;
     loadingPromise = (async () => {
       try {
-        const result = await invoke<DeckStat[]>("get_deck_stats");
+        const result = await invoke<DeckStat[]>("get_all_decks");
         decks = result;
         lastDeckStatsTime = Date.now();
       } catch (error) {
@@ -443,19 +443,19 @@
 
   const importDropdownItems = [
     {
+      value: 'apkg',
       label: "Import .apkg",
-      description: "Anki deck package",
-      onClick: handleImportApkg
+      description: "Anki deck package"
     },
     {
+      value: 'colpkg',
       label: "Import .colpkg",
-      description: "Full collection",
-      onClick: handleImportColpkg
+      description: "Full collection"
     },
     {
+      value: 'text',
       label: "Import text/CSV",
-      description: "Text file import",
-      onClick: handleImportText
+      description: "Text file import"
     }
   ];
 
@@ -483,7 +483,7 @@
           type: 'stats',
           title: 'Stats Snapshot',
           component: StatsSnapshotWidget,
-          props: {},
+          props: { collectionStatus },
           order: widgets.length,
           gridHeight: 1
         });
@@ -526,17 +526,28 @@
       <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">{totalDue} cards due today across {decks.length} {decks.length === 1 ? 'deck' : 'decks'}</p>
     </div>
     <div class="flex items-center gap-2">
-      <NeuDropdown items={importDropdownItems}>
-        <button
-          class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
-          style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Import</span>
-        </button>
-      </NeuDropdown>
+      <NeuSelect
+        options={importDropdownItems}
+        placeholder="Import"
+        onchange={(v) => {
+          if (v === 'apkg') handleImportApkg();
+          else if (v === 'colpkg') handleImportColpkg();
+          else if (v === 'text') handleImportText();
+        }}
+        size="sm"
+      >
+        {#snippet trigger()}
+          <button
+            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card); box-shadow: var(--neu-subtle);"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Import</span>
+          </button>
+        {/snippet}
+      </NeuSelect>
       <button
         onclick={toggleSelectMode}
         class="neu-subtle neu-btn px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2"
@@ -594,8 +605,9 @@
         <div class="space-y-4">
           <!-- Deck Name -->
           <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">Deck Name</label>
+            <label for="custom-study-name" class="block text-sm font-medium text-text-secondary mb-1">Deck Name</label>
             <input
+              id="custom-study-name"
               type="text"
               bind:value={customStudyName}
               class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
@@ -605,11 +617,12 @@
 
           <!-- Search Query -->
           <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">
+            <label for="custom-study-query" class="block text-sm font-medium text-text-secondary mb-1">
               Search Query
               <span class="text-xs font-normal text-text-secondary ml-2">(e.g., deck:MyDeck tag:exam is:due)</span>
             </label>
             <input
+              id="custom-study-query"
               type="text"
               bind:value={customStudyQuery}
               class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all font-mono text-sm"
@@ -630,8 +643,9 @@
 
           <!-- Card Limit -->
           <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">Card Limit</label>
+            <label for="custom-study-limit" class="block text-sm font-medium text-text-secondary mb-1">Card Limit</label>
             <input
+              id="custom-study-limit"
               type="number"
               bind:value={customStudyLimit}
               min="1"

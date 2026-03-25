@@ -5,6 +5,7 @@
   import TagInput from "./TagInput.svelte";
   import RichTextEditor from "./RichTextEditor.svelte";
   import NeuDialog from "./ui/NeuDialog.svelte";
+  import NeuSelect from "./ui/NeuSelect.svelte";
   import { renderMath, clearMathJaxCache, preprocessAnkiMath } from "./mathjax";
 
   // Props using Svelte 5 runes
@@ -91,7 +92,7 @@
       }
       
       // Load decks
-      const result = await invoke<Array<{ id: number; name: string; shortName: string; level: number; newCount: number; learnCount: number; reviewCount: number; cardCount: number; isFiltered: boolean }>>("get_all_decks");
+      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>("get_all_decks");
       decks = result.map(deck => ({ id: deck.id, name: deck.name }));
       if (decks.length > 0) {
         selectedDeckId = decks[0].id;
@@ -439,20 +440,14 @@
     <!-- Deck Selector -->
     <div class="field-group">
       <label class="field-label" for="deck-select">Deck</label>
-      <div class="deck-selector neu-pressed">
-        <select
-          id="deck-select"
+      <div class="deck-selector">
+        <NeuSelect
+          options={decks.map(d => ({ value: d.id, label: d.name }))}
           bind:value={selectedDeckId}
-          class="deck-select"
+          size="sm"
+          searchable={true}
           aria-label="Select deck"
-        >
-          {#each decks as deck}
-            <option value={deck.id}>{deck.name}</option>
-          {/each}
-        </select>
-        <svg class="select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
+        />
       </div>
     </div>
 

@@ -412,7 +412,7 @@
   // Load decks for move dropdown
   async function loadDecks() {
     try {
-      const result = await invoke<Array<{ id: number; name: string; shortName: string; level: number; newCount: number; learnCount: number; reviewCount: number; cardCount: number; isFiltered: boolean }>>('get_all_decks');
+      const result = await invoke<Array<{ id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean }>>('get_all_decks');
       availableDecks = result.map(d => ({ id: d.id, name: d.name }));
     } catch (e) {
       console.error('Failed to load decks:', e);

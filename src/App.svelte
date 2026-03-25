@@ -22,6 +22,7 @@
   } from "./lib/notifications";
   import "./lib/statsAPI";
   import { loadCustomTheme } from "./lib/customTheme";
+  import { initMathJax } from "./lib/mathjax";
 
   // Page state
   type Page = 'dashboard' | 'deckOverview' | 'study' | 'editor' | 'stats' | 'browser';
@@ -79,6 +80,7 @@
   type CollectionStatus = 'loading' | 'ready' | 'error';
   let collectionStatus: CollectionStatus = $state('loading');
   let collectionError: string = $state('');
+  let isCollectionOpen: boolean = $state(false);
 
   // Import modal state
   let showImportModal = $state(false);
@@ -110,8 +112,17 @@
 
   // Get due card count for notifications
   async function getDueCardCount(): Promise<number> {
-    const stats = await invoke<Array<any>>("get_deck_stats");
-    return stats.reduce((sum: number, d: any) => sum + (d.new_cards || 0) + (d.learn_cards || 0) + (d.review_cards || 0), 0);
+    const decks = await invoke<Array<{id: number; name: string; new_count: number; learn_count: number; review_count: number}>>("get_all_decks");
+    return decks.reduce((sum: number, d: any) => sum + (d.new_count || 0) + (d.learn_count || 0) + (d.review_count || 0), 0);
+  }
+
+  // Get deck stats for dashboard
+  async function getDeckStats() {
+    try {
+      await invoke("get_all_decks");
+    } catch (e) {
+      console.error("Failed to get deck stats:", e);
+    }
   }
 
   // Initialize on mount
@@ -142,14 +153,17 @@
     
     browserCheckComplete = true;
     
-    // Fire and forget - don't block UI on these
-    prefs.load().catch(e => console.error("Prefs load error:", e));
-    loadCustomTheme().catch(e => console.error("Failed to load custom theme:", e));
-
-    // Initialize collection — this is the critical path
+    // Sequential initialization
+    try {
+      await Promise.all([prefs.load(), initMathJax()]);
+    } catch (e) {
+      console.error("Non-critical init error:", e);
+    }
     try {
       await invoke("init_standalone_collection");
       collectionStatus = 'ready';
+      isCollectionOpen = true;
+      getDeckStats();
 
       // Dev-only: seed test deck if env flag is set
       if (import.meta.env.DEV) {
@@ -412,7 +426,13 @@
         <div style="pointer-events: auto; display: flex; align-items: center; gap: 8px;">
           {#if currentPage === 'deckOverview' && activeDeck}
             <!-- Breadcrumb: Decks > DeckName -->
-            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); cursor: pointer;" onclick={goToDashboard}>Decks</span>
+            <button
+              type="button"
+              onclick={goToDashboard}
+              style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); cursor: pointer; background: none; border: none; padding: 0;"
+            >
+              Decks
+            </button>
             <svg class="h-3 w-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
@@ -752,11 +772,10 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="notetype-manager-title"
+        tabindex="-1"
       >
         <div
           class="bg-bg-card border border-border rounded-2xl shadow-xl w-full max-w-4xl h-[80vh]"
-          onclick={(e) => e.stopPropagation()}
-          onkeydown={(e) => e.stopPropagation()}
           role="document"
         >
           {#await import('./lib/NotetypeManager.svelte') then mod}

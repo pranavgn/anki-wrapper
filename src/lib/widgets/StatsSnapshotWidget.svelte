@@ -14,12 +14,26 @@
     };
   }
 
+  type CollectionStatus = "loading" | "ready" | "error";
+  
+  let { collectionStatus = "loading" }: { collectionStatus?: CollectionStatus } = $props();
+
   let stats: ReviewStats | null = $state(null);
   let isLoading = $state(true);
   let todayReviews = $state(0);
 
+  // Load stats when collection becomes ready
+  $effect(() => {
+    if (collectionStatus === 'ready') {
+      loadStats();
+    }
+  });
+
   onMount(async () => {
-    await loadStats();
+    // Only load if collection is already ready
+    if (collectionStatus === 'ready') {
+      await loadStats();
+    }
   });
 
   async function loadStats() {

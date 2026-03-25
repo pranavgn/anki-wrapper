@@ -134,6 +134,14 @@
   pointer-events: none;
 }
 
+/* ── NeuSelect dropdown ── */
+.neu-select-popup {
+  background: var(--bg-card);
+  box-shadow: var(--neu-up);
+  border-radius: var(--radius-md);
+  animation: scaleIn 0.15s ease-out;
+}
+
 /* ── Transitions — scoped to interactive elements only ── */
 button, a, input, select, textarea, [role="button"], .transition-colors {
   transition: background-color 0.1s ease, border-color 0.1s ease, box-shadow 0.12s ease, transform 0.12s ease;

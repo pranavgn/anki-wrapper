@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
+  import NeuSelect from "./ui/NeuSelect.svelte";
   import {
     pickAndImportApkg,
     pickAndImportColpkg,
@@ -329,14 +330,12 @@
     <div class="text-import-form">
       <div class="form-group">
         <label class="form-label">Deck</label>
-        <select
-          class="form-select neu-pressed"
+        <NeuSelect
+          options={availableDecks.map(d => ({ value: d.id, label: d.name }))}
           bind:value={selectedDeckId}
-        >
-          {#each availableDecks as deck}
-            <option value={deck.id}>{deck.name}</option>
-          {/each}
-        </select>
+          size="sm"
+          searchable={true}
+        />
       </div>
 
       <div class="form-group">

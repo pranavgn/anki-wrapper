@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { addToast } from "./toast";
   import NeuDialog from "./ui/NeuDialog.svelte";
+  import NeuSelect from "./ui/NeuSelect.svelte";
 
   interface Props {
     deckId: number;
@@ -343,8 +344,9 @@
         </div>
 
         <div class="option-row">
-          <label class="option-label">Maximum interval (days)</label>
+          <label for="maximum-interval" class="option-label">Maximum interval (days)</label>
           <input
+            id="maximum-interval"
             type="number"
             bind:value={opts.maximumInterval}
             min="0"
@@ -358,18 +360,21 @@
         <h3 class="section-title">FSRS</h3>
         
         <div class="option-row toggle-row">
-          <label class="option-label">Enable FSRS</label>
+          <label for="fsrs-toggle" class="option-label">Enable FSRS</label>
           <button
+            id="fsrs-toggle"
             onclick={() => opts.fsrsEnabled = !opts.fsrsEnabled}
             class="toggle-btn {opts.fsrsEnabled ? 'active' : ''}"
+            aria-label={opts.fsrsEnabled ? "Disable FSRS" : "Enable FSRS"}
           >
             <span class="toggle-knob"></span>
           </button>
         </div>
 
         <div class="option-row">
-          <label class="option-label">Desired retention: {Math.round(opts.desiredRetention * 100)}%</label>
+          <label for="desired-retention" class="option-label">Desired retention: {Math.round(opts.desiredRetention * 100)}%</label>
           <input
+            id="desired-retention"
             type="range"
             bind:value={opts.desiredRetention}
             min="0.70"
@@ -384,7 +389,7 @@
         </div>
 
         <div class="option-row">
-          <label class="option-label">FSRS Weights</label>
+          <label for="fsrs-weights" class="option-label">FSRS Weights</label>
           <div class="weights-display neu-pressed">
             <p class="weights-text">
               {opts.fsrsWeights.length > 0 ? opts.fsrsWeights.join(", ") : "Using default weights"}
@@ -432,12 +437,12 @@
         <h3 class="section-title">Lapses</h3>
         
         <div class="option-row">
-          <label class="option-label">Relearning steps (minutes)</label>
+          <label for="relearning-steps" class="option-label">Relearning steps (minutes)</label>
           <div class="steps-container">
             {#each opts.lapseSteps as step, i}
               <span class="step-pill neu-subtle">
                 {step}
-                <button onclick={() => removeLapseStep(i)} class="step-remove">
+                <button onclick={() => removeLapseStep(i)} class="step-remove" aria-label="Remove step {step}">
                   <svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -459,8 +464,9 @@
 
         <div class="option-row-grid">
           <div class="option-row">
-            <label class="option-label">Minimum interval (days)</label>
+            <label for="lapse-minimum-interval" class="option-label">Minimum interval (days)</label>
             <input
+              id="lapse-minimum-interval"
               type="number"
               bind:value={opts.lapseMinimumInterval}
               min="0"
@@ -468,8 +474,9 @@
             />
           </div>
           <div class="option-row">
-            <label class="option-label">Leech threshold (lapses)</label>
+            <label for="leech-threshold" class="option-label">Leech threshold (lapses)</label>
             <input
+              id="leech-threshold"
               type="number"
               bind:value={opts.leechThreshold}
               min="0"
@@ -479,14 +486,16 @@
         </div>
 
         <div class="option-row">
-          <label class="option-label">Leech action</label>
-          <select
+          <label for="leech-action" class="option-label">Leech action</label>
+          <NeuSelect
+            id="leech-action"
+            options={[
+              { value: 'suspend', label: 'Suspend card' },
+              { value: 'tag', label: 'Tag only' }
+            ]}
             bind:value={leechAction}
-            class="option-select neu-pressed"
-          >
-            <option value="suspend">Suspend card</option>
-            <option value="tag">Tag only</option>
-          </select>
+            size="sm"
+          />
         </div>
       </div>
     {/if}

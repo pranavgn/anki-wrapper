@@ -185,7 +185,7 @@
     
     isLoading = true;
     try {
-      const result = await invoke<DeckStat[]>("get_deck_stats");
+      const result = await invoke<DeckStat[]>("get_all_decks");
       decks = result;
       lastDeckStatsTime = Date.now();
     } catch (error) {
@@ -293,6 +293,8 @@
     ondragleave={handleRootDragLeave}
     ondrop={handleRootDrop}
     onkeydown={handleGridKeydown}
+    role="region"
+    aria-label="Deck grid"
     style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
   >
     {#if compact}
@@ -315,7 +317,7 @@
               {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
               {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
             "
-            role="listitem"
+            role="button"
             tabindex="0"
             aria-label="Deck: {deck.short_name || deck.name}. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due for review."
             draggable="true"

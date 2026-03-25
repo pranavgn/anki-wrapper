@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { addToast } from "./toast";
+  import NeuSelect from "./ui/NeuSelect.svelte";
   import {
     loadSessions,
     saveSession,
@@ -252,24 +253,31 @@
 
           <div class="cal-form-row">
             <label class="cal-form-label">Duration</label>
-            <select class="cal-form-input neu-pressed" bind:value={formDuration}>
-              <option value={15}>15 min</option>
-              <option value={30}>30 min</option>
-              <option value={45}>45 min</option>
-              <option value={60}>1 hour</option>
-              <option value={90}>1.5 hours</option>
-              <option value={120}>2 hours</option>
-            </select>
+            <NeuSelect
+              options={[
+                { value: 15, label: '15 min' },
+                { value: 30, label: '30 min' },
+                { value: 45, label: '45 min' },
+                { value: 60, label: '1 hour' },
+                { value: 90, label: '1.5 hours' },
+                { value: 120, label: '2 hours' }
+              ]}
+              bind:value={formDuration}
+              size="sm"
+            />
           </div>
 
           <div class="cal-form-row">
             <label class="cal-form-label">Deck</label>
-            <select class="cal-form-input neu-pressed" bind:value={formDeckId}>
-              <option value={null}>All decks</option>
-              {#each decks as deck}
-                <option value={deck.id}>{deck.name}</option>
-              {/each}
-            </select>
+            <NeuSelect
+              options={[
+                { value: null, label: 'All decks' },
+                ...decks.map(d => ({ value: d.id, label: d.name }))
+              ]}
+              bind:value={formDeckId}
+              size="sm"
+              searchable={true}
+            />
           </div>
 
           <div class="cal-form-row">

@@ -59,6 +59,10 @@
   const errorOverlays = document.querySelectorAll('[data-error], .vite-error-overlay, #vite-error-overlay');
   check('No Vite error overlay', errorOverlays.length === 0);
 
+  // ── Check no native <select> elements ──
+  const nativeSelects = document.querySelectorAll('select');
+  check('No native <select> elements', nativeSelects.length === 0, `Found ${nativeSelects.length} native <select> elements`);
+
   // ── Check body background is not white/transparent ──
   const bodyBg = getComputedStyle(document.body).backgroundColor;
   const isTransparent = bodyBg === 'rgba(0, 0, 0, 0)' || bodyBg === 'transparent';

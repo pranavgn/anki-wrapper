@@ -20,6 +20,7 @@
   type="button"
   role="switch"
   aria-checked={checked}
+  aria-label={checked ? "Toggle on" : "Toggle off"}
   {disabled}
   onclick={toggle}
   class="neu-toggle"

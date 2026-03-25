@@ -31,7 +31,7 @@
   let browserQuery = $state('');
   
   // Focus management
-  let mainContentRef: HTMLElement;
+  let mainContentRef: HTMLElement | null = $state(null);
   
   // Page order for determining animation direction
   const pageOrder: Page[] = ['dashboard', 'deckOverview', 'study', 'editor', 'stats', 'browser'];
@@ -833,8 +833,8 @@
 
 <style>
   @keyframes loading-bar {
-    0% { width: 0%; margin-left: 0%; }
-    50% { width: 60%; margin-left: 20%; }
-    100% { width: 0%; margin-left: 100%; }
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(150%); }
+    100% { transform: translateX(-100%); }
   }
 </style>

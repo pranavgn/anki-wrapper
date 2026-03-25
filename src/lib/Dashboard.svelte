@@ -656,8 +656,9 @@
 
           <!-- Sort Order -->
           <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">Sort Order</label>
+            <label for="custom-study-sort" class="block text-sm font-medium text-text-secondary mb-1">Sort Order</label>
             <select
+              id="custom-study-sort"
               bind:value={customStudyOrder}
               class="w-full px-4 py-2 bg-bg-subtle rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
             >
@@ -735,17 +736,6 @@
 </div>
 
 <style>
-  .deck-card {
-    opacity: 0;
-    animation: deckFadeIn 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-  }
-
-  .deck-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--neu-up);
-  }
-
   .dashboard-layout {
     display: flex;
     gap: 24px;

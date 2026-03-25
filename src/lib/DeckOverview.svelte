@@ -38,18 +38,20 @@
 
   // Card type distribution using theme colors
   const colors = getChartColors();
-  const cardTypes = [
+  const cardTypes = $derived([
     { name: 'New', count: deck.new_count, color: colors.newCards },
     { name: 'Learning', count: deck.learn_count, color: colors.learning },
     { name: 'Review', count: deck.review_count, color: colors.accent }
-  ];
+  ]);
 
-  const totalCards = deck.card_count;
+  const totalCards = $derived(deck.card_count);
 
   // Calculate progress percentage
-  const progressPercent = totalCards > 0 
-    ? Math.round(((deck.new_count + deck.learn_count + deck.review_count) / totalCards) * 100) 
-    : 0;
+  const progressPercent = $derived(
+    totalCards > 0 
+      ? Math.round(((deck.new_count + deck.learn_count + deck.review_count) / totalCards) * 100) 
+      : 0
+  );
 
   // Fetch real data on mount
   onMount(async () => {

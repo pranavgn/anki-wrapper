@@ -5,90 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>anki-wrapper</title>
-    <style>
-      /* Instant loading indicator - shows before JS */
-      #app:empty::after {
-        content: "Loading anki-wrapper...";
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        color: #8C8278;
-        background: #F0EBE3;
-      }
-    </style>
   </head>
   <body>
     <div id="app">
-      <!-- Polished splash skeleton - visible from first paint, replaced by Svelte on mount -->
-      <style>
-        @keyframes shimmer {
-          0% { background-position: -400px 0; }
-          100% { background-position: 400px 0; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideIn {
-          from { width: 0%; }
-          to { width: 100%; }
-        }
-        .splash-shimmer {
-          background: linear-gradient(90deg, #EDE9E3 25%, #F7F4EF 50%, #EDE9E3 75%);
-          background-size: 800px 100%;
-          animation: shimmer 1.4s infinite linear;
-          border-radius: 8px;
-        }
-        .splash-fade {
-          animation: fadeIn 0.3s ease-out both;
-        }
-        .splash-progress {
-          height: 2px;
-          background: linear-gradient(90deg, transparent, #C4714F, transparent);
-          animation: slideIn 1.5s ease-in-out infinite;
-        }
-      </style>
-      <div class="min-h-screen flex flex-col" style="background:#F7F4EF; font-family:system-ui,-apple-system,sans-serif;">
-        <nav style="height:48px; border-bottom:1px solid #E2DBD2; display:flex; align-items:center; padding:0 24px;">
-          <span style="font-size:14px; font-weight:500; color:#1C1917;">Anki Wrapper</span>
-        </nav>
-        <div class="splash-progress" style="position:relative;"></div>
-        <main style="flex:1; padding:24px;">
-          <div style="max-width:64rem; margin:0 auto;">
-            <div style="margin-bottom:32px;" class="splash-fade">
-              <div class="splash-shimmer" style="height:32px; width:200px; margin-bottom:8px;"></div>
-              <div class="splash-shimmer" style="height:16px; width:280px;"></div>
-            </div>
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:24px;">
-              <div style="background:white; border:1px solid #E2DBD2; border-radius:16px; padding:24px;" class="splash-fade">
-                <div class="splash-shimmer" style="height:20px; width:75%; margin-bottom:16px;"></div>
-                <div style="display:flex; gap:8px; margin-bottom:24px;">
-                  <div class="splash-shimmer" style="height:24px; width:48px; border-radius:12px;"></div>
-                  <div class="splash-shimmer" style="height:24px; width:64px; border-radius:12px;"></div>
-                </div>
-                <div class="splash-shimmer" style="height:40px; width:100%; border-radius:12px;"></div>
-              </div>
-              <div style="background:white; border:1px solid #E2DBD2; border-radius:16px; padding:24px;" class="splash-fade">
-                <div class="splash-shimmer" style="height:20px; width:60%; margin-bottom:16px;"></div>
-                <div style="display:flex; gap:8px; margin-bottom:24px;">
-                  <div class="splash-shimmer" style="height:24px; width:48px; border-radius:12px;"></div>
-                </div>
-                <div class="splash-shimmer" style="height:40px; width:100%; border-radius:12px;"></div>
-              </div>
-              <div style="background:white; border:1px solid #E2DBD2; border-radius:16px; padding:24px;" class="splash-fade">
-                <div class="splash-shimmer" style="height:20px; width:80%; margin-bottom:16px;"></div>
-                <div style="display:flex; gap:8px; margin-bottom:24px;">
-                  <div class="splash-shimmer" style="height:24px; width:64px; border-radius:12px;"></div>
-                  <div class="splash-shimmer" style="height:24px; width:48px; border-radius:12px;"></div>
-                </div>
-                <div class="splash-shimmer" style="height:40px; width:100%; border-radius:12px;"></div>
-              </div>
-            </div>
-          </div>
-        </main>
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg-base,#F0EBE3);">
+        <div style="width:200px;height:3px;border-radius:2px;background:var(--bg-subtle,#EDE9E3);overflow:hidden;">
+          <div style="height:100%;width:40%;border-radius:2px;background:var(--accent,#8B7355);animation:bar 1.8s ease-in-out infinite;"></div>
+        </div>
       </div>
+      <style>@keyframes bar{0%{transform:translateX(-100%)}50%{transform:translateX(150%)}100%{transform:translateX(-100%)}}</style>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

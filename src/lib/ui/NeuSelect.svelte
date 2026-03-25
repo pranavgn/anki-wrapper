@@ -24,7 +24,7 @@
 
   let isOpen = $state(false);
   let triggerEl: HTMLButtonElement;
-  let listEl: HTMLUListElement;
+  let listEl: HTMLUListElement | null = $state(null);
   let focusedIndex = $state(-1);
 
   const sizeClasses: Record<string, string> = {

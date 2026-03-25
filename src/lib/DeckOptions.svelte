@@ -640,8 +640,7 @@
     color: var(--text-secondary);
   }
 
-  .option-input,
-  .option-select {
+  .option-input {
     width: 100%;
     padding: 10px 12px;
     font-family: var(--sans);
@@ -651,11 +650,6 @@
     border: none;
     border-radius: var(--radius-sm);
     outline: none;
-  }
-
-  .option-select {
-    cursor: pointer;
-    appearance: none;
   }
 
   .toggle-row {

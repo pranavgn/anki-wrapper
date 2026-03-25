@@ -23,7 +23,7 @@
     xl: 'max-w-2xl'
   };
 
-  let dialogEl: HTMLElement;
+  let dialogEl: HTMLElement | null = $state(null);
   let previousActiveElement: HTMLElement | null = null;
 
   function handleKeydown(e: KeyboardEvent) {

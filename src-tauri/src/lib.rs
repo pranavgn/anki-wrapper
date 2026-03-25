@@ -23,12 +23,15 @@ pub struct AppPreferences {
     // Backup
     pub auto_backup: bool,
     pub backup_count: u32,          // number of backups to keep
+    
+    // Notifications
+    pub notifications_enabled: bool,
 }
 
 impl Default for AppPreferences {
     fn default() -> Self {
-        Self { 
-            animations_enabled: true, 
+        Self {
+            animations_enabled: true,
             reduce_motion: false,
             theme: "system".to_string(),
             font_size: 16,
@@ -40,6 +43,7 @@ impl Default for AppPreferences {
             confirm_delete: true,
             auto_backup: false,
             backup_count: 5,
+            notifications_enabled: false,
         }
     }
 }
@@ -78,6 +82,108 @@ fn save_preferences(prefs: AppPreferences, _state: State<AppState>) -> Result<()
     
     Ok(())
 }
+
+// ============ STUDY SCHEDULE ============
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudySession {
+    pub id: String,              // UUID-like: "ss_1719849600000"
+    pub date: String,            // "2025-07-01"
+    pub time: String,            // "09:00" (24h format)
+    pub duration_mins: u32,      // planned duration in minutes
+    pub deck_id: Option<i64>,    // null = all decks
+    pub deck_name: Option<String>,
+    pub card_goal: Option<u32>,  // target number of cards, optional
+    pub note: String,            // user's note, e.g. "Focus on kanji"
+    pub completed: bool,
+    pub notify: bool,            // send OS notification at scheduled time
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct StudyScheduleData {
+    pub sessions: Vec<StudySession>,
+}
+
+fn get_schedule_path() -> Result<std::path::PathBuf, String> {
+    let dir = dirs::data_local_dir()
+        .ok_or("Could not find local data directory")?
+        .join("anki-wrapper");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("study-schedule.json"))
+}
+
+#[command]
+fn get_study_sessions() -> Result<Vec<StudySession>, String> {
+    let path = get_schedule_path()?;
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let data: StudyScheduleData = serde_json::from_str(&content).unwrap_or_default();
+    Ok(data.sessions)
+}
+
+#[command]
+fn save_study_session(session: StudySession) -> Result<(), String> {
+    let path = get_schedule_path()?;
+    let mut data = if path.exists() {
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        StudyScheduleData::default()
+    };
+
+    // Upsert: replace if same id exists, otherwise push
+    if let Some(pos) = data.sessions.iter().position(|s| s.id == session.id) {
+        data.sessions[pos] = session;
+    } else {
+        data.sessions.push(session);
+    }
+
+    let content = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, &content).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+fn delete_study_session(session_id: String) -> Result<(), String> {
+    let path = get_schedule_path()?;
+    if !path.exists() { return Ok(()); }
+
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut data: StudyScheduleData = serde_json::from_str(&content).unwrap_or_default();
+    data.sessions.retain(|s| s.id != session_id);
+
+    let content = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, &content).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+fn mark_session_completed(session_id: String, completed: bool) -> Result<(), String> {
+    let path = get_schedule_path()?;
+    if !path.exists() { return Err("No schedule file".to_string()); }
+
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut data: StudyScheduleData = serde_json::from_str(&content).unwrap_or_default();
+
+    if let Some(session) = data.sessions.iter_mut().find(|s| s.id == session_id) {
+        session.completed = completed;
+    } else {
+        return Err("Session not found".to_string());
+    }
+
+    let content = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, &content).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 use tauri::{command, State, AppHandle, Manager};
 use serde::{Deserialize, Serialize};
 use rusqlite::params;
@@ -1261,7 +1367,7 @@ fn parse_search_query(query: &str) -> String {
     
     // "is:new" - new cards
     if query.contains("is:new") {
-        conditions.push("c.queue = -2".to_string());
+        conditions.push("c.queue = 0".to_string());
     }
     // "is:learn" - learning cards
     if query.contains("is:learn") {
@@ -2075,6 +2181,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_decorum::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .setup(|app| {
             log::info!("Anki Wrapper starting up...");
@@ -2141,6 +2248,11 @@ pub fn run() {
             // Preferences
             get_preferences,
             save_preferences,
+            // Study schedule
+            get_study_sessions,
+            save_study_session,
+            delete_study_session,
+            mark_session_completed,
             // Search commands
             search_cards,
             search_notes,
@@ -2157,6 +2269,11 @@ pub fn run() {
             get_deck_specific_stats,
             get_today_stats,
             get_review_history,
+            reset_review_stats,
+            export_review_stats_csv,
+            import_review_stats_csv,
+            get_review_heatmap,
+            get_difficult_cards,
             // Plugin system
             get_installed_plugins,
             enable_plugin,
@@ -3001,10 +3118,10 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
     for day_offset in 1..=30 {
         let due_day = today as i32 + day_offset as i32;
         
-        // Count new cards (queue = -2 means new)
+        // Count new cards (queue = 0 means new)
         let new_count: i64 = conn.query_row(
             &format!(
-                "SELECT COUNT(*) FROM cards c WHERE c.queue = -2 AND c.due = ? {}",
+                "SELECT COUNT(*) FROM cards c WHERE c.queue = 0 AND c.due = ? {}",
                 deck_filter
             ),
             params![due_day],
@@ -3109,9 +3226,9 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
 
     // 4. Card type distribution
     let card_types = {
-        // New: queue = -2
+        // New: queue = 0
         let new_count: i64 = conn.query_row(
-            &format!("SELECT COUNT(*) FROM cards c WHERE c.queue = -2 {}", deck_filter),
+            &format!("SELECT COUNT(*) FROM cards c WHERE c.queue = 0 {}", deck_filter),
             rusqlite::params_from_iter(deck_params.iter()),
             |row| row.get(0)
         ).unwrap_or(0);
@@ -3150,9 +3267,9 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
         // Young retention (ivl < 21) - ease >= 2 means correct answer
         let young_total: i64 = conn.query_row(
             &format!(
-                "SELECT COUNT(*) FROM revlog r 
-                 JOIN cards c ON r.cid = c.id 
-                 WHERE c.ivl < 21 {}",
+                "SELECT COUNT(*) FROM revlog r
+                 JOIN cards c ON r.cid = c.id
+                 WHERE r.lastIvl < 21 {}",
                 deck_filter
             ),
             rusqlite::params_from_iter(deck_params.iter()),
@@ -3161,9 +3278,9 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
         
         let young_correct: i64 = conn.query_row(
             &format!(
-                "SELECT COUNT(*) FROM revlog r 
-                 JOIN cards c ON r.cid = c.id 
-                 WHERE c.ivl < 21 AND r.ease >= 2 {}",
+                "SELECT COUNT(*) FROM revlog r
+                 JOIN cards c ON r.cid = c.id
+                 WHERE r.lastIvl < 21 AND r.ease >= 2 {}",
                 deck_filter
             ),
             rusqlite::params_from_iter(deck_params.iter()),
@@ -3173,9 +3290,9 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
         // Mature retention (ivl >= 21)
         let mature_total: i64 = conn.query_row(
             &format!(
-                "SELECT COUNT(*) FROM revlog r 
-                 JOIN cards c ON r.cid = c.id 
-                 WHERE c.ivl >= 21 {}",
+                "SELECT COUNT(*) FROM revlog r
+                 JOIN cards c ON r.cid = c.id
+                 WHERE r.lastIvl >= 21 {}",
                 deck_filter
             ),
             rusqlite::params_from_iter(deck_params.iter()),
@@ -3184,9 +3301,9 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
         
         let mature_correct: i64 = conn.query_row(
             &format!(
-                "SELECT COUNT(*) FROM revlog r 
-                 JOIN cards c ON r.cid = c.id 
-                 WHERE c.ivl >= 21 AND r.ease >= 2 {}",
+                "SELECT COUNT(*) FROM revlog r
+                 JOIN cards c ON r.cid = c.id
+                 WHERE r.lastIvl >= 21 AND r.ease >= 2 {}",
                 deck_filter
             ),
             rusqlite::params_from_iter(deck_params.iter()),
@@ -3235,12 +3352,17 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
     // 7. Streak calculation
     let (current_streak, longest_streak) = {
         let mut stmt = conn.prepare(
-            "SELECT DISTINCT date(r.id/1000, 'unixepoch', 'localtime') as rev_date 
-             FROM revlog r 
-             ORDER BY rev_date DESC"
+            &format!(
+                "SELECT DISTINCT date(r.id/1000, 'unixepoch', 'localtime') as rev_date
+                 FROM revlog r
+                 JOIN cards c ON r.cid = c.id
+                 WHERE 1=1 {}
+                 ORDER BY rev_date DESC",
+                deck_filter
+            )
         ).map_err(|e| e.to_string())?;
         
-        let rows: Vec<String> = stmt.query_map([], |row| row.get(0))
+        let rows: Vec<String> = stmt.query_map(rusqlite::params_from_iter(deck_params.iter()), |row| row.get(0))
             .map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
             .collect();
@@ -3305,16 +3427,22 @@ fn get_review_stats(deck_id: Option<i64>, state: State<AppState>) -> Result<Revi
     ).unwrap_or(0);
     
     let total_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes",
-        [],
+        &format!(
+            "SELECT COUNT(DISTINCT c.nid) FROM cards c WHERE 1=1 {}",
+            deck_filter
+        ),
+        rusqlite::params_from_iter(deck_params.iter()),
         |row| row.get(0)
     ).unwrap_or(0);
 
     let average_ease: f64 = conn.query_row(
-        "SELECT AVG(CAST(c.factor AS REAL)/10) FROM cards c WHERE c.queue = 2",
-        [],
+        &format!(
+            "SELECT AVG(CAST(c.factor AS REAL) / 1000.0) FROM cards c WHERE c.queue = 2 {}",
+            deck_filter
+        ),
+        rusqlite::params_from_iter(deck_params.iter()),
         |row| row.get(0)
-    ).unwrap_or(250.0) / 100.0;
+    ).unwrap_or(2.5);
 
     let average_interval_days: f64 = conn.query_row(
         &format!(
@@ -3388,6 +3516,152 @@ fn format_deck_id(id: i64) -> String {
 #[command]
 fn get_deck_specific_stats(deck_id: i64, state: State<AppState>) -> Result<ReviewStats, String> {
     get_review_stats(Some(deck_id), state)
+}
+
+#[command]
+fn reset_review_stats(state: State<AppState>) -> Result<u64, String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+    let conn = collection.storage.db();
+    let deleted = conn.execute("DELETE FROM revlog", []).map_err(|e| e.to_string())?;
+    Ok(deleted as u64)
+}
+
+#[command]
+fn export_review_stats_csv(out_path: String, state: State<AppState>) -> Result<String, String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+    let conn = collection.storage.db();
+
+    let mut stmt = conn.prepare(
+        "SELECT r.id, r.cid, r.usn, r.ease, r.ivl, r.lastIvl, r.factor, r.time, r.type FROM revlog r ORDER BY r.id"
+    ).map_err(|e| e.to_string())?;
+
+    let mut csv = String::from("id,cid,usn,ease,ivl,lastIvl,factor,time,type\n");
+    let rows = stmt.query_map([], |row| {
+        Ok(format!("{},{},{},{},{},{},{},{},{}",
+            row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?,
+            row.get::<_, i32>(3)?, row.get::<_, i32>(4)?, row.get::<_, i32>(5)?,
+            row.get::<_, i32>(6)?, row.get::<_, i64>(7)?, row.get::<_, i32>(8)?))
+    }).map_err(|e| e.to_string())?;
+
+    for row in rows.filter_map(|r| r.ok()) { csv.push_str(&row); csv.push('\n'); }
+    std::fs::write(&out_path, &csv).map_err(|e| e.to_string())?;
+    Ok(out_path)
+}
+
+#[command]
+fn import_review_stats_csv(path: String, state: State<AppState>) -> Result<u64, String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+    let conn = collection.storage.db();
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut count: u64 = 0;
+
+    for (i, line) in content.lines().enumerate() {
+        if i == 0 { continue; }
+        let f: Vec<&str> = line.split(',').collect();
+        if f.len() != 9 { continue; }
+        conn.execute(
+            "INSERT OR IGNORE INTO revlog (id,cid,usn,ease,ivl,lastIvl,factor,time,type) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+            rusqlite::params![
+                f[0].parse::<i64>().unwrap_or(0), f[1].parse::<i64>().unwrap_or(0),
+                f[2].parse::<i64>().unwrap_or(0), f[3].parse::<i32>().unwrap_or(0),
+                f[4].parse::<i32>().unwrap_or(0), f[5].parse::<i32>().unwrap_or(0),
+                f[6].parse::<i32>().unwrap_or(0), f[7].parse::<i64>().unwrap_or(0),
+                f[8].parse::<i32>().unwrap_or(0),
+            ]
+        ).map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HeatmapDay {
+    pub date: String,
+    pub count: i64,
+    pub time_secs: i64,
+}
+
+#[command]
+fn get_review_heatmap(days: Option<i64>, deck_id: Option<i64>, state: State<AppState>) -> Result<Vec<HeatmapDay>, String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+    let conn = collection.storage.db();
+    let days_back = days.unwrap_or(365);
+
+    let (deck_filter, deck_params) = if let Some(did) = deck_id {
+        let ids = get_child_deck_ids(&conn, did);
+        let ph: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
+        (format!("AND c.did IN ({})", ph.join(",")), ids)
+    } else { (String::new(), vec![]) };
+
+    let sql = format!(
+        "SELECT date(r.id/1000, 'unixepoch', 'localtime') as rev_date, COUNT(*) as cnt, COALESCE(SUM(r.time),0)/1000 as secs
+         FROM revlog r JOIN cards c ON r.cid = c.id
+         WHERE r.id/1000 >= strftime('%s','now','-{} days') {}
+         GROUP BY rev_date ORDER BY rev_date", days_back, deck_filter);
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(rusqlite::params_from_iter(deck_params.iter()), |row| {
+        Ok(HeatmapDay { date: row.get(0)?, count: row.get(1)?, time_secs: row.get::<_, Option<i64>>(2)?.unwrap_or(0) })
+    }).map_err(|e| e.to_string())?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DifficultCard {
+    pub card_id: i64,
+    pub note_id: i64,
+    pub deck_id: i64,
+    pub deck_name: String,
+    pub ease_factor: f64,
+    pub interval: i32,
+    pub lapses: i32,
+    pub total_reviews: i64,
+    pub again_count: i64,
+    pub retention_rate: f64,
+    pub avg_time_ms: f64,
+    pub fields_csv: String,
+}
+
+#[command]
+fn get_difficult_cards(deck_id: Option<i64>, limit: Option<i64>, state: State<AppState>) -> Result<Vec<DifficultCard>, String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+    let conn = collection.storage.db();
+    let limit_val = limit.unwrap_or(50);
+
+    let (deck_filter, deck_params) = if let Some(did) = deck_id {
+        let ids = get_child_deck_ids(&conn, did);
+        let ph: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
+        (format!("AND c.did IN ({})", ph.join(",")), ids)
+    } else { (String::new(), vec![]) };
+
+    let sql = format!(
+        "SELECT c.id, c.nid, c.did, COALESCE(d.name,''),
+                CAST(c.factor AS REAL)/1000.0, c.ivl, c.lapses,
+                COUNT(r.id), SUM(CASE WHEN r.ease=1 THEN 1 ELSE 0 END),
+                CAST(SUM(CASE WHEN r.ease>=2 THEN 1 ELSE 0 END) AS REAL)/MAX(COUNT(r.id),1),
+                AVG(r.time), SUBSTR(n.flds,1,200)
+         FROM cards c JOIN revlog r ON r.cid=c.id JOIN notes n ON c.nid=n.id LEFT JOIN decks d ON c.did=d.id
+         WHERE c.queue>=0 {} GROUP BY c.id HAVING COUNT(r.id)>=3
+         ORDER BY CAST(SUM(CASE WHEN r.ease>=2 THEN 1 ELSE 0 END) AS REAL)/MAX(COUNT(r.id),1) ASC, SUM(CASE WHEN r.ease=1 THEN 1 ELSE 0 END) DESC
+         LIMIT ?", deck_filter);
+
+    let mut pv: Vec<i64> = deck_params; pv.push(limit_val);
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(rusqlite::params_from_iter(pv.iter()), |row| {
+        Ok(DifficultCard {
+            card_id: row.get(0)?, note_id: row.get(1)?, deck_id: row.get(2)?,
+            deck_name: row.get(3)?, ease_factor: row.get(4)?, interval: row.get(5)?,
+            lapses: row.get(6)?, total_reviews: row.get(7)?, again_count: row.get(8)?,
+            retention_rate: row.get(9)?, avg_time_ms: row.get(10)?,
+            fields_csv: row.get::<_, Option<String>>(11)?.unwrap_or_default(),
+        })
+    }).map_err(|e| e.to_string())?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
 #[command]

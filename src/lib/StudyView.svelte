@@ -8,6 +8,7 @@
   import { rewriteMediaUrls } from "./media";
   import { renderMath, clearMathJaxCache, preprocessAnkiMath } from "./mathjax";
   import { studyNav } from "./studyNav.svelte.ts";
+  import { sendMilestoneNotification } from "./notifications";
 
   // Props using Svelte 5 runes
   interface Props {
@@ -129,6 +130,13 @@
       await invoke("answer_card", { cardId: currentCard.card_id, ease });
       reviewedCount++;
       remainingCards = Math.max(0, remainingCards - 1);
+
+      // Check for milestone notifications
+      if (prefs.notifications_enabled) {
+        if (reviewedCount === 50) sendMilestoneNotification('reviews', 50);
+        if (reviewedCount === 100) sendMilestoneNotification('reviews', 100);
+        if (reviewedCount === 200) sendMilestoneNotification('reviews', 200);
+      }
 
       // Trigger MiniDeck receive animation on success
       if (!isAgain && miniDeckRef) {

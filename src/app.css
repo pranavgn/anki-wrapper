@@ -153,6 +153,40 @@ p, li { line-height: 1.7; }
 @keyframes modalIn { from { opacity:0; transform:scale(0.94) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
 @keyframes rowFadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
+/* Navbar transition animations */
+@keyframes navSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes navSlideRight {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes navSlideLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.nav-anim-left {
+  animation: navSlideDown 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.nav-anim-center {
+  animation: navSlideRight 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+.nav-anim-center-reverse {
+  animation: navSlideLeft 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+.nav-anim-right {
+  animation: navSlideDown 0.22s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+/* Respect reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .nav-anim-left, .nav-anim-center, .nav-anim-center-reverse, .nav-anim-right {
+    animation: none;
+  }
+}
+
 /* Card study animations */
 @keyframes cardFlyToDeck {
   0% { transform: scale(1) translate(0,0) rotate(0deg); opacity:1; }
@@ -211,6 +245,25 @@ input:focus, textarea:focus, select:focus {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Nav divider — visual separator between button groups */
+.nav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  opacity: 0.5;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Traffic light gutter — reserves space for macOS window controls */
+.traffic-light-gutter {
+  width: 0;
+  flex-shrink: 0;
+}
+.platform-macos .traffic-light-gutter {
+  width: 78px; /* 16px inset + 3×12px dots + 2×8px gaps + buffer */
+}
 
 /* Responsive */
 @media (max-width: 1024px) { :root { font-size: 15px; } }

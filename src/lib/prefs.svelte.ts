@@ -23,6 +23,9 @@ export interface AppPreferences {
   // Backup
   auto_backup: boolean;
   backup_count: number;
+  
+  // Notifications
+  notifications_enabled: boolean;
 }
 
 // Global state using Svelte 5 runes
@@ -45,6 +48,8 @@ class PreferencesState {
   auto_backup = $state(false);
   backup_count = $state(5);
   
+  notifications_enabled = $state(false);
+  
   async load() {
     try {
       const p = await invoke<AppPreferences>('get_preferences');
@@ -62,6 +67,7 @@ class PreferencesState {
       this.confirm_delete = p.confirm_delete;
       this.auto_backup = p.auto_backup;
       this.backup_count = p.backup_count;
+      if ('notifications_enabled' in p) this.notifications_enabled = p.notifications_enabled;
       
       // Apply theme immediately
       this.applyTheme();
@@ -89,6 +95,7 @@ class PreferencesState {
           confirm_delete: this.confirm_delete,
           auto_backup: this.auto_backup,
           backup_count: this.backup_count,
+          notifications_enabled: this.notifications_enabled,
         }
       });
     } catch (e) {

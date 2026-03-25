@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
   import { fade, fly } from "svelte/transition";
   import StudyView from "./lib/StudyView.svelte";
@@ -22,6 +22,15 @@
   import { pluginEngine, setCurrentLoadingPlugin, clearCurrentLoadingPlugin } from "./lib/pluginEngine";
   import { loadAllPlugins } from "./lib/pluginLoader";
   import { studyNav } from "./lib/studyNav.svelte.ts";
+  import {
+    initNotifications,
+    startDailyReminderCheck,
+    startScheduleChecker,
+    stopAll,
+    sendMilestoneNotification,
+    sendStudyReminder,
+  } from "./lib/notifications";
+  import "./lib/statsAPI";
 
   import PluginManager from "./lib/PluginManager.svelte";
 
@@ -30,6 +39,12 @@
   let currentPage: Page = $state('dashboard');
   let previousPage: Page = $state('dashboard');
   let browserQuery = $state('');
+  
+  // Page order for determining animation direction
+  const pageOrder: Page[] = ['dashboard', 'deckOverview', 'study', 'editor', 'stats', 'browser'];
+  
+  // Track nav animation direction
+  let navDirection: 'forward' | 'back' = $state('forward');
   
   // Card editor state
   let editingCard = $state<any>(null);
@@ -42,6 +57,9 @@
 
   // Navigation function
   function navigate(page: Page) {
+    const prevIdx = pageOrder.indexOf(currentPage);
+    const nextIdx = pageOrder.indexOf(page);
+    navDirection = nextIdx >= prevIdx ? 'forward' : 'back';
     previousPage = currentPage;
     currentPage = page;
   }
@@ -93,6 +111,12 @@
   let currentDeckId: number | null = $state(null);
   let currentDeckName = $state("");
   let activeDeck: any = $state(null);
+
+  // Get due card count for notifications
+  async function getDueCardCount(): Promise<number> {
+    const stats = await invoke<Array<any>>("get_deck_stats");
+    return stats.reduce((sum: number, d: any) => sum + (d.new_cards || 0) + (d.learn_cards || 0) + (d.review_cards || 0), 0);
+  }
 
   // Initialize on mount
   onMount(async () => {
@@ -209,10 +233,33 @@
       
       // Fire the app:ready hook now that plugins are loaded
       await pluginEngine.runAction('app:ready', {});
+
+      // Start notification systems if enabled
+      if (prefs.notifications_enabled) {
+        initNotifications().then((granted) => {
+          if (granted) {
+            // Check for due cards and send reminder if any
+            getDueCardCount().then(count => {
+              if (count > 10) sendStudyReminder(count);
+            });
+
+            // Due-card reminders every 2 hours
+            startDailyReminderCheck(getDueCardCount, 7200000);
+
+            // Scheduled session checker every 60s
+            startScheduleChecker();
+          }
+        });
+      }
     } catch (error) {
       collectionStatus = 'error';
       collectionError = error instanceof Error ? error.message : String(error);
     }
+  });
+
+  // Cleanup notifications on destroy
+  onDestroy(() => {
+    stopAll();
   });
 
   function startReview(deckId: number, deckName: string) {
@@ -230,18 +277,31 @@
     navigate('deckOverview');
   }
 
-  function exitReviewMode() {
+  async function exitReviewMode() {
     if (currentPage === 'study' && previousPage === 'deckOverview') {
+      navDirection = 'back';
       navigate('deckOverview');
     } else {
+      navDirection = 'back';
       navigate('dashboard');
       currentDeckId = null;
       currentDeckName = "";
       activeDeck = null;
     }
+
+    // Check for streak milestones when exiting study mode
+    if (prefs.notifications_enabled) {
+      try {
+        const stats = await invoke<any>("get_review_stats", { deckId: null });
+        if (stats.current_streak > 0 && stats.current_streak % 7 === 0) {
+          sendMilestoneNotification('streak', stats.current_streak);
+        }
+      } catch (e) { /* ignore */ }
+    }
   }
 
   function goToDashboard() {
+    navDirection = 'back';
     navigate('dashboard');
     currentDeckId = null;
     currentDeckName = "";
@@ -290,12 +350,16 @@
   </main>
 {:else}
   <!-- App Shell -->
-  <div class="min-h-screen bg-bg-base flex flex-col">
+  <div class="h-screen bg-bg-base flex flex-col overflow-hidden">
     <!-- Top Navigation -->
-    <nav data-tauri-drag-region class="app-navbar flex items-center justify-between px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30;">
+    <nav data-tauri-drag-region class="app-navbar flex items-center px-6 py-3" style="background: var(--bg-card); border-bottom: 1px solid var(--border); position: relative; z-index: 30; flex-shrink: 0;">
 
+      <!-- Traffic light gutter (macOS only — the class is added in onMount) -->
+      <div class="traffic-light-gutter"></div>
+
+      {#key currentPage}
       <!-- ═══ LEFT SECTION ═══ -->
-      <div class="flex items-center gap-2 min-w-[180px] ml-2">
+      <div class="flex items-center gap-2 {prefs.reduce_motion ? '' : 'nav-anim-left'}" style="position: relative; z-index: 2; flex-shrink: 0;">
         {#if currentPage === 'dashboard'}
           <!-- Logo -->
           <svg class="h-7 w-7" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; margin-left: 8px;">
@@ -305,7 +369,7 @@
           <span style="font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em;">Mnemora</span>
 
         {:else if studyNav.active}
-          <!-- Study mode: Back + Undo -->
+          <!-- Study mode: End + Undo -->
           <button
             onclick={() => studyNav.exit?.()}
             class="neu-subtle neu-btn flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer"
@@ -314,7 +378,7 @@
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Back</span>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">End</span>
           </button>
           {#if studyNav.canUndo}
             <button
@@ -330,67 +394,66 @@
           {/if}
 
         {:else}
-          <!-- All other pages: Back to dashboard -->
+          <!-- All other pages: Back -->
           <button
             onclick={goToDashboard}
-            class="flex items-center gap-2 cursor-pointer"
-            style="background: none; border: none; padding: 0;"
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Back to dashboard"
           >
-            <svg class="h-7 w-7" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
-              <rect width="100" height="100" rx="22" fill="var(--accent)" />
-              <path d="M30 70V32l20 24 20-24v38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
-            <span style="font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em;">Mnemora</span>
           </button>
         {/if}
       </div>
 
       <!-- ═══ CENTER SECTION ═══ -->
-      <div class="flex items-center gap-2">
-        {#if currentPage === 'deckOverview' && activeDeck}
-          <!-- Breadcrumb: Decks > DeckName -->
-          <button onclick={goToDashboard} class="cursor-pointer" style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); background: none; border: none;">
-            Decks
-          </button>
-          <svg class="h-3 w-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-          <span style="font-family: var(--sans); font-size: 13px; color: var(--text-primary); font-weight: 500;">
-            {activeDeck.name}
-          </span>
+      <div class="{prefs.reduce_motion ? '' : (navDirection === 'forward' ? 'nav-anim-center' : 'nav-anim-center-reverse')}" style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 8px; pointer-events: none; z-index: 1;">
+        <div style="pointer-events: auto; display: flex; align-items: center; gap: 8px;">
+          {#if currentPage === 'deckOverview' && activeDeck}
+            <!-- Breadcrumb: Decks > DeckName -->
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); cursor: pointer;" onclick={goToDashboard}>Decks</span>
+            <svg class="h-3 w-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--text-primary); font-weight: 500;">
+              {activeDeck.name}
+            </span>
 
-        {:else if studyNav.active}
-          <!-- Study mode: Deck name + progress -->
-          <span style="font-family: var(--serif); font-size: 17px; font-weight: 500; color: var(--text-primary);">
-            {studyNav.deckName}
-          </span>
-          {#if studyNav.progress > 0}
-            <div style="width: 60px; height: 4px; border-radius: 2px; background: var(--bg-subtle); margin-left: 8px; overflow: hidden;">
-              <div style="width: {studyNav.progress}%; height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease;"></div>
-            </div>
+          {:else if studyNav.active}
+            <!-- Study mode: Deck name + progress -->
+            <span style="font-family: var(--serif); font-size: 17px; font-weight: 500; color: var(--text-primary);">
+              {studyNav.deckName}
+            </span>
+            {#if studyNav.progress > 0}
+              <div style="width: 60px; height: 4px; border-radius: 2px; background: var(--bg-subtle); margin-left: 8px; overflow: hidden;">
+                <div style="width: {studyNav.progress}%; height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease;"></div>
+              </div>
+            {/if}
+
+          {:else if currentPage === 'editor'}
+            <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
+              {editingCard ? 'Edit Card' : 'Add Card'}
+            </span>
+
+          {:else if currentPage === 'stats'}
+            <span style="font-family: var(--sans); font-size: 14px; color: var(--text-primary); font-weight: 500;">
+              Statistics
+            </span>
+
+          {:else if currentPage === 'browser'}
+            <span style="font-family: var(--sans); font-size: 14px; color: var(--text-primary); font-weight: 500;">
+              Card Browser
+            </span>
           {/if}
-
-        {:else if currentPage === 'editor'}
-          <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
-            {editingCard ? 'Edit Card' : 'Add Card'}
-          </span>
-
-        {:else if currentPage === 'stats'}
-          <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
-            Statistics
-          </span>
-
-        {:else if currentPage === 'browser'}
-          <span style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
-            Browse
-          </span>
-        {/if}
+        </div>
       </div>
 
       <!-- ═══ RIGHT SECTION ═══ -->
-      <div class="flex items-center justify-end gap-2.5 min-w-[180px]">
+      <div class="flex items-center gap-1.5 {prefs.reduce_motion ? '' : 'nav-anim-right'}" style="margin-left: auto; position: relative; z-index: 2; flex-shrink: 0;">
         {#if studyNav.active}
-          <!-- Study mode: Flag + Counts -->
+          <!-- Study: minimal — just flag + settings -->
           <div class="relative">
             <button
               onclick={() => { studyNav.showFlagPicker = !studyNav.showFlagPicker; }}
@@ -426,62 +489,145 @@
               </div>
             {/if}
           </div>
+          <div class="nav-divider"></div>
+          <button
+            onclick={() => showSettings = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
 
-          <!-- Remaining/Reviewed counts -->
-          <div class="flex items-center gap-3">
-            <span style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">
-              {studyNav.remainingCards} left
-            </span>
-            <span style="font-family: var(--sans); font-size: 12px; color: var(--accent);">
-              {studyNav.reviewedCount} done
-            </span>
-          </div>
-
-        {:else}
-          <!-- Non-study pages -->
-
-          {#if currentPage === 'deckOverview'}
-            <!-- Add card button -->
-            <button
-              onclick={() => navigate('editor')}
-              class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
-              style="background: var(--bg-card);"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Add</span>
-            </button>
-          {/if}
-
-          <!-- Plugins button (always visible outside study) -->
+        {:else if currentPage === 'dashboard'}
+          <!-- Dashboard: full toolbar -->
+          <button
+            onclick={() => navigate('editor')}
+            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Add</span>
+          </button>
+          <div class="nav-divider"></div>
+          <button
+            onclick={() => showImportModal = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Import"
+            aria-label="Import"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
+          <button
+            onclick={handleExportCollection}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Export"
+            aria-label="Export"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+          <div class="nav-divider"></div>
           <button
             onclick={() => showPluginManager = true}
-            class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
             style="background: var(--bg-card);"
             title="Plugins"
             aria-label="Plugins"
           >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </button>
-        {/if}
+          <button
+            onclick={() => showSettings = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
 
-        <!-- Settings gear (ALWAYS visible on every page) -->
-        <button
-          onclick={() => showSettings = true}
-          class="neu-subtle neu-btn flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer"
-          style="background: var(--bg-card);"
-          title="Settings"
-          aria-label="Settings"
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
+        {:else if currentPage === 'deckOverview'}
+          <!-- Deck overview: Add + utilities -->
+          <button
+            onclick={() => navigate('editor')}
+            class="neu-subtle neu-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span style="font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 500;">Add</span>
+          </button>
+          <div class="nav-divider"></div>
+          <button
+            onclick={() => showPluginManager = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Plugins"
+            aria-label="Plugins"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </button>
+          <button
+            onclick={() => showSettings = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+        {:else}
+          <!-- Editor, Stats, Browser: just utilities -->
+          <button
+            onclick={() => showPluginManager = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Plugins"
+            aria-label="Plugins"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </button>
+          <button
+            onclick={() => showSettings = true}
+            class="neu-subtle neu-btn flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer"
+            style="background: var(--bg-card);"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        {/if}
       </div>
+      {/key}
     </nav>
     
     <!-- Error Banner -->
@@ -497,7 +643,7 @@
     {/if}
 
     <!-- Main Content -->
-    <main class="{studyNav.active ? 'flex-1 overflow-hidden' : 'flex-1 overflow-y-auto p-6 lg:p-10'}">
+    <main class="{studyNav.active ? 'flex-1 min-h-0 overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto p-6 lg:p-10'}">
       <!-- Loading State - show skeleton in Dashboard -->
       {#if collectionStatus === 'loading'}
         <div class="max-w-6xl mx-auto">

@@ -5,6 +5,7 @@
   import NeuDialog from "./ui/NeuDialog.svelte";
   import NeuToggle from "./ui/NeuToggle.svelte";
   import { DESIGN_PRESETS, ACCENT_PRESETS } from './themes';
+  import { save, open } from "@tauri-apps/plugin-dialog";
 
   interface Props {
     isOpen: boolean;
@@ -15,6 +16,9 @@
 
   let isLoading = $state(false);
   let appVersion = $state("1.0.0");
+  let isExporting = $state(false);
+  let isImporting = $state(false);
+  let showResetConfirm = $state(false);
 
   // Load app version on mount
   $effect(() => {
@@ -69,6 +73,41 @@
       await prefs.save();
     } catch (e) {
       console.error("Failed to auto-save preferences:", e);
+    }
+  }
+
+  // Statistics functions
+  async function handleExportStats() {
+    isExporting = true;
+    try {
+      const file = await save({ filters: [{ name: "CSV", extensions: ["csv"] }], defaultPath: "review-history.csv" });
+      if (!file) { isExporting = false; return; }
+      await invoke("export_review_stats_csv", { outPath: file });
+      addToast("Review history exported", "success");
+    } catch (e) {
+      addToast(`Export failed: ${e}`, "error");
+    } finally { isExporting = false; }
+  }
+
+  async function handleImportStats() {
+    isImporting = true;
+    try {
+      const file = await open({ filters: [{ name: "CSV", extensions: ["csv"] }], multiple: false });
+      if (!file) { isImporting = false; return; }
+      const count = await invoke<number>("import_review_stats_csv", { path: file });
+      addToast(`Imported ${count} review entries`, "success");
+    } catch (e) {
+      addToast(`Import failed: ${e}`, "error");
+    } finally { isImporting = false; }
+  }
+
+  async function handleResetStats() {
+    try {
+      const deleted = await invoke<number>("reset_review_stats");
+      addToast(`Deleted ${deleted} review entries`, "success");
+      showResetConfirm = false;
+    } catch (e) {
+      addToast(`Reset failed: ${e}`, "error");
     }
   }
 
@@ -393,6 +432,64 @@
           <p class="no-backups">No backups found</p>
         {/if}
       </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="settings-section">
+      <h3 class="section-header">Statistics</h3>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Export Review History</span>
+          <p class="setting-desc">Download all review data as CSV</p>
+        </div>
+        <button onclick={handleExportStats} class="neu-subtle neu-btn setting-action-btn" disabled={isExporting}>
+          {isExporting ? 'Exporting...' : 'Export CSV'}
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Import Review History</span>
+          <p class="setting-desc">Merge CSV review data into your log</p>
+        </div>
+        <button onclick={handleImportStats} class="neu-subtle neu-btn setting-action-btn" disabled={isImporting}>
+          {isImporting ? 'Importing...' : 'Import CSV'}
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Notifications</span>
+          <p class="setting-desc">Daily study reminders when cards are due</p>
+        </div>
+        <NeuToggle
+          bind:checked={prefs.notifications_enabled}
+          onchange={handleToggleChange}
+        />
+      </div>
+
+      {#if !showResetConfirm}
+        <div class="setting-row">
+          <div>
+            <span class="setting-label setting-danger-label">Reset All Statistics</span>
+            <p class="setting-desc">Permanently delete your entire review history</p>
+          </div>
+          <button onclick={() => showResetConfirm = true} class="setting-danger-btn">
+            Reset
+          </button>
+        </div>
+      {:else}
+        <div class="danger-confirm-box">
+          <p class="danger-confirm-text">
+            This will permanently delete all review history. This cannot be undone.
+          </p>
+          <div class="danger-confirm-actions">
+            <button onclick={() => showResetConfirm = false} class="neu-subtle neu-btn setting-action-btn">Cancel</button>
+            <button onclick={handleResetStats} class="setting-danger-btn">Yes, delete everything</button>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- About Section -->
@@ -792,5 +889,54 @@
 
   .restore-confirm-btn:hover {
     opacity: 0.9;
+  }
+
+  .setting-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 2px 0 0;
+  }
+
+  .setting-action-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .setting-danger-label { color: var(--danger, #EF4444); }
+
+  .setting-danger-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.08);
+    color: var(--danger, #EF4444);
+    white-space: nowrap;
+  }
+
+  .danger-confirm-box {
+    background: rgba(239,68,68,0.05);
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid rgba(239,68,68,0.15);
+    margin: 8px 0;
+  }
+
+  .danger-confirm-text {
+    font-size: 13px;
+    color: var(--danger, #EF4444);
+    margin: 0 0 10px;
+    font-weight: 500;
+  }
+
+  .danger-confirm-actions {
+    display: flex;
+    gap: 8px;
   }
 </style>

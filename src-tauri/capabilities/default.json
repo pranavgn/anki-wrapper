@@ -19,6 +19,14 @@
     "dialog:default",
     "fs:default",
     "fs:read-all",
-    "decorum:allow-show-snap-overlay"
+    "decorum:allow-show-snap-overlay",
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
+    "notification:allow-register-action-types",
+    "notification:allow-get-pending",
+    "notification:allow-cancel",
+    "notification:allow-get-active"
   ]
 }

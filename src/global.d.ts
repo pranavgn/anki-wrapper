@@ -45,6 +45,11 @@ declare global {
        */
       version: string;
     };
+
+    /**
+     * Stats API exposed to plugins/addons for accessing study statistics
+     */
+    __ankiStats: typeof import('./lib/statsAPI').default;
   }
 }
 

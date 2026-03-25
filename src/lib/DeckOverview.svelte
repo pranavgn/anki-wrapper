@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import { addToast } from "./toast";
+  import { getChartColors } from "./chartTheme";
 
   interface DeckStat {
     id: number;
@@ -27,25 +28,46 @@
     onStats: () => void;
   } = $props();
 
-  // Mock data for charts (will be replaced with real data later)
-  const weekData = [12, 8, 15, 10, 18, 6, 14];
-  const forecastData = [5, 8, 12, 6, 10, 15, 9];
+  // Real data state
+  let weekData = $state<number[]>([]);
+  let streak = $state(0);
+  let isLoading = $state(true);
+
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Card type distribution (mock data)
+  // Card type distribution using theme colors
+  const colors = getChartColors();
   const cardTypes = [
-    { name: 'New', count: deck.new_count, color: '#5B9BD5' },
-    { name: 'Learning', count: deck.learn_count, color: '#C49A4F' },
-    { name: 'Review', count: deck.review_count, color: '#C4714F' }
+    { name: 'New', count: deck.new_count, color: colors.newCards },
+    { name: 'Learning', count: deck.learn_count, color: colors.learning },
+    { name: 'Review', count: deck.review_count, color: colors.accent }
   ];
 
   const totalCards = deck.card_count;
-  const streak = 7; // Mock streak data
 
   // Calculate progress percentage
   const progressPercent = totalCards > 0 
     ? Math.round(((deck.new_count + deck.learn_count + deck.review_count) / totalCards) * 100) 
     : 0;
+
+  // Fetch real data on mount
+  onMount(async () => {
+    try {
+      const [heatmap, stats] = await Promise.all([
+        invoke<Array<{date: string; count: number}>>("get_review_heatmap", { days: 7, deckId: deck.id }),
+        invoke<any>("get_review_stats", { deckId: deck.id })
+      ]);
+      
+      weekData = heatmap.map(d => d.count);
+      streak = stats.current_streak;
+    } catch (e) {
+      console.error("Failed to load deck overview data:", e);
+      weekData = [];
+      streak = 0;
+    } finally {
+      isLoading = false;
+    }
+  });
 
   function handleStudy() {
     onStudy(deck.id, deck.name);
@@ -99,7 +121,7 @@
         padding: 16px 24px;
       "
     >
-      <div style="font-family: var(--serif); font-size: 28px; font-weight: 700; color: #5B9BD5;">
+      <div style="font-family: var(--serif); font-size: 28px; font-weight: 700; color: {cardTypes[0].color};">
         {deck.new_count}
       </div>
       <div style="font-family: var(--sans); font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
@@ -113,7 +135,7 @@
         padding: 16px 24px;
       "
     >
-      <div style="font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--warning);">
+      <div style="font-family: var(--serif); font-size: 28px; font-weight: 700; color: {cardTypes[1].color};">
         {deck.learn_count}
       </div>
       <div style="font-family: var(--sans); font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
@@ -127,7 +149,7 @@
         padding: 16px 24px;
       "
     >
-      <div style="font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--accent);">
+      <div style="font-family: var(--serif); font-size: 28px; font-weight: 700; color: {cardTypes[2].color};">
         {deck.review_count}
       </div>
       <div style="font-family: var(--sans); font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
@@ -178,68 +200,37 @@
       <h3 style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">
         This Week
       </h3>
-      <svg viewBox="0 0 200 100" class="w-full h-24">
-        {#each weekData as value, i}
-          <rect
-            x={i * 28 + 10}
-            y={100 - (value / 20) * 80}
-            width="20"
-            height={(value / 20) * 80}
-            fill="var(--accent)"
-            rx="3"
-            opacity="0.8"
-          />
-          <text
-            x={i * 28 + 20}
-            y="95"
-            text-anchor="middle"
-            fill="var(--text-muted)"
-            font-size="8"
-            font-family="var(--sans)"
-          >
-            {weekDays[i]}
-          </text>
-        {/each}
-      </svg>
+      {#if weekData.length === 0 || weekData.every(v => v === 0)}
+        <div style="display: flex; align-items: center; justify-content: center; height: 96px;">
+          <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">No recent reviews</p>
+        </div>
+      {:else}
+        <svg viewBox="0 0 200 100" class="w-full h-24">
+          {#each weekData as value, i}
+            <rect
+              x={i * 28 + 10}
+              y={100 - (value / 20) * 80}
+              width="20"
+              height={(value / 20) * 80}
+              fill="var(--accent)"
+              rx="3"
+              opacity="0.8"
+            />
+            <text
+              x={i * 28 + 20}
+              y="95"
+              text-anchor="middle"
+              fill="var(--text-muted)"
+              font-size="8"
+              font-family="var(--sans)"
+            >
+              {weekDays[i]}
+            </text>
+          {/each}
+        </svg>
+      {/if}
     </div>
 
-    <!-- Forecast Chart -->
-    <div 
-      class="neu-raised"
-      style="
-        background: var(--bg-card);
-        box-shadow: var(--neu-up);
-        border-radius: var(--radius-md);
-        padding: 20px;
-      "
-    >
-      <h3 style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">
-        Forecast
-      </h3>
-      <svg viewBox="0 0 200 100" class="w-full h-24">
-        {#each forecastData as value, i}
-          <rect
-            x={i * 28 + 10}
-            y={100 - (value / 20) * 80}
-            width="20"
-            height={(value / 20) * 80}
-            fill="var(--success)"
-            rx="3"
-            opacity="0.8"
-          />
-          <text
-            x={i * 28 + 20}
-            y="95"
-            text-anchor="middle"
-            fill="var(--text-muted)"
-            font-size="8"
-            font-family="var(--sans)"
-          >
-            {weekDays[i]}
-          </text>
-        {/each}
-      </svg>
-    </div>
   </div>
 
   <!-- Card Types Doughnut -->
@@ -272,7 +263,7 @@
           cy="50"
           r="40"
           fill="none"
-          stroke="#5B9BD5"
+          stroke={cardTypes[0].color}
           stroke-width="12"
           stroke-dasharray="{(deck.new_count / totalCards) * 251.2} 251.2"
           stroke-dashoffset="0"
@@ -284,7 +275,7 @@
           cy="50"
           r="40"
           fill="none"
-          stroke="var(--warning)"
+          stroke={cardTypes[1].color}
           stroke-width="12"
           stroke-dasharray="{(deck.learn_count / totalCards) * 251.2} 251.2"
           stroke-dashoffset="-{(deck.new_count / totalCards) * 251.2}"
@@ -296,7 +287,7 @@
           cy="50"
           r="40"
           fill="none"
-          stroke="var(--accent)"
+          stroke={cardTypes[2].color}
           stroke-width="12"
           stroke-dasharray="{(deck.review_count / totalCards) * 251.2} 251.2"
           stroke-dashoffset="-{((deck.new_count + deck.learn_count) / totalCards) * 251.2}"

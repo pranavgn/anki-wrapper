@@ -60,3 +60,4 @@ regex = "1.10"
 
 # Date/time handling for statistics
 chrono = "0.4"
+tauri-plugin-notification = "2"

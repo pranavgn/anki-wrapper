@@ -287,7 +287,7 @@
 </script>
 
 <div class="decks-grid-widget">
-  <section
+  <div
     bind:this={gridEl}
     ondragover={handleRootDragOver}
     ondragleave={handleRootDragLeave}

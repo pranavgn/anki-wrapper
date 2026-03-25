@@ -483,7 +483,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
       <input
-        type="text"
+        type="search"
         bind:value={query}
         placeholder="Search cards...  Try: deck:French  tag:vocab  is:due"
         aria-label="Search cards"
@@ -552,7 +552,7 @@
           {#if loading}
         <!-- Loading skeleton -->
         <div class="p-4 space-y-2">
-          {#each Array(8) as _, i}
+          {#each {length: 8} as _, i}
             <div 
               class="h-11 rounded-lg animate-pulse flex gap-4"
               style="background: linear-gradient(90deg, var(--bg-subtle) 25%, var(--bg-card) 50%, var(--bg-subtle) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"
@@ -668,6 +668,7 @@
                 role="button"
                 tabindex="0"
                 aria-label="Card: {row.front_preview}. Deck: {row.deck_name}. Due: {row.due_str}."
+                aria-selected={selectedIds.has(row.card_id)}
                 class="group cursor-pointer"
                 style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
               >
@@ -732,6 +733,7 @@
               checked={allSelected}
               bind:this={headerCheckbox}
               onclick={toggleSelectAll}
+              aria-label="Select all notes"
             />
           </div>
           <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Front</div>
@@ -749,6 +751,7 @@
               onkeydown={(e) => e.key === 'Enter' && selectNote(row.note_id, row.first_card_id)}
               role="button"
               tabindex="0"
+              aria-selected={selectedNoteIds.has(row.note_id)}
               class="group cursor-pointer"
               style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
             >
@@ -758,6 +761,7 @@
                   class="w-4 h-4 rounded cursor-pointer accent-accent"
                   checked={selectedNoteIds.has(row.note_id)}
                   onclick={(e) => handleNoteRowSelect(row.note_id, i, e)}
+                  aria-label="Select note"
                 />
               </div>
               <div class="h-11 flex items-center px-3 border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}"><span class="text-sm truncate">{row.front_preview}</span></div>
@@ -814,6 +818,7 @@
             {#each availableDecks as deck}
               <button
                 onclick={() => handleMoveToDeck(deck.id, deck.name)}
+                aria-label="Move to {deck.name}"
                 class="w-full text-left px-4 py-2 text-sm hover:bg-bg-subtle"
               >
                 {deck.name}
@@ -834,6 +839,7 @@
               />
               <button
                 onclick={handleAddTag}
+                aria-label="Add tag"
                 class="px-3 py-1.5 bg-accent text-white rounded-lg text-sm"
               >
                 Add
@@ -848,12 +854,14 @@
             <div class="flex gap-2 justify-end">
               <button
                 onclick={() => showDeleteConfirm = false}
+                aria-label="Cancel delete"
                 class="px-3 py-1.5 rounded-lg text-sm"
               >
                 Cancel
               </button>
               <button
                 onclick={handleBulkDelete}
+                aria-label="Confirm delete"
                 class="px-3 py-1.5 bg-danger text-white rounded-lg text-sm"
               >
                 Delete
@@ -872,6 +880,7 @@
           
           <button
             onclick={handleSuspend}
+            aria-label="Suspend selected cards"
             class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -882,6 +891,7 @@
           
           <button
             onclick={handleUnsuspend}
+            aria-label="Unsuspend selected cards"
             class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -893,6 +903,7 @@
           
           <button
             onclick={handleBury}
+            aria-label="Bury selected cards"
             class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -903,6 +914,7 @@
           
           <button
             onclick={() => { loadDecks(); showMoveDropdown = !showMoveDropdown; showTagInput = false; showDeleteConfirm = false; }}
+            aria-label="Move selected cards to deck"
             class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -913,6 +925,7 @@
           
           <button
             onclick={() => { showTagInput = !showTagInput; showMoveDropdown = false; showDeleteConfirm = false; }}
+            aria-label="Add tag to selected notes"
             class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -923,6 +936,7 @@
           
           <button
             onclick={() => { showDeleteConfirm = !showDeleteConfirm; showMoveDropdown = false; showTagInput = false; }}
+            aria-label="Delete selected notes"
             class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-text-secondary/10 text-sm text-[#FCA5A5]"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

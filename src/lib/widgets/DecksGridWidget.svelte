@@ -356,7 +356,7 @@
 
         <!-- Loading skeletons for compact mode -->
         {#if isLoading}
-          {#each Array(3) as _, index}
+          {#each {length: 3} as _, index}
             <div
               class="neu-raised"
               style="
@@ -423,7 +423,7 @@
                 onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleDeckSelection(deck.id)}
               >
                 {#if selectedDecks.has(deck.id)}
-                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: white;" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                   </svg>
                 {/if}
@@ -439,7 +439,7 @@
                 aria-expanded={expandedDecks.has(deck.id)}
                 onclick={(e) => { e.stopPropagation(); toggleDeckExpanded(deck.id); }}
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   {#if expandedDecks.has(deck.id)}
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
                   {:else}
@@ -499,7 +499,7 @@
 
         <!-- Loading skeletons -->
         {#if isLoading}
-          {#each Array(3) as _, index}
+          {#each {length: 3} as _, index}
             <div
               class="neu-raised"
               style="
@@ -542,7 +542,7 @@
               animation-delay: {decks.filter(d => shouldShowDeck(d)).length * 40}ms;
             "
           >
-            <svg class="h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+            <svg class="h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span style="font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--text-primary);">New Deck</span>
@@ -592,7 +592,7 @@
         aria-label="Clear selection"
         title="Clear selection"
       >
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>

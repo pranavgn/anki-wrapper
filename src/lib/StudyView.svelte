@@ -355,8 +355,13 @@
 <div class="h-full flex flex-col overflow-hidden" style="background: var(--bg-base);">
   <!-- Progress Bar -->
   <div class="px-6 pt-4 pb-2">
-    <div 
+    <div
       class="neu-pressed"
+      role="progressbar"
+      aria-valuenow={progressPercent}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-label="Study progress: {progressPercent}% complete"
       style="
         background: var(--bg-deep);
         box-shadow: var(--neu-down);
@@ -365,7 +370,7 @@
         overflow: hidden;
       "
     >
-      <div 
+      <div
         style="
           height: 100%;
           width: {progressPercent}%;
@@ -475,6 +480,7 @@
           role="button"
           tabindex="0"
           aria-label={isFlipped ? "Click to flip card back to front" : "Click to reveal answer"}
+          aria-live="polite"
           onclick={toggleFlip}
           onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleFlip()}
           style="cursor: pointer;"
@@ -509,7 +515,7 @@
             style="z-index: 2;"
           >
             <!-- Front Face -->
-            <div 
+            <div
               class="card-face neu-raised"
               style="
                 background: var(--bg-card);
@@ -523,14 +529,15 @@
                 justify-content: center;
               "
             >
-              <div 
+              <div
                 class="card-content prose prose-lg max-w-none text-center"
                 style="font-family: var(--serif); font-size: 26px; color: var(--text-primary);"
                 bind:this={frontEl}
+                aria-live="polite"
               >
                 {@html currentCard.front}
               </div>
-              <p 
+              <p
                 class="mt-6"
                 style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);"
               >
@@ -539,7 +546,7 @@
             </div>
 
             <!-- Back Face -->
-            <div 
+            <div
               class="card-face card-back-face neu-raised"
               style="
                 background: var(--bg-card-raised);
@@ -553,20 +560,21 @@
                 justify-content: center;
               "
             >
-              <div 
+              <div
                 class="mb-4"
                 style="font-family: var(--sans); font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;"
               >
                 ANSWER
               </div>
-              <div 
+              <div
                 class="card-content prose prose-lg max-w-none text-center"
                 style="font-family: var(--serif); font-size: 24px; color: var(--text-primary);"
                 bind:this={backEl}
+                aria-live="polite"
               >
                 {@html currentCard.back}
               </div>
-              <p 
+              <p
                 class="mt-6"
                 style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);"
               >

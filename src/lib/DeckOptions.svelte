@@ -216,7 +216,7 @@
 
     {#if isLoading}
       <div class="loading-state">
-        {#each Array(5) as _}
+        {#each {length: 5} as _}
           <div class="skeleton-line"></div>
         {/each}
       </div>
@@ -247,100 +247,107 @@
       <div class="option-section">
         <h3 class="section-title">New Cards</h3>
         
-        <div class="option-row">
-          <label class="option-label">Cards per day</label>
-          <input
-            type="number"
-            bind:value={opts.newCardsPerDay}
-            min="0"
-            max="9999"
-            class="option-input neu-pressed"
-          />
-        </div>
+         <div class="option-row">
+           <label for="new-cards-per-day" class="option-label">Cards per day</label>
+           <input
+             id="new-cards-per-day"
+             type="number"
+             bind:value={opts.newCardsPerDay}
+             min="0"
+             max="9999"
+             class="option-input neu-pressed"
+           />
+         </div>
 
-        <div class="option-row">
-          <label class="option-label">Learning steps (minutes)</label>
-          <div class="steps-container">
-            {#each opts.learningSteps as step, i}
-              <span class="step-pill neu-subtle">
-                {step}
-                <button onclick={() => removeLearningStep(i)} class="step-remove">
-                  <svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
-            {/each}
-          </div>
-          <div class="step-input-row">
-            <input
-              type="number"
-              bind:value={newLearningStep}
-              placeholder="Add step (minutes)"
-              class="step-input neu-pressed"
-              onkeydown={(e) => e.key === "Enter" && addLearningStep()}
-            />
-            <button onclick={addLearningStep} class="add-step-btn neu-subtle neu-btn">Add</button>
-          </div>
-        </div>
+         <div class="option-row">
+           <label for="learning-steps-input" class="option-label">Learning steps (minutes)</label>
+           <div class="steps-container">
+             {#each opts.learningSteps as step, i}
+               <span class="step-pill neu-subtle">
+                 {step}
+                 <button onclick={() => removeLearningStep(i)} class="step-remove">
+                   <svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                   </svg>
+                 </button>
+               </span>
+             {/each}
+           </div>
+           <div class="step-input-row">
+             <input
+               id="learning-steps-input"
+               type="number"
+               bind:value={newLearningStep}
+               placeholder="Add step (minutes)"
+               class="step-input neu-pressed"
+               onkeydown={(e) => e.key === "Enter" && addLearningStep()}
+             />
+             <button onclick={addLearningStep} class="add-step-btn neu-subtle neu-btn">Add</button>
+           </div>
+         </div>
 
-        <div class="option-row-grid">
-          <div class="option-row">
-            <label class="option-label">Graduating interval (days)</label>
-            <input
-              type="number"
-              bind:value={opts.graduatingInterval}
-              min="0"
-              class="option-input neu-pressed"
-            />
-          </div>
-          <div class="option-row">
-            <label class="option-label">Easy interval (days)</label>
-            <input
-              type="number"
-              bind:value={opts.easyInterval}
-              min="0"
-              class="option-input neu-pressed"
-            />
-          </div>
-        </div>
+         <div class="option-row-grid">
+           <div class="option-row">
+             <label for="graduating-interval" class="option-label">Graduating interval (days)</label>
+             <input
+               id="graduating-interval"
+               type="number"
+               bind:value={opts.graduatingInterval}
+               min="0"
+               class="option-input neu-pressed"
+             />
+           </div>
+           <div class="option-row">
+             <label for="easy-interval" class="option-label">Easy interval (days)</label>
+             <input
+               id="easy-interval"
+               type="number"
+               bind:value={opts.easyInterval}
+               min="0"
+               class="option-input neu-pressed"
+             />
+           </div>
+         </div>
       </div>
 
       <!-- Reviews -->
       <div class="option-section">
         <h3 class="section-title">Reviews</h3>
         
-        <div class="option-row">
-          <label class="option-label">Max reviews per day</label>
-          <input
-            type="number"
-            bind:value={opts.maxReviewsPerDay}
-            min="0"
-            class="option-input neu-pressed"
-          />
-        </div>
+         <div class="option-row">
+           <label for="max-reviews-per-day" class="option-label">Max reviews per day</label>
+           <input
+             id="max-reviews-per-day"
+             type="number"
+             bind:value={opts.maxReviewsPerDay}
+             min="0"
+             class="option-input neu-pressed"
+           />
+         </div>
 
-        <div class="option-row-grid">
-          <div class="option-row">
-            <label class="option-label">Easy bonus</label>
-            <input
-              type="number"
-              bind:value={opts.easyBonus}
-              min="0"
-              step="0.01"
-              class="option-input neu-pressed"
-            />
-          </div>
-          <div class="option-row">
-            <label class="option-label">Interval modifier</label>
-            <input
-              type="number"
-              bind:value={opts.intervalModifier}
-              min="0"
-              step="0.01"
-              class="option-input neu-pressed"
-            />
-          </div>
+         <div class="option-row-grid">
+           <div class="option-row">
+             <label for="easy-bonus" class="option-label">Easy bonus</label>
+             <input
+               id="easy-bonus"
+               type="number"
+               bind:value={opts.easyBonus}
+               min="0"
+               step="0.01"
+               class="option-input neu-pressed"
+             />
+           </div>
+           <div class="option-row">
+             <label for="interval-modifier" class="option-label">Interval modifier</label>
+             <input
+               id="interval-modifier"
+               type="number"
+               bind:value={opts.intervalModifier}
+               min="0"
+               step="0.01"
+               class="option-input neu-pressed"
+             />
+           </div>
         </div>
 
         <div class="option-row">

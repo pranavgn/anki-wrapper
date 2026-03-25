@@ -328,45 +328,51 @@
   <!-- Step 2c: Text/CSV Import -->
   {#if currentStep === "text"}
     <div class="text-import-form">
-      <div class="form-group">
-        <label class="form-label">Deck</label>
-        <NeuSelect
-          options={availableDecks.map(d => ({ value: d.id, label: d.name }))}
-          bind:value={selectedDeckId}
-          size="sm"
-          searchable={true}
-        />
-      </div>
+       <div class="form-group">
+         <label for="import-deck-select" class="form-label">Deck</label>
+         <NeuSelect
+           id="import-deck-select"
+           options={availableDecks.map(d => ({ value: d.id, label: d.name }))}
+           bind:value={selectedDeckId}
+           size="sm"
+           searchable={true}
+         />
+       </div>
 
-      <div class="form-group">
-        <label class="form-label">Note Type</label>
-        <input
-          type="text"
-          class="form-input neu-pressed"
-          bind:value={notetypeName}
-          placeholder="Basic"
-        />
-      </div>
+       <div class="form-group">
+         <label for="import-notetype" class="form-label">Note Type</label>
+         <input
+           id="import-notetype"
+           type="text"
+           class="form-input neu-pressed"
+           bind:value={notetypeName}
+           placeholder="Basic"
+         />
+       </div>
 
-      <div class="form-group">
-        <label class="form-label">Delimiter</label>
-        <div class="button-group">
-          {#each ["tab", "comma", "semicolon"] as d}
-            <button
-              class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
-              onclick={() => (delimiter = d as typeof delimiter)}
-            >
-              {getDelimiterLabel(d)}
-            </button>
-          {/each}
-        </div>
-      </div>
+       <div class="form-group">
+         <label for="delimiter-group" class="form-label">Delimiter</label>
+         <div class="button-group" role="radiogroup" id="delimiter-group" aria-label="Delimiter">
+           {#each ["tab", "comma", "semicolon"] as d}
+             <button
+               role="radio"
+               aria-checked={delimiter === d}
+               class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
+               onclick={() => (delimiter = d as typeof delimiter)}
+             >
+               {getDelimiterLabel(d)}
+             </button>
+           {/each}
+         </div>
+       </div>
 
       <div class="form-row">
         <label class="form-label">Allow HTML in fields</label>
         <button
           class="toggle-switch {htmlEnabled ? 'active' : ''}"
           onclick={() => (htmlEnabled = !htmlEnabled)}
+          role="switch"
+          aria-checked={htmlEnabled}
         >
           <span class="toggle-knob"></span>
         </button>

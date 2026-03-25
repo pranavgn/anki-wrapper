@@ -386,40 +386,42 @@
         />
       </div>
 
-      {#if scheduleType === 'exact'}
-        <div class="cal-form-row">
-          <label class="cal-form-label">Time</label>
-          <input type="time" class="cal-form-input neu-pressed" bind:value={formTime} />
-        </div>
-      {:else if scheduleType === 'hour'}
-        <div class="cal-form-row">
-          <label class="cal-form-label">Hour</label>
-          <NeuSelect
-            options={Array.from({length: 24}, (_, i) => ({
-              value: i,
-              label: i === 0 ? '12 AM' : i < 12 ? i + ' AM' : i === 12 ? '12 PM' : (i-12) + ' PM'
-            }))}
-            bind:value={formHour}
-            size="sm"
-          />
-        </div>
-      {/if}
+       {#if scheduleType === 'exact'}
+         <div class="cal-form-row">
+           <label for="form-time" class="cal-form-label">Time</label>
+           <input id="form-time" type="time" class="cal-form-input neu-pressed" bind:value={formTime} />
+         </div>
+       {:else if scheduleType === 'hour'}
+         <div class="cal-form-row">
+           <label for="form-hour" class="cal-form-label">Hour</label>
+           <NeuSelect
+             id="form-hour"
+             options={Array.from({length: 24}, (_, i) => ({
+               value: i,
+               label: i === 0 ? '12 AM' : i < 12 ? i + ' AM' : i === 12 ? '12 PM' : (i-12) + ' PM'
+             }))}
+             bind:value={formHour}
+             size="sm"
+           />
+         </div>
+       {/if}
 
-      <div class="cal-form-row">
-        <label class="cal-form-label">Duration</label>
-        <NeuSelect
-          options={[
-            { value: 15, label: '15 min' },
-            { value: 30, label: '30 min' },
-            { value: 45, label: '45 min' },
-            { value: 60, label: '1 hour' },
-            { value: 90, label: '1.5 hours' },
-            { value: 120, label: '2 hours' }
-          ]}
-          bind:value={formDuration}
-          size="sm"
-        />
-      </div>
+       <div class="cal-form-row">
+         <label for="form-duration" class="cal-form-label">Duration</label>
+         <NeuSelect
+           id="form-duration"
+           options={[
+             { value: 15, label: '15 min' },
+             { value: 30, label: '30 min' },
+             { value: 45, label: '45 min' },
+             { value: 60, label: '1 hour' },
+             { value: 90, label: '1.5 hours' },
+             { value: 120, label: '2 hours' }
+           ]}
+           bind:value={formDuration}
+           size="sm"
+         />
+       </div>
 
       <div class="cal-form-row">
         <label for="form-deck" class="cal-form-label">Deck</label>
@@ -473,22 +475,23 @@
         />
       </div>
 
-      {#if recurrence === 'weekly'}
-        <div class="cal-form-row">
-          <label class="cal-form-label">On days</label>
-          <div style="display: flex; gap: 4px;">
-            {#each ['S','M','T','W','T','F','S'] as day, i}
-              <button
-                type="button"
-                class="neu-subtle"
-                style="width: 28px; height: 28px; border-radius: 50%; font-size: 11px; cursor: pointer;
-                  {recurDays.includes(i) ? 'background: var(--accent); color: white;' : 'color: var(--text-secondary);'}"
-                onclick={() => toggleRecurDay(i)}
-              >{day}</button>
-            {/each}
-          </div>
-        </div>
-      {/if}
+       {#if recurrence === 'weekly'}
+         <div class="cal-form-row">
+           <label id="recur-days-label" class="cal-form-label">On days</label>
+           <div role="group" aria-labelledby="recur-days-label" style="display: flex; gap: 4px;">
+             {#each ['S','M','T','W','T','F','S'] as day, i}
+               <button
+                 type="button"
+                 id={`recur-day-${i}`}
+                 class="neu-subtle"
+                 style="width: 28px; height: 28px; border-radius: 50%; font-size: 11px; cursor: pointer;
+                   {recurDays.includes(i) ? 'background: var(--accent); color: white;' : 'color: var(--text-secondary);'}"
+                 onclick={() => toggleRecurDay(i)}
+               >{day}</button>
+             {/each}
+           </div>
+         </div>
+       {/if}
 
       <div class="cal-form-row">
         <label for="form-notify" class="cal-form-label">Notify me</label>

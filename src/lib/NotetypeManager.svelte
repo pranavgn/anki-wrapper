@@ -187,11 +187,15 @@
       {:else if error && notetypes.length === 0}
         <p class="error-text">{error}</p>
       {:else}
-        <ul class="notetype-list">
+        <ul class="notetype-list" role="listbox" aria-label="Note types">
           {#each notetypes as nt}
-            <li 
+            <li
               class="notetype-item neu-subtle {selectedNotetypeId === nt.id ? 'selected' : ''}"
               onclick={() => selectNotetype(nt.id)}
+              role="option"
+              aria-selected={selectedNotetypeId === nt.id}
+              tabindex="0"
+              onkeydown={(e) => e.key === 'Enter' && selectNotetype(nt.id)}
             >
               <span class="notetype-name">{nt.name}</span>
               <span class="notetype-kind">{nt.kind}</span>
@@ -248,18 +252,18 @@
             <input type="text" id="name" bind:value={editName} class="form-input neu-pressed" />
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Fields</label>
-            <div class="fields-list">
-              {#each editFields as field, i}
-                <div class="field-row">
-                  <input type="text" bind:value={field.name} placeholder="Field name" class="form-input neu-pressed" />
-                  <button class="remove-btn neu-subtle neu-btn" onclick={() => removeField(i)}>✕</button>
-                </div>
-              {/each}
-              <button class="add-btn neu-subtle neu-btn" onclick={addField}>Add Field</button>
-            </div>
-          </div>
+           <div class="form-group">
+             <label for="fields-container" class="form-label">Fields</label>
+             <div id="fields-container" class="fields-list">
+               {#each editFields as field, i}
+                 <div class="field-row">
+                   <input type="text" bind:value={field.name} placeholder="Field name" class="form-input neu-pressed" />
+                   <button class="remove-btn neu-subtle neu-btn" onclick={() => removeField(i)} aria-label="Remove field">✕</button>
+                 </div>
+               {/each}
+               <button class="add-btn neu-subtle neu-btn" onclick={addField}>Add Field</button>
+             </div>
+           </div>
 
           <div class="form-group">
             <label class="form-label">Templates</label>
@@ -271,7 +275,7 @@
                     <textarea bind:value={tmpl.front_html} placeholder="Front template" class="form-textarea neu-pressed"></textarea>
                     <textarea bind:value={tmpl.back_html} placeholder="Back template" class="form-textarea neu-pressed"></textarea>
                   </div>
-                  <button class="remove-btn neu-subtle neu-btn" onclick={() => removeTemplate(i)}>✕</button>
+                  <button class="remove-btn neu-subtle neu-btn" onclick={() => removeTemplate(i)} aria-label="Remove template">✕</button>
                 </div>
               {/each}
               <button class="add-btn neu-subtle neu-btn" onclick={addTemplate}>Add Template</button>

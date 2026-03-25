@@ -246,26 +246,27 @@
       <!-- Add session form -->
       {#if showAddForm}
         <div class="cal-add-form">
-          <div class="cal-form-row">
-            <label class="cal-form-label">Time</label>
-            <input type="time" class="cal-form-input neu-pressed" bind:value={formTime} />
-          </div>
+           <div class="cal-form-row">
+             <label for="form-time" class="cal-form-label">Time</label>
+             <input id="form-time" type="time" class="cal-form-input neu-pressed" bind:value={formTime} />
+           </div>
 
-          <div class="cal-form-row">
-            <label class="cal-form-label">Duration</label>
-            <NeuSelect
-              options={[
-                { value: 15, label: '15 min' },
-                { value: 30, label: '30 min' },
-                { value: 45, label: '45 min' },
-                { value: 60, label: '1 hour' },
-                { value: 90, label: '1.5 hours' },
-                { value: 120, label: '2 hours' }
-              ]}
-              bind:value={formDuration}
-              size="sm"
-            />
-          </div>
+           <div class="cal-form-row">
+             <label for="form-duration" class="cal-form-label">Duration</label>
+             <NeuSelect
+               id="form-duration"
+               options={[
+                 { value: 15, label: '15 min' },
+                 { value: 30, label: '30 min' },
+                 { value: 45, label: '45 min' },
+                 { value: 60, label: '1 hour' },
+                 { value: 90, label: '1.5 hours' },
+                 { value: 120, label: '2 hours' }
+               ]}
+               bind:value={formDuration}
+               size="sm"
+             />
+           </div>
 
           <div class="cal-form-row">
             <label class="cal-form-label">Deck</label>

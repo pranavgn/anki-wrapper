@@ -260,6 +260,7 @@
             onmouseup={handleMouseUp}
             onmouseleave={handleMouseUp}
             class="canvas"
+            aria-label="Drawing canvas for image occlusion"
           ></canvas>
         </div>
         
@@ -281,15 +282,16 @@
       
     {:else if currentStep === "details"}
       <div class="details-step">
-        <div class="form-group">
-          <label class="form-label">Back Extra (optional)</label>
-          <textarea
-            bind:value={backExtra}
-            rows="3"
-            placeholder="Extra information to show on the back"
-            class="form-textarea neu-pressed"
-          ></textarea>
-        </div>
+         <div class="form-group">
+           <label for="back-extra" class="form-label">Back Extra (optional)</label>
+           <textarea
+             id="back-extra"
+             bind:value={backExtra}
+             rows="3"
+             placeholder="Extra information to show on the back"
+             class="form-textarea neu-pressed"
+           ></textarea>
+         </div>
         
         <p class="card-count-info">
           This will create <strong>{rectangles.length}</strong> cards (one per occlusion) in the default Image Occlusion deck.

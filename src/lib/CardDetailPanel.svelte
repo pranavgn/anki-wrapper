@@ -127,7 +127,7 @@
       <div class="flex-1 p-4 space-y-4">
         <div class="h-48 bg-bg-subtle rounded-xl animate-pulse"></div>
         <div class="space-y-2">
-          {#each Array(6) as _}
+          {#each {length: 6} as _}
             <div class="h-4 bg-bg-subtle rounded animate-pulse"></div>
           {/each}
         </div>
@@ -202,6 +202,7 @@
                 class="w-8 h-8 rounded-lg flex items-center justify-center transition-all {detail.flag === flag.value ? 'ring-2 ring-offset-2 ring-gray-400' : 'hover:scale-110'}"
                 style="background-color: {flag.color}20; border: 2px solid {flag.color}"
                 title={flag.label}
+                aria-label="Set flag to {flag.label}"
               >
                 {#if detail.flag === flag.value}
                   <svg class="h-4 w-4" style="color: {flag.color}" fill="currentColor" viewBox="0 0 20 20">
@@ -238,6 +239,7 @@
         <div class="flex gap-2 pt-2">
           <button
             onclick={() => onEdit(detail)}
+            aria-label="Edit card"
             class="flex-1 flex items-center justify-center gap-2 px-3 py-2 neu-subtle neu-btn rounded-xl text-sm hover:bg-bg-subtle transition-colors"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,6 +250,7 @@
           
           <button
             onclick={handleSuspend}
+            aria-label="Suspend card"
             class="flex-1 flex items-center justify-center gap-2 px-3 py-2 neu-subtle neu-btn rounded-xl text-sm hover:bg-bg-subtle transition-colors"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,12 +263,14 @@
             <div class="flex-1 flex gap-1">
               <button
                 onclick={() => showDeleteConfirm = false}
+                aria-label="Cancel delete"
                 class="flex-1 px-3 py-2 neu-subtle neu-btn rounded-xl text-sm hover:bg-bg-subtle transition-colors"
               >
                 Cancel
               </button>
               <button
                 onclick={handleDelete}
+                aria-label="Confirm delete"
                 class="flex-1 px-3 py-2 border border-red-500 text-red-500 rounded-xl text-sm hover:bg-red-50 transition-colors"
               >
                 Delete
@@ -274,6 +279,7 @@
           {:else}
             <button
               onclick={() => showDeleteConfirm = true}
+              aria-label="Delete card"
               class="flex-1 flex items-center justify-center gap-2 px-3 py-2 neu-subtle neu-btn rounded-xl text-sm text-danger hover:bg-red-50 transition-colors"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

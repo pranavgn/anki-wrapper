@@ -218,54 +218,57 @@
     // ── Register loading steps ──
     loader.register([
       { name: 'Preferences',  weight: 1 },
-      { name: 'Collection',   weight: 3 }, // heaviest
       { name: 'MathJax',      weight: 1 },
+      { name: 'Collection',   weight: 3 }, // heaviest
       { name: 'Plugins',      weight: 1 },
     ]);
+    console.log(`[Loader] Registered steps. Initial progress: ${loader.progress}%`);
 
-    // ── Run first 3 in parallel ──
-    const prefsPromise = (async () => {
-      loader.start('Preferences');
-      try { await prefs.load(); } catch(e) { console.error('Prefs error:', e); }
-      loader.finish('Preferences');
-    })();
+    // ── Step 1: Preferences ──
+    loader.start('Preferences');
+    console.log(`[Loader] Starting Preferences. Progress: ${loader.progress}%`);
+    try { await prefs.load(); } catch(e) { console.error('Prefs error:', e); }
+    loader.finish('Preferences');
+    console.log(`[Loader] Finished Preferences. Progress: ${loader.progress}%`);
 
-    const mathPromise = (async () => {
-      loader.start('MathJax');
-      try { await initMathJax(); } catch(e) { console.error('MathJax error:', e); }
-      loader.finish('MathJax');
-    })();
+    // ── Step 2: MathJax ──
+    loader.start('MathJax');
+    console.log(`[Loader] Starting MathJax. Progress: ${loader.progress}%`);
+    try { await initMathJax(); } catch(e) { console.error('MathJax error:', e); }
+    loader.finish('MathJax');
+    console.log(`[Loader] Finished MathJax. Progress: ${loader.progress}%`);
 
-    const collectionPromise = (async () => {
-      loader.start('Collection');
-      try {
-        await invoke("init_standalone_collection");
-        collectionStatus = 'ready';
-        isCollectionOpen = true;
-      } catch (error) {
-        collectionStatus = 'error';
-        collectionError = error instanceof Error ? error.message : String(error);
-        loader.fail('Collection', collectionError);
-        return; // don't finish — it failed
-      }
-      loader.finish('Collection');
-    })();
+    // ── Step 3: Collection (critical path) ──
+    loader.start('Collection');
+    console.log(`[Loader] Starting Collection. Progress: ${loader.progress}%`);
+    try {
+      await invoke("init_standalone_collection");
+      collectionStatus = 'ready';
+      isCollectionOpen = true;
+    } catch (error) {
+      collectionStatus = 'error';
+      collectionError = error instanceof Error ? error.message : String(error);
+      loader.fail('Collection', collectionError);
+      console.log(`[Loader] Failed Collection. Progress: ${loader.progress}%`);
+      return; // don't continue to plugins
+    }
+    loader.finish('Collection');
+    console.log(`[Loader] Finished Collection. Progress: ${loader.progress}%`);
 
-    // Wait for the critical path (collection) + non-critical in parallel
-    await Promise.all([prefsPromise, mathPromise, collectionPromise]);
-
-    // ── Plugins — deferred, non-blocking ──
+    // ── Step 4: Plugins (deferred, non-blocking) ──
     if (collectionStatus === 'ready') {
       getDeckStats();
 
       // Use requestIdleCallback to load plugins without blocking the UI
       const loadPlugins = async () => {
         loader.start('Plugins');
+        console.log(`[Loader] Starting Plugins. Progress: ${loader.progress}%`);
         try {
           await loadAllPlugins();
           await pluginEngine.runAction('app:ready', {});
         } catch(e) { console.error('Plugin error:', e); }
         loader.finish('Plugins');
+        console.log(`[Loader] Finished Plugins. Progress: ${loader.progress}%`);
       };
 
       if ('requestIdleCallback' in window) {

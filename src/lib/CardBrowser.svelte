@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { untrack } from "svelte";
   import { fly, fade } from "svelte/transition";
   import { prefs } from "./prefs.svelte.ts";
   import { fly_if_enabled } from "./animate.svelte.ts";
@@ -44,8 +45,8 @@
   ];
 
   // Search state
-  let query = $state(initialQuery);
-  let debouncedQuery = $state(initialQuery);
+  let query = $state(untrack(() => initialQuery));
+  let debouncedQuery = $state(untrack(() => initialQuery));
   let searchError = $state<string | null>(null);
   let loading = $state(false);
   let rows: any[] = $state([]);
@@ -442,13 +443,11 @@
   }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
 <div
   class="h-full flex flex-col bg-bg-base"
   in:fly={fly_if_enabled({ y: 40, duration: 280 })}
   out:fly={fly_if_enabled({ y: 40, duration: 200 })}
-  onkeydown={handleKeydown}
-  role="application"
-  tabindex="-1"
 >
   <!-- Header -->
   <div class="flex items-center gap-4 p-4 border-b border-border/30">
@@ -607,8 +606,7 @@
             <div class="sticky top-0 z-10 flex items-center px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50" style="background: var(--bg-subtle); color: var(--text-muted);">Deck</div>
             <button
               onclick={() => sortOrder = sortOrder === 'cardDue' ? 'cardDueDesc' : 'cardDue'}
-              aria-label="Sort by due date"
-              aria-sort={sortOrder === 'cardDue' ? 'ascending' : sortOrder === 'cardDueDesc' ? 'descending' : 'none'}
+              aria-label="Sort by due date{sortOrder === 'cardDue' ? ', ascending' : sortOrder === 'cardDueDesc' ? ', descending' : ''}"
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Due
@@ -620,8 +618,7 @@
             </button>
             <button
               onclick={() => sortOrder = sortOrder === 'cardInterval' ? 'cardIntervalDesc' : 'cardInterval'}
-              aria-label="Sort by interval"
-              aria-sort={sortOrder === 'cardInterval' ? 'ascending' : sortOrder === 'cardIntervalDesc' ? 'descending' : 'none'}
+              aria-label="Sort by interval{sortOrder === 'cardInterval' ? ', ascending' : sortOrder === 'cardIntervalDesc' ? ', descending' : ''}"
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Interval
@@ -633,8 +630,7 @@
             </button>
             <button
               onclick={() => sortOrder = sortOrder === 'cardEase' ? 'cardEaseDesc' : 'cardEase'}
-              aria-label="Sort by ease"
-              aria-sort={sortOrder === 'cardEase' ? 'ascending' : sortOrder === 'cardEaseDesc' ? 'descending' : 'none'}
+              aria-label="Sort by ease{sortOrder === 'cardEase' ? ', ascending' : sortOrder === 'cardEaseDesc' ? ', descending' : ''}"
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Ease
@@ -646,8 +642,7 @@
             </button>
             <button
               onclick={() => sortOrder = sortOrder === 'cardLapses' ? 'cardLapsesDesc' : 'cardLapses'}
-              aria-label="Sort by lapses"
-              aria-sort={sortOrder === 'cardLapses' ? 'ascending' : sortOrder === 'cardLapsesDesc' ? 'descending' : 'none'}
+              aria-label="Sort by lapses{sortOrder === 'cardLapses' ? ', ascending' : sortOrder === 'cardLapsesDesc' ? ', descending' : ''}"
               class="sticky top-0 z-10 flex items-center justify-between px-3 h-9 text-[11px] uppercase tracking-wider font-semibold border-b border-border/50 hover:text-text-primary" style="background: var(--bg-subtle); color: var(--text-muted);"
             >
               Lapses
@@ -668,16 +663,16 @@
                 role="button"
                 tabindex="0"
                 aria-label="Card: {row.front_preview}. Deck: {row.deck_name}. Due: {row.due_str}."
-                aria-selected={selectedIds.has(row.card_id)}
+                aria-pressed={selectedIds.has(row.card_id)}
                 class="group cursor-pointer"
                 style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
               >
-                <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}" onclick={(e) => e.stopPropagation()}>
+                <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedCardId === row.card_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedIds.has(row.card_id) ? 'bg-accent-soft/50' : ''}">
                   <input
                     type="checkbox"
                     class="w-4 h-4 rounded cursor-pointer accent-accent"
                     checked={selectedIds.has(row.card_id)}
-                    onclick={(e) => handleRowSelect(row.card_id, i, e)}
+                    onclick={(e) => { e.stopPropagation(); handleRowSelect(row.card_id, i, e); }}
                     aria-label="Select card"
                   />
                 </div>
@@ -751,16 +746,16 @@
               onkeydown={(e) => e.key === 'Enter' && selectNote(row.note_id, row.first_card_id)}
               role="button"
               tabindex="0"
-              aria-selected={selectedNoteIds.has(row.note_id)}
+              aria-pressed={selectedNoteIds.has(row.note_id)}
               class="group cursor-pointer"
               style="display: contents; animation: rowFadeIn 180ms ease forwards; animation-delay: {Math.min(i, 30) * 15}ms; opacity: 0;"
             >
-              <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}" onclick={(e) => e.stopPropagation()}>
+              <div class="h-11 flex items-center justify-center border-b border-border/30 transition-colors group-hover:bg-bg-subtle {selectedNoteId === row.note_id ? 'bg-accent-soft border-l-4 border-l-accent' : ''} {selectedNoteIds.has(row.note_id) ? 'bg-accent-soft/50' : ''}">
                 <input
                   type="checkbox"
                   class="w-4 h-4 rounded cursor-pointer accent-accent"
                   checked={selectedNoteIds.has(row.note_id)}
-                  onclick={(e) => handleNoteRowSelect(row.note_id, i, e)}
+                  onclick={(e) => { e.stopPropagation(); handleNoteRowSelect(row.note_id, i, e); }}
                   aria-label="Select note"
                 />
               </div>

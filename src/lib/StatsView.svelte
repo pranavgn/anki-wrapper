@@ -334,7 +334,7 @@
     } as ChartData;
   });
 
-  let cardTypesChartOptions: ChartOptions = {
+  let cardTypesChartOptions = $derived.by<ChartOptions>(() => ({
     ...baseDoughnutOptions(chartColors),
     plugins: {
       ...baseDoughnutOptions(chartColors).plugins,
@@ -359,7 +359,7 @@
         },
       },
     },
-  } as ChartOptions;
+  } as ChartOptions));
 
   // Chart: Forecast (bar)
   let forecastChartData = $derived.by(() => {
@@ -382,7 +382,7 @@
     } as ChartData;
   });
 
-  let forecastChartOptions: ChartOptions = {
+  let forecastChartOptions = $derived.by<ChartOptions>(() => ({
     ...baseBarOptions(chartColors),
     scales: {
       ...baseBarOptions(chartColors).scales,
@@ -404,7 +404,7 @@
         },
       },
     },
-  } as ChartOptions;
+  } as ChartOptions));
 
   // Chart: Daily Reviews (bar)
   let dailyReviewsChartData = $derived.by(() => {
@@ -427,7 +427,7 @@
     } as ChartData;
   });
 
-  let dailyReviewsChartOptions: ChartOptions = {
+  let dailyReviewsChartOptions = $derived.by<ChartOptions>(() => ({
     ...baseBarOptions(chartColors),
     scales: {
       ...baseBarOptions(chartColors).scales,
@@ -446,17 +446,17 @@
         callbacks: {
           title: (ctx) => {
             const idx = ctx[0].dataIndex;
-            return new Date(stats!.daily_reviews[idx].date).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'short', 
-              day: 'numeric' 
+            return new Date(stats!.daily_reviews[idx].date).toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'short',
+              day: 'numeric'
             });
           },
           label: (ctx) => `${ctx.parsed.y} reviews`,
         },
       },
     },
-  } as ChartOptions;
+  } as ChartOptions));
 
   // Chart: Hourly Breakdown (bar)
   let hourlyChartData = $derived.by(() => {
@@ -478,7 +478,7 @@
     } as ChartData;
   });
 
-  let hourlyChartOptions: ChartOptions = {
+  let hourlyChartOptions = $derived.by<ChartOptions>(() => ({
     ...baseBarOptions(chartColors),
     plugins: {
       ...baseBarOptions(chartColors).plugins,
@@ -489,7 +489,7 @@
         },
       },
     },
-  } as ChartOptions;
+  } as ChartOptions));
 </script>
 
 <div class="stats-container">
@@ -847,30 +847,6 @@
     position: relative;
     display: flex;
     align-items: center;
-  }
-
-  .filter-select {
-    padding: 10px 36px 10px 14px;
-    font-family: var(--sans);
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
-    background: transparent;
-    border: none;
-    appearance: none;
-    cursor: pointer;
-    outline: none;
-  }
-
-  .select-arrow {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    color: var(--text-secondary);
-    pointer-events: none;
   }
 
   .stats-card {

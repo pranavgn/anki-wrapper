@@ -625,30 +625,6 @@
     align-items: center;
   }
 
-  .deck-select {
-    width: 100%;
-    padding: 14px 40px 14px 16px;
-    font-family: var(--sans);
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text-primary);
-    background: transparent;
-    border: none;
-    appearance: none;
-    cursor: pointer;
-    outline: none;
-  }
-
-  .select-arrow {
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    color: var(--text-secondary);
-    pointer-events: none;
-  }
 
   .tags-container {
     padding: 12px;

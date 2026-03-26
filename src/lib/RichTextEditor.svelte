@@ -19,8 +19,8 @@
     onchange?: (html: string) => void;
   } = $props();
 
-  let editorEl: HTMLDivElement;
-  let codeMirrorEl: HTMLDivElement;
+  let editorEl: HTMLDivElement = $state();
+  let codeMirrorEl: HTMLDivElement = $state();
   let codeMirrorView: EditorView | null = null;
   
   // Mode state

@@ -18,10 +18,16 @@
 
   let {
     onStudy = (deckId: number, deckName: string) => {},
-    compact = false
+    compact = false,
+    search = '',
+    sortBy = 'name' as 'name' | 'due' | 'new' | 'total',
+    filterBy = 'all' as 'all' | 'due' | 'new',
   }: {
     onStudy?: (deckId: number, deckName: string) => void;
     compact?: boolean;
+    search?: string;
+    sortBy?: 'name' | 'due' | 'new' | 'total';
+    filterBy?: 'all' | 'due' | 'new';
   } = $props();
 
   let decks: DeckStat[] = $state([]);
@@ -164,9 +170,30 @@
     dragOverRoot = false;
   }
 
-  // Derived total due cards
-  const totalDue = $derived.by(() => {
-    return decks.reduce((sum, deck) => sum + deck.new_count + deck.learn_count + deck.review_count, 0);
+  const totalDue = $derived.by(() =>
+    decks.reduce((sum, deck) => sum + deck.new_count + deck.learn_count + deck.review_count, 0)
+  );
+
+  const filteredDecks = $derived.by(() => {
+    let result = decks.filter(d => shouldShowDeck(d));
+
+    // Search
+    const q = search.trim().toLowerCase();
+    if (q) result = result.filter(d =>
+      d.name.toLowerCase().includes(q) || d.short_name.toLowerCase().includes(q)
+    );
+
+    // Filter
+    if (filterBy === 'due')  result = result.filter(d => d.review_count > 0 || d.learn_count > 0);
+    if (filterBy === 'new')  result = result.filter(d => d.new_count > 0);
+
+    // Sort
+    const copy = [...result];
+    if (sortBy === 'name')  copy.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === 'due')   copy.sort((a, b) => (b.review_count + b.learn_count) - (a.review_count + a.learn_count));
+    if (sortBy === 'new')   copy.sort((a, b) => b.new_count - a.new_count);
+    if (sortBy === 'total') copy.sort((a, b) => b.card_count - a.card_count);
+    return copy;
   });
 
   // Load deck stats on mount
@@ -299,62 +326,97 @@
     style="{dragOverRoot ? 'outline: 2px dashed var(--text-muted); outline-offset: 8px; border-radius: 16px;' : ''}"
   >
     {#if compact}
-      <!-- Compact mode: Single-column list layout -->
+      <!-- Compact mode: Single-column list with checkboxes -->
       <div class="decks-list-compact" role="list" aria-label="Deck list">
-        {#each decks.filter(d => shouldShowDeck(d)) as deck, index (deck.id)}
+        {#each filteredDecks as deck, index (deck.id)}
           <div
             data-deck-id={deck.id}
-            class="deck-card-compact"
+            class="deck-card-compact neu-raised neu-btn"
             style="
-              background: var(--bg-card);
-              box-shadow: var(--neu-subtle);
-              border: 1px solid var(--border);
-              border-radius: 10px;
-              padding: 12px 14px;
-              cursor: pointer;
+              padding: 10px 12px;
               animation-delay: {index * 20}ms;
-              {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
+              {selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 1px;' : ''}
               {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 16}px;` : ''}
               {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
               {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
             "
             role="button"
             tabindex="0"
-            aria-label="Deck: {deck.short_name || deck.name}. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due for review."
+            aria-label="Deck: {deck.short_name || deck.name}. {deck.card_count} cards. {deck.new_count} new, {deck.learn_count} learning, {deck.review_count} due."
             draggable="true"
             ondragstart={(e) => handleDragStart(e, deck.id)}
             ondragover={(e) => handleDragOver(e, deck.id)}
             ondragleave={handleDragLeave}
             ondrop={(e) => handleDrop(e, deck.id)}
             ondragend={handleDragEnd}
-            onclick={() => {
-              if (selectMode) {
-                toggleDeckSelection(deck.id);
-              } else {
-                handleDeckClick(deck.id, deck.name);
-              }
-            }}
+            onclick={() => handleDeckClick(deck.id, deck.name)}
             onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDeckClick(deck.id, deck.name)}
           >
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
-                {deck.short_name || deck.name}
-              </span>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                {#if deck.new_count > 0}
-                  <span style="font-size: 11px; color: #3B82F6; font-family: var(--sans);">{deck.new_count}</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <!-- Always-visible checkbox -->
+              <div
+                class="deck-checkbox"
+                style="
+                  flex-shrink: 0;
+                  width: 16px; height: 16px;
+                  border-radius: 4px;
+                  background: {selectedDecks.has(deck.id) ? 'var(--accent)' : 'var(--bg-subtle)'};
+                  box-shadow: var(--neu-down);
+                  display: flex; align-items: center; justify-content: center;
+                "
+                role="checkbox"
+                aria-checked={selectedDecks.has(deck.id)}
+                aria-label="Select {deck.short_name || deck.name}"
+                tabindex="-1"
+                onclick={(e) => { e.stopPropagation(); toggleDeckSelection(deck.id); }}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); toggleDeckSelection(deck.id); } }}
+              >
+                {#if selectedDecks.has(deck.id)}
+                  <svg style="width: 10px; height: 10px; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7" />
+                  </svg>
                 {/if}
-                {#if deck.learn_count > 0}
-                  <span style="font-size: 11px; color: #EC4899; font-family: var(--sans);">{deck.learn_count}</span>
-                {/if}
-                {#if deck.review_count > 0}
-                  <span style="font-size: 11px; color: #10B981; font-family: var(--sans);">{deck.review_count}</span>
-                {/if}
+              </div>
+
+              <!-- Deck info -->
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 6px;">
+                  <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    {deck.short_name || deck.name}
+                  </span>
+                  <!-- Due badges -->
+                  <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                    {#if deck.new_count > 0}
+                      <span style="font-size: 11px; font-weight: 600; color: #3B82F6; font-family: var(--sans);">{deck.new_count}</span>
+                    {/if}
+                    {#if deck.learn_count > 0}
+                      <span style="font-size: 11px; font-weight: 600; color: #EC4899; font-family: var(--sans);">{deck.learn_count}</span>
+                    {/if}
+                    {#if deck.review_count > 0}
+                      <span style="font-size: 11px; font-weight: 600; color: #10B981; font-family: var(--sans);">{deck.review_count}</span>
+                    {/if}
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                  <span style="font-family: var(--sans); font-size: 11px; color: var(--text-muted);">
+                    {deck.card_count} {deck.card_count === 1 ? 'card' : 'cards'}
+                  </span>
+                  {#if deck.is_filtered}
+                    <span style="font-family: var(--sans); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px;">
+                      Filtered
+                    </span>
+                  {/if}
+                </div>
               </div>
             </div>
           </div>
         {/each}
 
+        {#if filteredDecks.length === 0}
+          <p style="font-family: var(--sans); font-size: 13px; color: var(--text-muted); text-align: center; padding: 24px 0;">
+            {decks.length === 0 ? 'No decks yet' : 'No decks match'}
+          </p>
+        {/if}
       </div>
     {:else}
       <!-- Non-compact mode: Grid layout (original) -->
@@ -365,7 +427,6 @@
             class="deck-card bg-bg-card rounded-2xl p-6 cursor-pointer relative"
             style="
               box-shadow: var(--neu-subtle);
-              border: 1px solid var(--border);
               animation-delay: {index * 30}ms;
               {selectionMode && selectedDecks.has(deck.id) ? 'outline: 2px solid var(--accent); outline-offset: 2px;' : ''}
               {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
@@ -516,7 +577,6 @@
       style="
         background: var(--bg-card);
         box-shadow: 0 8px 32px rgba(0,0,0,0.15), var(--neu-up);
-        border: 1px solid var(--border);
         animation: slideUp 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
       "
     >
@@ -577,14 +637,11 @@
 
   .deck-card-compact {
     opacity: 0;
+    border-radius: var(--radius-md);
     animation: deckFadeIn 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
 
-  .deck-card-compact:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--neu-up);
-  }
 
   @keyframes deckFadeIn {
     from {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, onMount } from 'svelte';
 
   type Option<T> = {
     value: T;
@@ -26,6 +26,17 @@
   let triggerEl: HTMLButtonElement;
   let listEl: HTMLUListElement | null = $state(null);
   let focusedIndex = $state(-1);
+  let containerEl: HTMLDivElement;
+
+  onMount(() => {
+    function handleDocClick(e: MouseEvent) {
+      if (isOpen && !containerEl?.contains(e.target as Node)) {
+        isOpen = false;
+      }
+    }
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  });
 
   const sizeClasses: Record<string, string> = {
     sm: 'px-3 py-1.5 text-sm',
@@ -106,7 +117,7 @@
   );
 </script>
 
-<div class="neu-select-container" class:is-disabled={disabled}>
+<div class="neu-select-container" class:is-disabled={disabled} bind:this={containerEl}>
   <button
     bind:this={triggerEl}
     type="button"
@@ -169,7 +180,6 @@
     width: 100%;
     background: var(--bg-card);
     box-shadow: var(--neu-down);
-    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-family: var(--sans);
@@ -221,7 +231,6 @@
     padding: 0.25rem 0;
     background: var(--bg-card);
     box-shadow: var(--neu-up);
-    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     list-style: none;
     max-height: 15rem;

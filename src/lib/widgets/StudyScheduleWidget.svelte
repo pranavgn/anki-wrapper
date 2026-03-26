@@ -664,7 +664,6 @@
     font-family: var(--sans);
     color: var(--accent);
     background: var(--bg-card);
-    border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.1s;

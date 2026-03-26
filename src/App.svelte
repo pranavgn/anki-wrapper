@@ -24,6 +24,7 @@
   import { loadCustomTheme } from "./lib/customTheme";
   import { initMathJax } from "./lib/mathjax";
   import { loader } from "./lib/loadingTracker.svelte";
+  import { seedTestData } from "./lib/seedData";
 
   // Lazy-loaded components — only fetched when first needed
   const LazyStatsView     = () => import("./lib/StatsView.svelte");
@@ -224,19 +225,17 @@
     ]);
     console.log(`[Loader] Registered steps. Initial progress: ${loader.progress}%`);
 
-    // ── Step 1: Preferences ──
+    // ── Steps 1 & 2: Preferences + MathJax (parallel) ──
     loader.start('Preferences');
-    console.log(`[Loader] Starting Preferences. Progress: ${loader.progress}%`);
-    try { await prefs.load(); } catch(e) { console.error('Prefs error:', e); }
-    loader.finish('Preferences');
-    console.log(`[Loader] Finished Preferences. Progress: ${loader.progress}%`);
-
-    // ── Step 2: MathJax ──
     loader.start('MathJax');
-    console.log(`[Loader] Starting MathJax. Progress: ${loader.progress}%`);
-    try { await initMathJax(); } catch(e) { console.error('MathJax error:', e); }
+    console.log(`[Loader] Starting Preferences + MathJax. Progress: ${loader.progress}%`);
+    await Promise.all([
+      prefs.load().catch(e => console.error('Prefs error:', e)),
+      initMathJax().catch(e => console.error('MathJax error:', e)),
+    ]);
+    loader.finish('Preferences');
     loader.finish('MathJax');
-    console.log(`[Loader] Finished MathJax. Progress: ${loader.progress}%`);
+    console.log(`[Loader] Finished Preferences + MathJax. Progress: ${loader.progress}%`);
 
     // ── Step 3: Collection (critical path) ──
     loader.start('Collection');
@@ -258,6 +257,7 @@
     // ── Step 4: Plugins (deferred, non-blocking) ──
     if (collectionStatus === 'ready') {
       getDeckStats();
+      seedTestData().catch(() => {});
 
       // Use requestIdleCallback to load plugins without blocking the UI
       const loadPlugins = async () => {
@@ -689,7 +689,7 @@
     <!-- Loading State -->
     {#if collectionStatus === 'loading'}
       <div class="flex-1 flex items-center justify-center">
-        <div class="w-48 flex flex-col items-center gap-3">
+        <div class="w-56 flex flex-col items-center gap-3">
           <div
             class="w-full h-1 rounded-full overflow-hidden"
             style="background: var(--bg-subtle);"
@@ -713,6 +713,20 @@
           >
             {loader.progress}%
           </span>
+          {#if loader.currentStep}
+            <span
+              style="font-family: var(--sans); font-size: 11px; color: var(--text-secondary); letter-spacing: 0.02em;"
+            >
+              Loading {loader.currentStep}…
+            </span>
+          {/if}
+          {#if loader.error}
+            <span
+              style="font-family: var(--sans); font-size: 11px; color: var(--danger, #e53e3e); letter-spacing: 0.02em; text-align: center;"
+            >
+              {loader.error}
+            </span>
+          {/if}
         </div>
       </div>
     {:else}
@@ -724,7 +738,7 @@
           <div
             in:fly={fly_if_enabled({ x: -20, duration: 150 })}
           >
-            <Dashboard onStudy={openDeckOverview} />
+            <Dashboard onStudy={openDeckOverview} onImport={() => showImportModal = true} />
           </div>
           {:else if currentPage === 'deckOverview' && activeDeck}
             <div

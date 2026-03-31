@@ -21,9 +21,9 @@
     if (widget.gridHeight) return widget.gridHeight;
     // Default heights per widget type
     switch (widget.type) {
-      case 'schedule': return 2;  // Study Schedule is taller (calendar + sessions)
+      case 'calendar': return 3;
+      case 'schedule': return 3;
       case 'stats': return 1;
-      case 'upcoming': return 1;
       default: return 1;         // Plugin widgets default to 1 unit
     }
   }
@@ -35,7 +35,7 @@
       class="widget-cell"
       style="--grid-units: {getGridHeight(widget)};"
     >
-      <div class="widget-card neu-raised" style="background: var(--bg-card); border-radius: var(--radius-md); overflow: hidden;">
+      <div class="widget-card neu-raised" style="background: var(--bg-card); border-radius: var(--radius-md); overflow: visible;">
         <div class="widget-header">
           <h3 style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">{widget.title}</h3>
         </div>
@@ -59,6 +59,7 @@
     height: calc(var(--grid-units) * 180px);
     min-height: calc(var(--grid-units) * 180px);
     max-height: calc(var(--grid-units) * 180px);
+    overflow: visible;
   }
 
   .widget-card {
@@ -66,6 +67,8 @@
     display: flex;
     flex-direction: column;
     padding: 16px 20px;
+    border: 1px solid var(--border);
+    overflow: visible;
   }
 
   .widget-header {

@@ -57,7 +57,7 @@ class PreferencesState {
   
   notifications_enabled = $state(false);
   
-  widget_order = $state<string[]>(['decks', 'schedule', 'upcoming', 'stats']);
+  widget_order = $state<string[]>(['decks', 'schedule', 'stats']);
   
   // Custom theme indicators (read-only, derived from disk)
   custom_theme_css = $state(false);

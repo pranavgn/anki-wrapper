@@ -1,113 +1,75 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { loadSessions, upcomingSessions, type StudySession } from "../studySchedule";
-  import { addToast } from "../toast";
+  import { scheduleStore } from "../scheduleStore.svelte";
+  import {
+    SESSION_TYPE_THEMES,
+    formatTime12h,
+    formatDateLabel,
+    formatDuration,
+    type SessionType,
+  } from "../types/scheduler";
+  import FloatingScheduler from "./FloatingScheduler.svelte";
 
-  let sessions: StudySession[] = $state([]);
-  let isLoading = $state(true);
+  let schedulerOpen = $state(false);
 
-  onMount(async () => {
-    await loadSessionsData();
+  onMount(() => { scheduleStore.init(); });
+
+  /** Group upcoming sessions by date */
+  let grouped = $derived.by(() => {
+    const map = new Map<string, typeof scheduleStore.upcoming>();
+    for (const s of scheduleStore.upcoming) {
+      const arr = map.get(s.date) || [];
+      arr.push(s);
+      map.set(s.date, arr);
+    }
+    return Array.from(map.entries());
   });
 
-  async function loadSessionsData() {
-    isLoading = true;
-    try {
-      sessions = await loadSessions();
-    } catch (error) {
-      console.error("Error loading sessions:", error);
-      addToast("Failed to load study sessions", "error");
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  let upcoming = $derived.by(() => {
-    return upcomingSessions(sessions).slice(0, 3);
-  });
-
-  function formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (dateStr === today.toISOString().split('T')[0]) {
-      return 'Today';
-    } else if (dateStr === tomorrow.toISOString().split('T')[0]) {
-      return 'Tomorrow';
-    } else {
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    }
-  }
-
-  function formatTime(timeStr: string): string {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
-  }
-
-  async function handleStartSession(session: StudySession) {
-    // This would need to be connected to the actual study flow
-    addToast(`Starting session: ${session.deck_name || 'All Decks'}`, "info");
+  function getTypeTheme(session: { session_type?: string | null }) {
+    const t = (session.session_type as SessionType) || 'review';
+    return SESSION_TYPE_THEMES[t];
   }
 </script>
 
-<div class="upcoming-sessions-widget" style="height: 100%; display: flex; flex-direction: column;">
-  {#if isLoading}
-    <div class="flex items-center justify-center" style="flex: 1;">
-      <div class="loading-spinner"></div>
+<div class="upcoming-widget">
+  <div class="upcoming-header">
+    <div class="upcoming-schedule-wrapper">
+      <button class="upcoming-schedule-btn" onclick={() => schedulerOpen = true}>
+        + Schedule
+      </button>
+      <FloatingScheduler
+        bind:open={schedulerOpen}
+        onclose={() => schedulerOpen = false}
+      />
     </div>
-  {:else if upcoming.length === 0}
-    <div class="flex flex-col items-center justify-center" style="flex: 1;">
-      <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-      <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">No upcoming sessions</p>
-      <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin-top: 4px;">Schedule a study session to get started</p>
+  </div>
+
+  {#if scheduleStore.loading}
+    <div class="upcoming-empty">
+      <div class="upcoming-spinner"></div>
+    </div>
+  {:else if grouped.length === 0}
+    <div class="upcoming-empty">
+      <p class="upcoming-empty-text">No upcoming sessions</p>
     </div>
   {:else}
-    <div class="sessions-list">
-      {#each upcoming as session (session.id)}
-        <div class="session-item p-3 rounded-xl" style="background: var(--bg-subtle);">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full" style="background: var(--accent);"></div>
-              <span style="font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-primary);">
-                {formatDate(session.date)}
+    <div class="upcoming-list">
+      {#each grouped as [date, sessions]}
+        <div class="upcoming-date-group">
+          <div class="upcoming-date-label">{formatDateLabel(date)}</div>
+          {#each sessions as session (session.id)}
+            {@const theme = getTypeTheme(session)}
+            <div class="session-row">
+              <div class="session-accent" style="background: {theme.text}"></div>
+              <div class="session-info">
+                <span class="session-deck">{session.deck_name || 'All decks'}</span>
+                <span class="session-meta">{formatTime12h(session.time)} · {formatDuration(session.duration_mins)}</span>
+              </div>
+              <span class="session-badge" style="background: {theme.bg}; color: {theme.text};">
+                {theme.label}
               </span>
             </div>
-            <span style="font-family: var(--sans); font-size: 12px; color: var(--text-secondary);">
-              {formatTime(session.time)}
-            </span>
-          </div>
-          
-          <div class="flex items-center justify-between">
-            <div>
-              <p style="font-family: var(--sans); font-size: 14px; color: var(--text-primary); font-weight: 500;">
-                {session.deck_name || 'All Decks'}
-              </p>
-              {#if session.card_goal}
-                <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted);">
-                  Goal: {session.card_goal} cards
-                </p>
-              {/if}
-              {#if session.note}
-                <p style="font-family: var(--sans); font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                  {session.note}
-                </p>
-              {/if}
-            </div>
-            
-            <button
-              onclick={() => handleStartSession(session)}
-              class="neu-btn px-3 py-1.5 rounded-lg cursor-pointer"
-              style="background: var(--accent); color: white; font-family: var(--sans); font-size: 12px; font-weight: 500; border: none;"
-            >
-              Start
-            </button>
-          </div>
+          {/each}
         </div>
       {/each}
     </div>
@@ -115,32 +77,50 @@
 </div>
 
 <style>
-  .upcoming-sessions-widget {
+  .upcoming-widget {
+    display: flex;
+    flex-direction: column;
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    gap: 8px;
   }
 
-  .sessions-list {
+  .upcoming-header {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .upcoming-schedule-wrapper {
+    position: relative;
+  }
+
+  .upcoming-schedule-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--sans);
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    box-shadow: 3px 3px 8px rgba(196,113,79,0.2), -2px -2px 6px rgba(255,255,255,0.1);
+  }
+  .upcoming-schedule-btn:hover { opacity: 0.92; }
+
+  .upcoming-empty {
     flex: 1;
-    min-height: 0;
-    overflow-y: auto;
     display: flex;
-    flex-direction: column;
-    gap: 12px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    align-items: center;
+    justify-content: center;
   }
 
-  .sessions-list::-webkit-scrollbar {
-    width: 3px;
-  }
-  .sessions-list::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 2px;
+  .upcoming-empty-text {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
   }
 
-  .loading-spinner {
+  .upcoming-spinner {
     width: 24px;
     height: 24px;
     border: 2px solid var(--bg-subtle);
@@ -153,11 +133,91 @@
     to { transform: rotate(360deg); }
   }
 
-  .session-item {
-    transition: background 0.2s ease;
+  .upcoming-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
 
-  .session-item:hover {
-    background: var(--bg-card);
+  .upcoming-list::-webkit-scrollbar {
+    width: 3px;
+  }
+  .upcoming-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .upcoming-date-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .upcoming-date-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 0;
+  }
+
+  .session-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: var(--radius-sm);
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+  .session-row:hover {
+    background: var(--bg-subtle);
+  }
+
+  .session-accent {
+    width: 3px;
+    height: 24px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .session-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .session-deck {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session-meta {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .session-badge {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
   }
 </style>

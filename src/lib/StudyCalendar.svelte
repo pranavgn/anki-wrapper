@@ -352,6 +352,10 @@
     line-height: 1;
   }
 
+  .cal-nav:hover {
+    background: var(--bg-subtle);
+  }
+
   .cal-title {
     font-size: 13px;
     font-weight: 600;
@@ -363,11 +367,14 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 1px;
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 4px;
   }
 
   .cal-day-label {
-    font-size: 9px;
-    color: var(--text-muted);
+    font-size: 10px;
+    color: var(--text-secondary);
     text-align: center;
     padding: 2px 0;
     font-family: var(--sans);
@@ -400,8 +407,9 @@
   .cal-day-num {
     font-size: 11px;
     font-weight: 400;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
   .cal-has-reviews .cal-day-num {
@@ -431,8 +439,8 @@
   }
 
   .cal-dot {
-    width: 3px;
-    height: 3px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
   }
 
@@ -571,7 +579,7 @@
 
   .cal-session-label {
     font-size: 10px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-family: var(--sans);
   }
 
@@ -639,6 +647,11 @@
     font-family: var(--sans);
   }
 
+  .cal-form-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+
   .cal-form-actions {
     display: flex;
     justify-content: flex-end;
@@ -671,7 +684,7 @@
 
   .cal-empty-msg {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     text-align: center;
     padding: 8px 0;
     margin: 0;

@@ -214,6 +214,16 @@
     try {
       const result = await invoke<DeckStat[]>("get_all_decks");
       decks = result;
+      if (import.meta.env.DEV && decks.length === 0) {
+        decks = [
+          { id: 1, name: 'Japanese Core 2000',              short_name: 'Japanese Core 2000',  level: 1, new_count: 25, learn_count:  8, review_count: 42, card_count: 2000, is_filtered: false },
+          { id: 2, name: 'Spanish Vocab',                   short_name: 'Spanish Vocab',        level: 1, new_count: 15, learn_count:  3, review_count: 28, card_count:  500, is_filtered: false },
+          { id: 3, name: 'Medical Terminology',             short_name: 'Medical Terminology',  level: 1, new_count: 50, learn_count: 12, review_count:  0, card_count:  800, is_filtered: false },
+          { id: 4, name: 'CS Fundamentals::Data Structures',short_name: 'Data Structures',      level: 2, new_count: 10, learn_count:  5, review_count: 15, card_count:  200, is_filtered: false },
+          { id: 5, name: 'CS Fundamentals::Algorithms',     short_name: 'Algorithms',           level: 2, new_count:  8, learn_count:  0, review_count: 22, card_count:  150, is_filtered: false },
+        ];
+        console.log('[DEV] Seeded mock deck data for UI testing');
+      }
       lastDeckStatsTime = Date.now();
     } catch (error) {
       console.error("Error loading deck stats:", error);
@@ -385,15 +395,15 @@
                     {deck.short_name || deck.name}
                   </span>
                   <!-- Due badges -->
-                  <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                  <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
                     {#if deck.new_count > 0}
-                      <span style="font-size: 11px; font-weight: 600; color: #3B82F6; font-family: var(--sans);">{deck.new_count}</span>
+                      <span style="font-size: 11px; font-weight: 600; font-family: var(--sans); color: #60A5FA; background: rgba(59,130,246,0.15); padding: 1px 6px; border-radius: 6px;">{deck.new_count}</span>
                     {/if}
                     {#if deck.learn_count > 0}
-                      <span style="font-size: 11px; font-weight: 600; color: #EC4899; font-family: var(--sans);">{deck.learn_count}</span>
+                      <span style="font-size: 11px; font-weight: 600; font-family: var(--sans); color: #F472B6; background: rgba(236,72,153,0.15); padding: 1px 6px; border-radius: 6px;">{deck.learn_count}</span>
                     {/if}
                     {#if deck.review_count > 0}
-                      <span style="font-size: 11px; font-weight: 600; color: #10B981; font-family: var(--sans);">{deck.review_count}</span>
+                      <span style="font-size: 11px; font-weight: 600; font-family: var(--sans); color: #34D399; background: rgba(16,185,129,0.15); padding: 1px 6px; border-radius: 6px;">{deck.review_count}</span>
                     {/if}
                   </div>
                 </div>
@@ -518,24 +528,15 @@
             </div>
 
             <!-- Stats row -->
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
               {#if deck.new_count > 0}
-                <div class="flex items-center gap-1.5">
-                  <div class="w-[7px] h-[7px] rounded-full" style="background: #3B82F6;"></div>
-                  <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.new_count} new</span>
-                </div>
+                <span style="font-size: 12px; font-weight: 600; font-family: var(--sans); color: #60A5FA; background: rgba(59,130,246,0.15); padding: 2px 8px; border-radius: 6px;">{deck.new_count} new</span>
               {/if}
               {#if deck.learn_count > 0}
-                <div class="flex items-center gap-1.5">
-                  <div class="w-[7px] h-[7px] rounded-full" style="background: #EC4899;"></div>
-                  <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.learn_count} due</span>
-                </div>
+                <span style="font-size: 12px; font-weight: 600; font-family: var(--sans); color: #F472B6; background: rgba(236,72,153,0.15); padding: 2px 8px; border-radius: 6px;">{deck.learn_count} learn</span>
               {/if}
               {#if deck.review_count > 0}
-                <div class="flex items-center gap-1.5">
-                  <div class="w-[7px] h-[7px] rounded-full" style="background: #10B981;"></div>
-                  <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">{deck.review_count} due</span>
-                </div>
+                <span style="font-size: 12px; font-weight: 600; font-family: var(--sans); color: #34D399; background: rgba(16,185,129,0.15); padding: 2px 8px; border-radius: 6px;">{deck.review_count} due</span>
               {/if}
             </div>
           </div>
@@ -632,7 +633,7 @@
   .decks-list-compact {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
 
   .deck-card-compact {

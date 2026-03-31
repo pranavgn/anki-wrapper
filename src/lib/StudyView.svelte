@@ -298,15 +298,22 @@
   // Sync study state → global nav store
   $effect(() => {
     if (!studyNav.active) return;
-    studyNav.remainingCards = remainingCards;
-    studyNav.reviewedCount = reviewedCount;
-    studyNav.currentFlag = currentFlag;
-    studyNav.canUndo = canUndo;
+    // Read local state into locals first to isolate tracking
+    const rc = remainingCards;
+    const rev = reviewedCount;
+    const cf = currentFlag;
+    const cu = canUndo;
+    // Write to external store (untracked writes)
+    studyNav.remainingCards = rc;
+    studyNav.reviewedCount = rev;
+    studyNav.currentFlag = cf;
+    studyNav.canUndo = cu;
   });
 
   $effect(() => {
     if (!studyNav.active) return;
-    studyNav.progress = progressPercent;
+    const p = progressPercent;
+    studyNav.progress = p;
   });
 
   // Flag colors

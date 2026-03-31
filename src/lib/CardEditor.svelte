@@ -556,7 +556,7 @@
 
 <style>
   .card-editor-container {
-    max-width: 620px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 44px 24px;
   }

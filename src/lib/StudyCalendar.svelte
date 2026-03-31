@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from "svelte";
   import { addToast } from "./toast";
   import NeuSelect from "./ui/NeuSelect.svelte";
   import {
@@ -60,10 +61,12 @@
   let sessionDates = $derived(new Set(sessions.map((s) => s.date)));
 
   // Load sessions on mount
-  $effect(() => {
-    loadSessions()
-      .then((s) => (sessions = s))
-      .catch((e) => console.error("Failed to load sessions:", e));
+  onMount(async () => {
+    try {
+      sessions = await loadSessions();
+    } catch (e) {
+      console.error("Failed to load sessions:", e);
+    }
   });
 
   function changeMonth(dir: number) {

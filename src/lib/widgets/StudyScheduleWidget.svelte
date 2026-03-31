@@ -64,15 +64,15 @@
     selectedDate ? sessions.filter(s => s.date === selectedDate) : []
   );
 
-  // Load sessions on mount
-  $effect(() => {
-    loadSessions()
-      .then((s) => (sessions = s))
-      .catch((e) => console.error("Failed to load sessions:", e));
-  });
+  // Load sessions on mount (handled in onMount below)
 
   import { onMount } from "svelte";
   onMount(async () => {
+    try {
+      sessions = await loadSessions();
+    } catch (e) {
+      console.error("Failed to load sessions:", e);
+    }
     try {
       const result = await invoke<Array<{id: number; name: string; short_name: string; level: number; new_count: number; learn_count: number; review_count: number; card_count: number; is_filtered: boolean}>>("get_all_decks");
       decks = result.map(d => ({ id: d.id, name: d.name }));

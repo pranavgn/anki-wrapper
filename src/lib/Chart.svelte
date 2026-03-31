@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import type { ChartType, ChartData, ChartOptions } from "chart.js";
 
   interface Props {
@@ -70,13 +70,18 @@
   });
 
   $effect(() => {
-    if (chart && data) {
-      chart.data = cloneData(data);
-      if (options) {
-        chart.options = prepareOptions(options);
+    // Only track data and options as dependencies, not chart
+    const d = data;
+    const o = options;
+    untrack(() => {
+      if (chart && d) {
+        chart.data = cloneData(d);
+        if (o) {
+          chart.options = prepareOptions(o);
+        }
+        chart.update();
       }
-      chart.update();
-    }
+    });
   });
 </script>
 

@@ -36,7 +36,15 @@
   let formNotify = $state(true);
   let isSaving = $state(false);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  // FIX: Use local date string, not UTC (toISOString uses UTC which can be wrong timezone)
+  function getLocalDateStr(d: Date = new Date()): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const todayStr = getLocalDateStr();
   const monthTitle = $derived(
     new Date(calYear, calMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })
   );

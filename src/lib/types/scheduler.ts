@@ -43,7 +43,8 @@ export function closedPopup<T>(): FloatingPopupState<T> {
 
 /** Helper to create default scheduler data */
 export function defaultSchedulerData(dateStr?: string): SchedulerPopupData {
-  const today = new Date().toISOString().split('T')[0];
+  // FIX: Use local date string, not UTC
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local time
   return {
     date: dateStr || today,
     time: '09:00',
@@ -80,10 +81,11 @@ export function formatDuration(mins: number): string {
 
 /** Format date to relative or short label */
 export function formatDateLabel(dateStr: string): string {
-  const today = new Date().toISOString().split('T')[0];
+  // FIX: Use local date string, not UTC
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local time
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const tomorrowStr = tomorrow.toLocaleDateString('en-CA');
 
   if (dateStr === today) return 'Today';
   if (dateStr === tomorrowStr) return 'Tomorrow';

@@ -79,7 +79,7 @@
   .widget-body {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: visible;
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
   }

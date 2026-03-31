@@ -56,14 +56,17 @@
   let importResult: ImportLog | null = $state(null);
   let showColpkgWarning = $state(false);
 
-  // Text import options
+  // Text import options (snake_case to match Rust struct)
   let selectedDeckId = $state(1);
   let notetypeName = $state("Basic");
   let delimiter = $state<"tab" | "comma" | "semicolon">("comma");
   let htmlEnabled = $state(false);
   let duplicatePolicy = $state<"update" | "preserve" | "ignore">("ignore");
+  let importMode = $state<"csv" | "cloze">("csv");
+  let clozeTags = $state("");
+  let autoCloze = $state(true);
 
-  // Available decks for text import
+  // Available decks for imports
   let availableDecks: DeckStat[] = $state([]);
 
   // Reset when modal opens
@@ -85,6 +88,7 @@
       availableDecks = result;
       if (availableDecks.length > 0) {
         selectedDeckId = availableDecks[0].id;
+        clozeDeckId = availableDecks[0].id;
       }
     } catch (e) {
       console.error("Failed to load decks:", e);
@@ -160,14 +164,33 @@
     isLoading = true;
     errorMessage = "";
     try {
-      const options: TextImportOptions = {
-        deckId: selectedDeckId,
-        notetypeName: notetypeName,
-        delimiter: delimiter === "tab" ? "\t" : delimiter === "comma" ? "," : ";",
-        htmlEnabled: htmlEnabled,
-        duplicatePolicy: duplicatePolicy,
-      };
-      importResult = await pickAndImportText(options);
+      if (importMode === "csv") {
+        // Use snake_case keys to match the Rust TextImportOptions struct
+        const options: TextImportOptions = {
+          deck_id: selectedDeckId,
+          notetype_name: notetypeName,
+          delimiter: delimiter === "tab" ? "\t" : delimiter === "comma" ? "," : ";",
+          html_enabled: htmlEnabled,
+          duplicate_policy: duplicatePolicy,
+        };
+        importResult = await pickAndImportText(options);
+      } else {
+        // Cloze mode - use the same pickAndImportText function
+        // The Rust backend will handle cloze detection based on file content
+        const tags = clozeTags
+          .split(/[,\s]+/)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+
+        const options: TextImportOptions = {
+          deck_id: selectedDeckId,
+          notetype_name: "Cloze", // Force cloze notetype
+          delimiter: "\n", // Line-based for cloze text
+          html_enabled: false,
+          duplicate_policy: "ignore",
+        };
+        importResult = await pickAndImportText(options);
+      }
       currentStep = "result";
     } catch (e) {
       if (e instanceof ImportError && e.isCancelled) {
@@ -229,6 +252,16 @@
 
       <button
         class="format-card neu-raised neu-btn"
+        onclick={() => selectFormat("text")}
+      >
+        <div class="format-info">
+          <div class="format-name">Text / CSV (.csv, .tsv, .txt, .md)</div>
+          <div class="format-description">Import CSV, TSV, or text files as flashcards</div>
+        </div>
+      </button>
+
+      <button
+        class="format-card neu-raised neu-btn"
         onclick={() => selectFormat("colpkg")}
       >
         <div class="format-header">
@@ -237,16 +270,6 @@
             <div class="format-description">Replace your entire collection from a backup</div>
           </div>
           <span class="format-badge badge-destructive">Destructive</span>
-        </div>
-      </button>
-
-      <button
-        class="format-card neu-raised neu-btn"
-        onclick={() => selectFormat("text")}
-      >
-        <div class="format-info">
-          <div class="format-name">Text / CSV (.txt, .csv)</div>
-          <div class="format-description">Tab or comma-separated flashcard data</div>
         </div>
       </button>
     </div>
@@ -299,7 +322,8 @@
       {:else}
         <div class="warning-box">
           <p class="warning-text">
-            This will replace your entire local collection with the contents of the .colpkg file. This cannot be undone.
+            This will replace your entire local collection with the contents of the .colpkg file.
+            This cannot be undone.
           </p>
         </div>
         <div class="warning-actions">
@@ -325,7 +349,7 @@
     </div>
   {/if}
 
-  <!-- Step 2c: Text/CSV Import -->
+  <!-- Step 2c: Text Import (CSV/TSV/Cloze) -->
   {#if currentStep === "text"}
     <div class="text-import-form">
        <div class="form-group">
@@ -340,57 +364,107 @@
        </div>
 
        <div class="form-group">
-         <label for="import-notetype" class="form-label">Note Type</label>
-         <input
-           id="import-notetype"
-           type="text"
-           class="form-input neu-pressed"
-           bind:value={notetypeName}
-           placeholder="Basic"
-         />
-       </div>
-
-       <div class="form-group">
-         <label for="delimiter-group" class="form-label">Delimiter</label>
-         <div class="button-group" role="radiogroup" id="delimiter-group" aria-label="Delimiter">
-           {#each ["tab", "comma", "semicolon"] as d}
-             <button
-               role="radio"
-               aria-checked={delimiter === d}
-               class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
-               onclick={() => (delimiter = d as typeof delimiter)}
-             >
-               {getDelimiterLabel(d)}
-             </button>
-           {/each}
+         <label for="import-mode-group" class="form-label">Import Mode</label>
+         <div class="button-group" role="radiogroup" id="import-mode-group" aria-label="Import Mode">
+           <button
+             role="radio"
+             aria-checked={importMode === "csv"}
+             class="group-btn {importMode === 'csv' ? 'active' : 'neu-subtle'}"
+             onclick={() => (importMode = "csv")}
+           >
+             CSV / TSV
+           </button>
+           <button
+             role="radio"
+             aria-checked={importMode === "cloze"}
+             class="group-btn {importMode === 'cloze' ? 'active' : 'neu-subtle'}"
+             onclick={() => (importMode = "cloze")}
+           >
+             Cloze Text
+           </button>
          </div>
        </div>
 
-      <div class="form-row">
-        <label class="form-label">Allow HTML in fields</label>
-        <button
-          class="toggle-switch {htmlEnabled ? 'active' : ''}"
-          onclick={() => (htmlEnabled = !htmlEnabled)}
-          role="switch"
-          aria-checked={htmlEnabled}
-        >
-          <span class="toggle-knob"></span>
-        </button>
-      </div>
+       {#if importMode === "csv"}
+         <div class="form-group">
+           <label for="import-notetype" class="form-label">Note Type</label>
+           <input
+             id="import-notetype"
+             type="text"
+             class="form-input neu-pressed"
+             bind:value={notetypeName}
+             placeholder="Basic"
+           />
+         </div>
 
-      <div class="form-group">
-        <label class="form-label">Duplicate Handling</label>
-        <div class="button-group">
-          {#each ["update", "preserve", "ignore"] as policy}
-            <button
-              class="group-btn {duplicatePolicy === policy ? 'active' : 'neu-subtle'}"
-              onclick={() => (duplicatePolicy = policy as typeof duplicatePolicy)}
-            >
-              {policy.charAt(0).toUpperCase() + policy.slice(1)}
-            </button>
-          {/each}
+         <div class="form-group">
+           <label for="delimiter-group" class="form-label">Delimiter</label>
+           <div class="button-group" role="radiogroup" id="delimiter-group" aria-label="Delimiter">
+             {#each ["tab", "comma", "semicolon"] as d}
+               <button
+                 role="radio"
+                 aria-checked={delimiter === d}
+                 class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
+                 onclick={() => (delimiter = d as typeof delimiter)}
+               >
+                 {getDelimiterLabel(d)}
+               </button>
+             {/each}
+           </div>
+         </div>
+
+        <div class="form-row">
+          <label class="form-label">Allow HTML in fields</label>
+          <button
+            class="toggle-switch {htmlEnabled ? 'active' : ''}"
+            onclick={() => (htmlEnabled = !htmlEnabled)}
+            role="switch"
+            aria-checked={htmlEnabled}
+          >
+            <span class="toggle-knob"></span>
+          </button>
         </div>
-      </div>
+
+        <div class="form-group">
+          <label class="form-label">Duplicate Handling</label>
+          <div class="button-group">
+            {#each ["update", "preserve", "ignore"] as policy}
+              <button
+                class="group-btn {duplicatePolicy === policy ? 'active' : 'neu-subtle'}"
+                onclick={() => (duplicatePolicy = policy as typeof duplicatePolicy)}
+              >
+                {policy.charAt(0).toUpperCase() + policy.slice(1)}
+              </button>
+            {/each}
+          </div>
+        </div>
+       {:else}
+         <div class="form-group">
+           <label for="cloze-tags" class="form-label">Tags (comma-separated)</label>
+           <input
+             id="cloze-tags"
+             type="text"
+             class="form-input neu-pressed"
+             bind:value={clozeTags}
+             placeholder="e.g. culture, exam-prep"
+           />
+         </div>
+
+         <div class="form-row">
+           <div>
+             <label class="form-label">Auto-generate cloze deletions</label>
+             <p class="form-hint">Wraps key terms in {{c1::…}} for lines without existing cloze syntax</p>
+           </div>
+           <button
+             class="toggle-switch {autoCloze ? 'active' : ''}"
+             onclick={() => (autoCloze = !autoCloze)}
+             role="switch"
+             aria-checked={autoCloze}
+           >
+             <span class="toggle-knob"></span>
+           </button>
+         </div>
+       {/if}
 
       <button
         class="import-btn"
@@ -398,6 +472,69 @@
         disabled={isLoading}
       >
         {isLoading ? "Importing..." : "Choose File"}
+      </button>
+
+      {#if errorMessage}
+        <p class="error-message">{errorMessage}</p>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Step 2d: Cloze Text/Markdown Import -->
+  {#if currentStep === "cloze"}
+    <div class="text-import-form">
+      <p class="cloze-intro">
+        Import a text or markdown file as cloze deletion cards. Each paragraph or line becomes
+        a separate card. Markdown headers and formatting are stripped automatically.
+      </p>
+
+      <div class="form-group">
+        <label for="cloze-deck-select" class="form-label">Deck</label>
+        <NeuSelect
+          id="cloze-deck-select"
+          options={availableDecks.map(d => ({ value: d.id, label: d.name }))}
+          bind:value={clozeDeckId}
+          size="sm"
+          searchable={true}
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="cloze-tags" class="form-label">Tags (comma-separated)</label>
+        <input
+          id="cloze-tags"
+          type="text"
+          class="form-input neu-pressed"
+          bind:value={clozeTags}
+          placeholder="e.g. culture, exam-prep"
+        />
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Auto-generate cloze deletions</label>
+          <p class="form-hint">Wraps key terms in {'{{c1::…}}'} for lines without existing cloze syntax</p>
+        </div>
+        <button
+          class="toggle-switch {autoCloze ? 'active' : ''}"
+          onclick={() => (autoCloze = !autoCloze)}
+          role="switch"
+          aria-checked={autoCloze}
+        >
+          <span class="toggle-knob"></span>
+        </button>
+      </div>
+
+      <button
+        class="import-btn"
+        onclick={handleClozeImport}
+        disabled={isLoading}
+      >
+        {#if isLoading}
+          Importing...
+        {:else}
+          Choose File (.txt, .md, .csv)
+        {/if}
       </button>
 
       {#if errorMessage}
@@ -430,15 +567,14 @@
         <div class="stat-item">
           <div class="stat-label">Decks Added</div>
           <div class="stat-value">
-            {importResult.decks_added.length > 0 ? importResult.decks_added.join(", ") : "None"}
+            {importResult.decks_added.length > 0
+              ? importResult.decks_added.join(", ")
+              : "—"}
           </div>
         </div>
       </div>
 
-      <button
-        class="done-btn"
-        onclick={handleDone}
-      >
+      <button class="done-btn" onclick={handleDone}>
         Done
       </button>
     </div>
@@ -449,16 +585,15 @@
   .back-button {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-bottom: 16px;
-    font-family: var(--sans);
-    font-size: 13px;
-    color: var(--text-secondary);
+    gap: 6px;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0;
-    transition: color 0.15s ease;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 4px 0;
+    margin-bottom: 12px;
   }
 
   .back-button:hover {
@@ -473,41 +608,36 @@
   .format-grid {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
   .format-card {
-    display: block;
     width: 100%;
     padding: 16px 20px;
     text-align: left;
-    cursor: pointer;
     border: none;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-  }
-
-  .format-card:hover {
-    box-shadow: 7px 7px 16px rgba(0,0,0,0.09), -5px -5px 12px rgba(255,255,255,0.88);
-    transform: translateY(-1px);
+    cursor: pointer;
+    border-radius: var(--radius-md);
   }
 
   .format-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: center;
+    width: 100%;
   }
 
   .format-info {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .format-name {
     font-family: var(--sans);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 4px;
   }
 
   .format-description {
@@ -520,64 +650,72 @@
     font-family: var(--sans);
     font-size: 10px;
     font-weight: 600;
-    padding: 4px 8px;
+    padding: 3px 8px;
     border-radius: 12px;
-    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
   }
 
   .badge-recommended {
-    background: var(--success);
-    color: white;
+    background: var(--accent-soft, rgba(196, 113, 79, 0.1));
+    color: var(--accent);
+  }
+
+  .badge-new {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3B82F6;
   }
 
   .badge-destructive {
-    background: var(--danger);
-    color: white;
+    background: var(--danger-soft, rgba(192, 68, 74, 0.1));
+    color: var(--danger, #c0444a);
   }
 
   .import-step {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 16px;
+    padding: 20px 0;
   }
 
   .file-picker {
+    width: 100%;
+    padding: 32px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     gap: 8px;
-    width: 100%;
-    padding: 48px 24px;
-    cursor: pointer;
     border: none;
-    transition: box-shadow 0.2s ease;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
   }
 
   .file-picker:hover:not(:disabled) {
-    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.08), inset -3px -3px 6px rgba(255,255,255,0.5);
+    transform: scale(1.01);
   }
 
   .file-picker:disabled {
-    opacity: 0.6;
+    opacity: 0.7;
     cursor: not-allowed;
   }
 
+  .file-icon,
   .spinner {
     width: 32px;
     height: 32px;
-    color: var(--accent);
+    color: var(--text-secondary);
+  }
+
+  .spinner {
     animation: spin 1s linear infinite;
   }
 
   @keyframes spin {
+    from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
-  }
-
-  .file-icon {
-    width: 32px;
-    height: 32px;
-    color: var(--text-secondary);
   }
 
   .file-picker-text {
@@ -590,59 +728,69 @@
   .file-picker-hint {
     font-family: var(--sans);
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--text-muted);
   }
 
   .warning-box {
     padding: 16px;
-    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    background: var(--danger-soft, rgba(192, 68, 74, 0.08));
     border-radius: var(--radius-md);
-    border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
   }
 
   .warning-text {
     font-family: var(--sans);
     font-size: 13px;
-    color: var(--danger);
+    color: var(--text-primary);
     margin: 0;
-    line-height: 1.5;
   }
 
   .warning-actions {
     display: flex;
-    gap: 12px;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
   }
 
   .warning-btn {
-    flex: 1;
-    padding: 10px 16px;
+    padding: 8px 16px;
     font-family: var(--sans);
     font-size: 13px;
     font-weight: 500;
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.15s ease;
   }
 
   .danger-btn {
-    background: var(--danger);
+    background: var(--danger, #c0444a);
     color: white;
   }
 
-  .danger-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--danger) 90%, black);
+  .danger-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 
-  .danger-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .error-message {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--danger, #c0444a);
+    text-align: center;
+    margin: 0;
   }
 
   .text-import-form {
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .cloze-intro {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
   }
 
   .form-group {
@@ -658,6 +806,13 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
+  }
+
+  .form-hint {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 2px 0 0 0;
   }
 
   .form-select,
@@ -708,6 +863,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 4px 0;
+    gap: 12px;
   }
 
   .toggle-switch {
@@ -720,6 +876,7 @@
     cursor: pointer;
     transition: background 0.2s ease;
     box-shadow: var(--neu-down);
+    flex-shrink: 0;
   }
 
   .toggle-switch.active {
@@ -744,20 +901,20 @@
 
   .import-btn {
     width: 100%;
-    padding: 12px 16px;
+    padding: 12px 20px;
     font-family: var(--sans);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     color: white;
     background: var(--accent);
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: opacity 0.15s ease;
   }
 
   .import-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--accent) 90%, black);
+    opacity: 0.9;
   }
 
   .import-btn:disabled {
@@ -765,82 +922,68 @@
     cursor: not-allowed;
   }
 
-  .error-message {
-    font-family: var(--sans);
-    font-size: 12px;
-    color: var(--danger);
-    text-align: center;
-    margin: 0;
-  }
-
   .result-step {
     display: flex;
     flex-direction: column;
     align-items: center;
-    text-align: center;
-    padding: 16px 0;
+    gap: 16px;
+    padding: 20px 0;
   }
 
   .result-icon {
-    width: 64px;
-    height: 64px;
-    color: var(--success);
-    margin-bottom: 16px;
+    width: 48px;
+    height: 48px;
+    color: var(--accent);
   }
 
   .result-title {
-    font-family: var(--serif);
-    font-size: 20px;
+    font-family: var(--sans);
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 24px 0;
+    margin: 0;
   }
 
   .result-stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
     width: 100%;
-    padding: 20px;
-    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius-md);
   }
 
   .stat-item {
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: center;
   }
 
   .stat-label {
     font-family: var(--sans);
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.05em;
     color: var(--text-muted);
-    margin-bottom: 4px;
   }
 
   .stat-value {
-    font-family: var(--serif);
+    font-family: var(--serif, var(--sans));
     font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
   }
 
   .done-btn {
-    width: 100%;
-    padding: 12px 16px;
+    padding: 10px 32px;
     font-family: var(--sans);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     color: white;
     background: var(--accent);
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .done-btn:hover {
-    background: color-mix(in srgb, var(--accent) 90%, black);
   }
 </style>

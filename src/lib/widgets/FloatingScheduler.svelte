@@ -35,8 +35,9 @@
   });
 
   // Click-outside to close
+  let justOpened = false;
   function handleClickOutside(e: MouseEvent) {
-    if (!open || !popupEl) return;
+    if (!open || !popupEl || justOpened) return;
     if (!popupEl.contains(e.target as Node)) {
       onclose();
     }
@@ -46,6 +47,14 @@
     // Use setTimeout so the opening click doesn't immediately close
     setTimeout(() => document.addEventListener('click', handleClickOutside), 0);
     return () => document.removeEventListener('click', handleClickOutside);
+  });
+
+  // Mark as just opened to prevent immediate close
+  $effect(() => {
+    if (open) {
+      justOpened = true;
+      setTimeout(() => { justOpened = false; }, 100);
+    }
   });
 
   function setType(t: SessionType) {

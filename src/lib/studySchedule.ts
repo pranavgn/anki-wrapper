@@ -6,6 +6,14 @@ import type { StudySession } from "./notifications";
 
 export type { StudySession };
 
+// FIX: Use local date string instead of UTC's toISOString()
+function getLocalDateStr(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function loadSessions(): Promise<StudySession[]> {
   return invoke<StudySession[]>("get_study_sessions");
 }
@@ -26,7 +34,8 @@ export function createSession(overrides: Partial<StudySession> = {}): StudySessi
   const now = new Date();
   return {
     id: `ss_${Date.now()}`,
-    date: now.toISOString().split("T")[0],
+    // FIX: Use local date, not UTC
+    date: getLocalDateStr(now),
     time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
     duration_mins: 30,
     deck_id: null,
@@ -57,7 +66,8 @@ export function sessionsForDate(sessions: StudySession[], date: string): StudySe
 
 /** Upcoming sessions (today or future, not completed) */
 export function upcomingSessions(sessions: StudySession[]): StudySession[] {
-  const today = new Date().toISOString().split("T")[0];
+  // FIX: Use local date for comparison
+  const today = getLocalDateStr();
   return sessions
     .filter((s) => s.date >= today && !s.completed)
     .sort((a, b) => {
@@ -73,7 +83,8 @@ export async function generateRecurringSessions(
 ): Promise<void> {
   if (!baseSession.recurrence || baseSession.recurrence === 'none') return;
 
-  const baseDate = new Date(baseSession.date);
+  // FIX: Use T12:00:00 to avoid UTC date shift
+  const baseDate = new Date(baseSession.date + "T12:00:00");
   
   for (let week = 1; week <= weeksToGenerate; week++) {
     if (baseSession.recurrence === 'daily') {
@@ -85,7 +96,7 @@ export async function generateRecurringSessions(
         const recurringSession = createSession({
           ...baseSession,
           id: `ss_${Date.now()}_${week}_${day}`,
-          date: newDate.toISOString().split("T")[0],
+          date: getLocalDateStr(newDate),
           base_session_id: baseSession.id,
         });
         
@@ -101,7 +112,7 @@ export async function generateRecurringSessions(
         const recurringSession = createSession({
           ...baseSession,
           id: `ss_${Date.now()}_${week}_${dayOfWeek}`,
-          date: newDate.toISOString().split("T")[0],
+          date: getLocalDateStr(newDate),
           base_session_id: baseSession.id,
         });
         

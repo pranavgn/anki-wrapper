@@ -15,8 +15,16 @@
 
   onMount(() => { scheduleStore.init(); });
 
+  // FIX: Use local date string, not UTC (toISOString uses UTC which can be wrong timezone)
+  function getLocalDateStr(d: Date = new Date()): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
   function todayStr(): string {
-    return new Date().toISOString().split('T')[0];
+    return getLocalDateStr();
   }
 
   function isToday(dateStr: string): boolean {
@@ -35,20 +43,20 @@
     const prevLast = new Date(year, month, 0).getDate();
     for (let i = startDay - 1; i >= 0; i--) {
       const d = prevLast - i;
-      const date = new Date(year, month - 1, d).toISOString().split('T')[0];
+      const date = getLocalDateStr(new Date(year, month - 1, d));
       days.push({ date, day: d, inMonth: false });
     }
 
     // Current month days
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      const date = new Date(year, month, d).toISOString().split('T')[0];
+      const date = getLocalDateStr(new Date(year, month, d));
       days.push({ date, day: d, inMonth: true });
     }
 
     // Next month days
     const remaining = 42 - days.length;
     for (let d = 1; d <= remaining; d++) {
-      const date = new Date(year, month + 1, d).toISOString().split('T')[0];
+      const date = getLocalDateStr(new Date(year, month + 1, d));
       days.push({ date, day: d, inMonth: false });
     }
 
@@ -64,7 +72,7 @@
       const d = new Date(start);
       d.setDate(d.getDate() + i);
       days.push({
-        date: d.toISOString().split('T')[0],
+        date: getLocalDateStr(d),
         day: d.getDate(),
         dayName: DAYS[i].slice(0, 3),
       });

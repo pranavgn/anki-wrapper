@@ -1,75 +1,98 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { scheduleStore } from "../scheduleStore.svelte";
-  import {
-    SESSION_TYPE_THEMES,
-    formatTime12h,
-    formatDateLabel,
-    formatDuration,
-    type SessionType,
-  } from "../types/scheduler";
-  import FloatingScheduler from "./FloatingScheduler.svelte";
+  import { loadSessions, upcomingSessions, type StudySession } from "../studySchedule";
+  import { addToast } from "../toast";
 
-  let schedulerOpen = $state(false);
+  let sessions: StudySession[] = $state([]);
+  let isLoading = $state(true);
 
-  onMount(() => { scheduleStore.init(); });
-
-  /** Group upcoming sessions by date */
-  let grouped = $derived.by(() => {
-    const map = new Map<string, typeof scheduleStore.upcoming>();
-    for (const s of scheduleStore.upcoming) {
-      const arr = map.get(s.date) || [];
-      arr.push(s);
-      map.set(s.date, arr);
-    }
-    return Array.from(map.entries());
+  onMount(async () => {
+    await loadSessionsData();
   });
 
-  function getTypeTheme(session: { session_type?: string | null }) {
-    const t = (session.session_type as SessionType) || 'review';
-    return SESSION_TYPE_THEMES[t];
+  async function loadSessionsData() {
+    isLoading = true;
+    try {
+      sessions = await loadSessions();
+    } catch (error) {
+      console.error("Error loading sessions:", error);
+      addToast("Failed to load study sessions", "error");
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  let upcoming = $derived.by(() => {
+    return upcomingSessions(sessions).slice(0, 3);
+  });
+
+  // FIX: Use local date string, not UTC
+  function getLocalDateStr(d: Date = new Date()): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatDate(dateStr: string): string {
+    const date = new Date(dateStr + "T12:00:00"); // Avoid UTC shift
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (dateStr === getLocalDateStr(today)) {
+      return 'Today';
+    } else if (dateStr === getLocalDateStr(tomorrow)) {
+      return 'Tomorrow';
+    } else {
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+  }
+
+  function formatTime(timeStr: string): string {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+  }
+
+  async function handleStartSession(session: StudySession) {
+    addToast(`Starting session: ${session.deck_name || 'All Decks'}`, "info");
   }
 </script>
 
-<div class="upcoming-widget">
-  <div class="upcoming-header">
-    <div class="upcoming-schedule-wrapper">
-      <button class="upcoming-schedule-btn" onclick={() => schedulerOpen = true}>
-        + Schedule
-      </button>
-      <FloatingScheduler
-        bind:open={schedulerOpen}
-        onclose={() => schedulerOpen = false}
-      />
+<div class="upcoming-sessions-widget" style="height: 100%; display: flex; flex-direction: column;">
+  {#if isLoading}
+    <div class="flex items-center justify-center" style="flex: 1;">
+      <div class="loading-spinner"></div>
     </div>
-  </div>
-
-  {#if scheduleStore.loading}
-    <div class="upcoming-empty">
-      <div class="upcoming-spinner"></div>
-    </div>
-  {:else if grouped.length === 0}
-    <div class="upcoming-empty">
-      <p class="upcoming-empty-text">No upcoming sessions</p>
+  {:else if upcoming.length === 0}
+    <div class="flex flex-col items-center justify-center" style="flex: 1;">
+      <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+      <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">No upcoming sessions</p>
+      <p style="font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin-top: 4px;">Schedule a study session to get started</p>
     </div>
   {:else}
-    <div class="upcoming-list">
-      {#each grouped as [date, sessions]}
-        <div class="upcoming-date-group">
-          <div class="upcoming-date-label">{formatDateLabel(date)}</div>
-          {#each sessions as session (session.id)}
-            {@const theme = getTypeTheme(session)}
-            <div class="session-row">
-              <div class="session-accent" style="background: {theme.text}"></div>
-              <div class="session-info">
-                <span class="session-deck">{session.deck_name || 'All decks'}</span>
-                <span class="session-meta">{formatTime12h(session.time)} · {formatDuration(session.duration_mins)}</span>
-              </div>
-              <span class="session-badge" style="background: {theme.bg}; color: {theme.text};">
-                {theme.label}
-              </span>
-            </div>
-          {/each}
+    <div class="sessions-list">
+      {#each upcoming as session (session.id)}
+        <div class="session-card">
+          <div class="session-left">
+            <div class="session-date-badge">{formatDate(session.date)}</div>
+            <div class="session-time-text">{formatTime(session.time)}</div>
+          </div>
+          <div class="session-right">
+            <div class="session-deck">{session.deck_name || 'All decks'}</div>
+            {#if session.card_goal}
+              <div class="session-goal">{session.card_goal} cards · {session.duration_mins}min</div>
+            {:else}
+              <div class="session-goal">{session.duration_mins}min</div>
+            {/if}
+            {#if session.note}
+              <div class="session-note">{session.note}</div>
+            {/if}
+          </div>
         </div>
       {/each}
     </div>
@@ -77,147 +100,85 @@
 </div>
 
 <style>
-  .upcoming-widget {
+  .sessions-list {
     display: flex;
     flex-direction: column;
-    height: 100%;
     gap: 8px;
-  }
-
-  .upcoming-header {
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .upcoming-schedule-wrapper {
-    position: relative;
-  }
-
-  .upcoming-schedule-btn {
-    padding: 6px 14px;
-    font-size: 12px;
-    font-weight: 500;
-    font-family: var(--sans);
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    box-shadow: 3px 3px 8px rgba(196,113,79,0.2), -2px -2px 6px rgba(255,255,255,0.1);
-  }
-  .upcoming-schedule-btn:hover { opacity: 0.92; }
-
-  .upcoming-empty {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .upcoming-empty-text {
-    font-family: var(--sans);
-    font-size: 13px;
-    color: var(--text-secondary);
-  }
-
-  .upcoming-spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--bg-subtle);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  .upcoming-list {
-    flex: 1;
-    min-height: 0;
     overflow-y: auto;
+  }
+
+  .session-card {
     display: flex;
-    flex-direction: column;
     gap: 12px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    padding: 10px 12px;
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    align-items: flex-start;
   }
 
-  .upcoming-list::-webkit-scrollbar {
-    width: 3px;
-  }
-  .upcoming-list::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 2px;
-  }
-
-  .upcoming-date-group {
+  .session-left {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 2px;
+    min-width: 56px;
   }
 
-  .upcoming-date-label {
-    font-family: var(--sans);
+  .session-date-badge {
     font-size: 11px;
     font-weight: 600;
+    color: var(--accent);
+    font-family: var(--sans);
+  }
+
+  .session-time-text {
+    font-size: 10px;
     color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 2px 0;
+    font-family: var(--sans);
   }
 
-  .session-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 8px;
-    border-radius: var(--radius-sm);
-    transition: background 0.1s;
-    cursor: pointer;
-  }
-  .session-row:hover {
-    background: var(--bg-subtle);
-  }
-
-  .session-accent {
-    width: 3px;
-    height: 24px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-
-  .session-info {
+  .session-right {
     flex: 1;
-    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
+    min-width: 0;
   }
 
   .session-deck {
-    font-family: var(--sans);
     font-size: 13px;
     font-weight: 500;
     color: var(--text-primary);
+    font-family: var(--sans);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .session-meta {
-    font-family: var(--sans);
+  .session-goal {
     font-size: 11px;
     color: var(--text-secondary);
+    font-family: var(--sans);
   }
 
-  .session-badge {
+  .session-note {
+    font-size: 10px;
+    color: var(--text-muted);
     font-family: var(--sans);
-    font-size: 11px;
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: 12px;
-    white-space: nowrap;
+    font-style: italic;
+  }
+
+  .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>

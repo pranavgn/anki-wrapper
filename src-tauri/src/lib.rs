@@ -196,7 +196,6 @@ use serde_json;
 use anki::collection::CollectionBuilder;
 use anki::prelude::Collection;
 use anki::import_export::package::ImportAnkiPackageOptions;
-use anki::import_export::text::csv::metadata::CsvMetadata;
 use anki::config::BoolKey;
 use anki::prelude::*;
 use anki::tags::Tag;
@@ -204,6 +203,9 @@ use anki::search::SortMode;
 use anki::browser_table::Column;
 use anki_proto::decks::DeckTreeNode;
 use tauri_plugin_decorum::WebviewWindowExt;
+use anki::import_export::package::{import_colpkg as anki_import_colpkg};
+use anki_proto::import_export::ExportAnkiPackageOptions;
+use tauri::Emitter;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UndoResult {
@@ -235,6 +237,7 @@ pub struct ImportLog {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct TextImportOptions {
     pub deck_id: i64,
     pub notetype_name: String,
@@ -2368,43 +2371,162 @@ fn import_apkg(path: String, state: State<AppState>) -> Result<ImportLog, String
 }
 
 #[command]
-fn import_colpkg(_path: String, state: State<AppState>) -> Result<String, String> {
-    let _collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
-    Err("Collection replacement not implemented yet - this would be destructive".to_string())
+fn import_colpkg(path: String, state: State<AppState>, app: AppHandle) -> Result<String, String> {
+    // Drop the collection lock before calling import_colpkg
+    {
+        let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+        *collection = None;
+    }
+
+    // Call anki-core's import_colpkg
+    let media_dir = get_app_data_dir()?.join("media");
+    let media_db = get_app_data_dir()?.join("media.db");
+    let col_path = get_app_data_dir()?.join("collection.anki2");
+    anki_import_colpkg(
+        path.as_str(),
+        col_path.to_str().unwrap(),
+        &media_dir,
+        &media_db,
+        state.collection.lock().unwrap().as_ref().unwrap().new_progress_handler()
+    )
+        .map_err(|e: anki::error::AnkiError| e.to_string())?;
+
+    // Reopen the collection
+    let db_path = get_app_data_dir()?.join("collection.anki2");
+    let new_collection = CollectionBuilder::new(db_path)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    {
+        let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+        *collection = Some(new_collection);
+    }
+
+    // Emit collection-ready event
+    app.emit("collection-ready", ())
+        .map_err(|e| e.to_string())?;
+
+    Ok("Collection imported successfully".to_string())
 }
 
 #[command]
-fn import_text_file(path: String, _options: TextImportOptions, state: State<AppState>) -> Result<ImportLog, String> {
+fn import_text_file(path: String, options: TextImportOptions, state: State<AppState>) -> Result<ImportLog, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = collection.as_mut().ok_or("Collection not ready yet. Please wait a moment.")?;
-    
-    // Create minimal CSV metadata - Anki will handle field mapping
-    let metadata = CsvMetadata::default();
-    
-    let result = collection.import_csv(&path, metadata)
-        .map_err(|e: anki::error::AnkiError| e.to_string())?;
-    
-    let output = result.output;
+
+    // Read the file
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+
+    // Get the notetype
+    let notetype = collection.get_notetype_by_name(&options.notetype_name)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Notetype '{}' not found", options.notetype_name))?;
+
+    let num_fields = notetype.fields.len();
+    let deck_id = anki::prelude::DeckId(options.deck_id);
+
+    let mut notes_added: u32 = 0;
+    let mut notes_skipped: u32 = 0;
+
+    for line in content.lines() {
+        let line = line.trim();
+
+        // Skip empty lines and comments (lines starting with #)
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Split by the chosen delimiter
+        let fields: Vec<&str> = line.split(&options.delimiter).collect();
+
+        // Skip lines that don't have enough fields (need at least 2 for front/back)
+        if fields.len() < 2 {
+            notes_skipped += 1;
+            continue;
+        }
+
+        // Create a new note
+        let mut note = anki::prelude::Note::new(&notetype);
+
+        // Set fields (up to the number the notetype supports)
+        for (i, field_value) in fields.iter().enumerate() {
+            if i >= num_fields {
+                break;
+            }
+            let value = if options.html_enabled {
+                field_value.to_string()
+            } else {
+                // Escape HTML if not enabled
+                field_value
+                    .replace('&', "&")
+                    .replace('<', "<")
+                    .replace('>', ">")
+            };
+            let _ = note.set_field(i, value);
+        }
+
+        // Try to add the note
+        match collection.add_note(&mut note, deck_id) {
+            Ok(_) => notes_added += 1,
+            Err(_) => notes_skipped += 1,
+        }
+    }
+
     Ok(ImportLog {
-        notes_added: output.new.len() as u32,
-        notes_updated: output.updated.len() as u32,
-        notes_skipped: output.duplicate.len() as u32,
+        notes_added,
+        notes_updated: 0,
+        notes_skipped,
         decks_added: vec![],
     })
 }
 
 #[command]
 fn export_deck_apkg(deck_id: i64, out_path: String, include_scheduling: bool, state: State<AppState>) -> Result<String, String> {
-    let _collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
-    let _ = (deck_id, out_path, include_scheduling);
-    Err("Export functionality coming soon".to_string())
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+
+    let options = ExportAnkiPackageOptions {
+        with_scheduling: include_scheduling,
+        ..Default::default()
+    };
+
+    collection.export_apkg(
+        &out_path,
+        options,
+        anki::search::SearchNode::from_deck_id(anki::decks::DeckId(deck_id), true),
+        None,
+    ).map_err(|e: anki::error::AnkiError| e.to_string())?;
+
+    Ok(out_path)
 }
 
 #[command]
 fn export_collection_colpkg(out_path: String, state: State<AppState>) -> Result<String, String> {
-    let _collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
-    let _ = out_path;
-    Err("Export functionality coming soon".to_string())
+    // Take ownership of the collection
+    let collection = {
+        let mut collection_lock = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+        collection_lock.take().ok_or("Collection not initialized")?
+    };
+
+    // Export the collection
+    let result = collection.export_colpkg(&out_path, true, false);
+
+    // Reopen the collection
+    let db_path = get_app_data_dir()?.join("collection.anki2");
+    let new_collection = CollectionBuilder::new(db_path)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    // Put it back
+    {
+        let mut collection_lock = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+        *collection_lock = Some(new_collection);
+    }
+
+    result.map_err(|e: anki::error::AnkiError| e.to_string())?;
+
+    Ok(out_path)
 }
 
 // ============ TAG FUNCTIONS ============

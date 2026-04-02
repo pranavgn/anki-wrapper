@@ -41,6 +41,12 @@
     is_filtered: boolean;
   };
 
+  type NotetypeOption = {
+    id: number;
+    name: string;
+    kind: string;
+  };
+
   type ImportLog = {
     notes_added: number;
     notes_updated: number;
@@ -56,18 +62,17 @@
   let importResult: ImportLog | null = $state(null);
   let showColpkgWarning = $state(false);
 
-  // Text import options (snake_case to match Rust struct)
+  // Text import options (unified for txt, csv, AND cloze)
   let selectedDeckId = $state(1);
+  let selectedNotetypeId = $state(0);
   let notetypeName = $state("Basic");
   let delimiter = $state<"tab" | "comma" | "semicolon">("comma");
   let htmlEnabled = $state(false);
   let duplicatePolicy = $state<"update" | "preserve" | "ignore">("ignore");
-  let importMode = $state<"csv" | "cloze">("csv");
-  let clozeTags = $state("");
-  let autoCloze = $state(true);
 
-  // Available decks for imports
+  // Available decks & notetypes
   let availableDecks: DeckStat[] = $state([]);
+  let availableNotetypes: NotetypeOption[] = $state([]);
 
   // Reset when modal opens
   $effect(() => {
@@ -79,6 +84,7 @@
       importResult = null;
       showColpkgWarning = false;
       loadDecks();
+      loadNotetypes();
     }
   });
 
@@ -88,10 +94,27 @@
       availableDecks = result;
       if (availableDecks.length > 0) {
         selectedDeckId = availableDecks[0].id;
-        clozeDeckId = availableDecks[0].id;
       }
     } catch (e) {
       console.error("Failed to load decks:", e);
+    }
+  }
+
+  async function loadNotetypes() {
+    try {
+      const result = await invoke<NotetypeOption[]>("get_all_notetypes");
+      availableNotetypes = result;
+      // Default to "Basic" if available
+      const basic = result.find((n) => n.name === "Basic");
+      if (basic) {
+        selectedNotetypeId = basic.id;
+        notetypeName = basic.name;
+      } else if (result.length > 0) {
+        selectedNotetypeId = result[0].id;
+        notetypeName = result[0].name;
+      }
+    } catch (e) {
+      console.error("Failed to load notetypes:", e);
     }
   }
 
@@ -129,7 +152,7 @@
       currentStep = "result";
     } catch (e) {
       if (e instanceof ImportError && e.isCancelled) {
-        // User cancelled, do nothing
+        // User cancelled
       } else {
         errorMessage = e instanceof Error ? e.message : "Import failed";
       }
@@ -150,7 +173,7 @@
       currentStep = "result";
     } catch (e) {
       if (e instanceof ImportError && e.isCancelled) {
-        // User cancelled, do nothing
+        // User cancelled
       } else {
         errorMessage = e instanceof Error ? e.message : "Import failed";
       }
@@ -160,47 +183,41 @@
     }
   }
 
+  /**
+   * Unified text import handler.
+   * Works for .txt, .csv, .tsv AND .cloze files — the notetype picker
+   * lets the user choose "Cloze" (or any other notetype) and
+   * anki-core's import_csv handles the rest.
+   */
   async function handleTextImport() {
     isLoading = true;
     errorMessage = "";
     try {
-      if (importMode === "csv") {
-        // Use snake_case keys to match the Rust TextImportOptions struct
-        const options: TextImportOptions = {
-          deck_id: selectedDeckId,
-          notetype_name: notetypeName,
-          delimiter: delimiter === "tab" ? "\t" : delimiter === "comma" ? "," : ";",
-          html_enabled: htmlEnabled,
-          duplicate_policy: duplicatePolicy,
-        };
-        importResult = await pickAndImportText(options);
-      } else {
-        // Cloze mode - use the same pickAndImportText function
-        // The Rust backend will handle cloze detection based on file content
-        const tags = clozeTags
-          .split(/[,\s]+/)
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0);
-
-        const options: TextImportOptions = {
-          deck_id: selectedDeckId,
-          notetype_name: "Cloze", // Force cloze notetype
-          delimiter: "\n", // Line-based for cloze text
-          html_enabled: false,
-          duplicate_policy: "ignore",
-        };
-        importResult = await pickAndImportText(options);
-      }
+      const options: TextImportOptions = {
+        deckId: selectedDeckId,
+        notetypeName: notetypeName,
+        delimiter:
+          delimiter === "tab" ? "\t" : delimiter === "comma" ? "," : ";",
+        htmlEnabled: htmlEnabled,
+        duplicatePolicy: duplicatePolicy,
+      };
+      importResult = await pickAndImportText(options);
       currentStep = "result";
     } catch (e) {
       if (e instanceof ImportError && e.isCancelled) {
-        // User cancelled, do nothing
+        // User cancelled
       } else {
         errorMessage = e instanceof Error ? e.message : "Import failed";
       }
     } finally {
       isLoading = false;
     }
+  }
+
+  function handleNotetypeChange(ntId: number) {
+    selectedNotetypeId = ntId;
+    const nt = availableNotetypes.find((n) => n.id === ntId);
+    if (nt) notetypeName = nt.name;
   }
 
   function handleDone() {
@@ -218,23 +235,35 @@
     if (d === "semicolon") return "Semicolon";
     return d;
   }
+
+  function getNotetypeHint(kind: string): string {
+    if (kind === "cloze") return "cloze";
+    return "";
+  }
 </script>
 
-<NeuDialog {isOpen} onClose={handleClose} title="Import Deck" size="lg">
+<NeuDialog {isOpen} onClose={handleClose} title="Import" size="lg">
   <!-- Back button -->
   {#if currentStep !== "format"}
-    <button
-      class="back-button"
-      onclick={goBack}
-    >
-      <svg class="back-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    <button class="back-button" onclick={goBack}>
+      <svg
+        class="back-icon"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M15 19l-7-7 7-7"
+        />
       </svg>
       Back
     </button>
   {/if}
 
-  <!-- Step 1: Format Picker -->
+  <!-- ───────── Step 1: Format Picker ───────── -->
   {#if currentStep === "format"}
     <div class="format-grid">
       <button
@@ -252,30 +281,35 @@
 
       <button
         class="format-card neu-raised neu-btn"
-        onclick={() => selectFormat("text")}
-      >
-        <div class="format-info">
-          <div class="format-name">Text / CSV (.csv, .tsv, .txt, .md)</div>
-          <div class="format-description">Import CSV, TSV, or text files as flashcards</div>
-        </div>
-      </button>
-
-      <button
-        class="format-card neu-raised neu-btn"
         onclick={() => selectFormat("colpkg")}
       >
         <div class="format-header">
           <div class="format-info">
             <div class="format-name">Collection Package (.colpkg)</div>
-            <div class="format-description">Replace your entire collection from a backup</div>
+            <div class="format-description"
+              >Replace your entire collection from a backup</div
+            >
           </div>
           <span class="format-badge badge-destructive">Destructive</span>
+        </div>
+      </button>
+
+      <button
+        class="format-card neu-raised neu-btn"
+        onclick={() => selectFormat("text")}
+      >
+        <div class="format-info">
+          <div class="format-name">Text / CSV / Cloze</div>
+          <div class="format-description">
+            Import .txt, .csv, .tsv, or .cloze flashcard data — supports Basic
+            and Cloze notetypes
+          </div>
         </div>
       </button>
     </div>
   {/if}
 
-  <!-- Step 2a: APKG Import -->
+  <!-- ───────── Step 2a: APKG ───────── -->
   {#if currentStep === "apkg"}
     <div class="import-step">
       <button
@@ -285,13 +319,34 @@
       >
         {#if isLoading}
           <svg class="spinner" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
           </svg>
           <span class="file-picker-text">Importing...</span>
         {:else}
-          <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          <svg
+            class="file-icon"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+            />
           </svg>
           <span class="file-picker-text">Click to choose a file</span>
           <span class="file-picker-hint">.apkg files only</span>
@@ -304,7 +359,7 @@
     </div>
   {/if}
 
-  <!-- Step 2b: COLPKG Import -->
+  <!-- ───────── Step 2b: COLPKG ───────── -->
   {#if currentStep === "colpkg"}
     <div class="import-step">
       {#if !showColpkgWarning}
@@ -313,8 +368,18 @@
           onclick={showColpkgConfirm}
           disabled={isLoading}
         >
-          <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          <svg
+            class="file-icon"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+            />
           </svg>
           <span class="file-picker-text">Click to choose a file</span>
           <span class="file-picker-hint">.colpkg files only</span>
@@ -322,17 +387,15 @@
       {:else}
         <div class="warning-box">
           <p class="warning-text">
-            This will replace your entire local collection with the contents of the .colpkg file.
-            This cannot be undone.
+            This will replace your entire local collection with the contents of
+            the .colpkg file. This cannot be undone.
           </p>
         </div>
         <div class="warning-actions">
           <button
             class="warning-btn neu-subtle"
-            onclick={() => (showColpkgWarning = false)}
+            onclick={() => (showColpkgWarning = false)}>Cancel</button
           >
-            Cancel
-          </button>
           <button
             class="warning-btn danger-btn"
             onclick={handleColpkgImport}
@@ -349,129 +412,100 @@
     </div>
   {/if}
 
-  <!-- Step 2c: Text Import (CSV/TSV/Cloze) -->
+  <!-- ───────── Step 2c: Unified Text / CSV / Cloze Import ───────── -->
   {#if currentStep === "text"}
     <div class="text-import-form">
-       <div class="form-group">
-         <label for="import-deck-select" class="form-label">Deck</label>
-         <NeuSelect
-           id="import-deck-select"
-           options={availableDecks.map(d => ({ value: d.id, label: d.name }))}
-           bind:value={selectedDeckId}
-           size="sm"
-           searchable={true}
-         />
-       </div>
+      <div class="form-group">
+        <label for="import-deck-select" class="form-label">Deck</label>
+        <NeuSelect
+          id="import-deck-select"
+          options={availableDecks.map((d) => ({ value: d.id, label: d.name }))}
+          bind:value={selectedDeckId}
+          size="sm"
+          searchable={true}
+        />
+      </div>
 
-       <div class="form-group">
-         <label for="import-mode-group" class="form-label">Import Mode</label>
-         <div class="button-group" role="radiogroup" id="import-mode-group" aria-label="Import Mode">
-           <button
-             role="radio"
-             aria-checked={importMode === "csv"}
-             class="group-btn {importMode === 'csv' ? 'active' : 'neu-subtle'}"
-             onclick={() => (importMode = "csv")}
-           >
-             CSV / TSV
-           </button>
-           <button
-             role="radio"
-             aria-checked={importMode === "cloze"}
-             class="group-btn {importMode === 'cloze' ? 'active' : 'neu-subtle'}"
-             onclick={() => (importMode = "cloze")}
-           >
-             Cloze Text
-           </button>
-         </div>
-       </div>
+      <!-- Notetype selector — includes Cloze and all custom notetypes -->
+      <div class="form-group">
+        <label for="import-notetype-select" class="form-label">
+          Note Type
+          {#if availableNotetypes.find((n) => n.id === selectedNotetypeId)?.kind === "cloze"}
+            <span class="notetype-badge">cloze</span>
+          {/if}
+        </label>
+        <NeuSelect
+          id="import-notetype-select"
+          options={availableNotetypes.map((n) => ({
+            value: n.id,
+            label: n.name + (n.kind === "cloze" ? "  ⌁" : ""),
+          }))}
+          value={selectedNotetypeId}
+          onchange={(v) => handleNotetypeChange(v)}
+          size="sm"
+          searchable={true}
+        />
+        <span class="form-hint">
+          Choose "Cloze" for files with <code>{`{{c1::...}}`}</code> syntax
+        </span>
+      </div>
 
-       {#if importMode === "csv"}
-         <div class="form-group">
-           <label for="import-notetype" class="form-label">Note Type</label>
-           <input
-             id="import-notetype"
-             type="text"
-             class="form-input neu-pressed"
-             bind:value={notetypeName}
-             placeholder="Basic"
-           />
-         </div>
-
-         <div class="form-group">
-           <label for="delimiter-group" class="form-label">Delimiter</label>
-           <div class="button-group" role="radiogroup" id="delimiter-group" aria-label="Delimiter">
-             {#each ["tab", "comma", "semicolon"] as d}
-               <button
-                 role="radio"
-                 aria-checked={delimiter === d}
-                 class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
-                 onclick={() => (delimiter = d as typeof delimiter)}
-               >
-                 {getDelimiterLabel(d)}
-               </button>
-             {/each}
-           </div>
-         </div>
-
-        <div class="form-row">
-          <label class="form-label">Allow HTML in fields</label>
-          <button
-            class="toggle-switch {htmlEnabled ? 'active' : ''}"
-            onclick={() => (htmlEnabled = !htmlEnabled)}
-            role="switch"
-            aria-checked={htmlEnabled}
-          >
-            <span class="toggle-knob"></span>
-          </button>
+      <div class="form-group">
+        <label for="delimiter-group" class="form-label">Delimiter</label>
+        <div
+          class="button-group"
+          role="radiogroup"
+          id="delimiter-group"
+          aria-label="Delimiter"
+        >
+          {#each ["tab", "comma", "semicolon"] as d}
+            <button
+              role="radio"
+              aria-checked={delimiter === d}
+              class="group-btn {delimiter === d ? 'active' : 'neu-subtle'}"
+              onclick={() => (delimiter = d as typeof delimiter)}
+            >
+              {getDelimiterLabel(d)}
+            </button>
+          {/each}
         </div>
+      </div>
 
-        <div class="form-group">
-          <label class="form-label">Duplicate Handling</label>
-          <div class="button-group">
-            {#each ["update", "preserve", "ignore"] as policy}
-              <button
-                class="group-btn {duplicatePolicy === policy ? 'active' : 'neu-subtle'}"
-                onclick={() => (duplicatePolicy = policy as typeof duplicatePolicy)}
-              >
-                {policy.charAt(0).toUpperCase() + policy.slice(1)}
-              </button>
-            {/each}
-          </div>
+      <div class="form-row">
+        <label class="form-label">Allow HTML in fields</label>
+        <button
+          class="toggle-switch {htmlEnabled ? 'active' : ''}"
+          onclick={() => (htmlEnabled = !htmlEnabled)}
+          role="switch"
+          aria-checked={htmlEnabled}
+        >
+          <span class="toggle-knob"></span>
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Duplicate Handling</label>
+        <div class="button-group">
+          {#each ["update", "preserve", "ignore"] as policy}
+            <button
+              class="group-btn {duplicatePolicy === policy
+                ? 'active'
+                : 'neu-subtle'}"
+              onclick={() =>
+                (duplicatePolicy = policy as typeof duplicatePolicy)}
+            >
+              {policy.charAt(0).toUpperCase() + policy.slice(1)}
+            </button>
+          {/each}
         </div>
-       {:else}
-         <div class="form-group">
-           <label for="cloze-tags" class="form-label">Tags (comma-separated)</label>
-           <input
-             id="cloze-tags"
-             type="text"
-             class="form-input neu-pressed"
-             bind:value={clozeTags}
-             placeholder="e.g. culture, exam-prep"
-           />
-         </div>
-
-         <div class="form-row">
-           <div>
-             <label class="form-label">Auto-generate cloze deletions</label>
-             <p class="form-hint">Wraps key terms in {{c1::…}} for lines without existing cloze syntax</p>
-           </div>
-           <button
-             class="toggle-switch {autoCloze ? 'active' : ''}"
-             onclick={() => (autoCloze = !autoCloze)}
-             role="switch"
-             aria-checked={autoCloze}
-           >
-             <span class="toggle-knob"></span>
-           </button>
-         </div>
-       {/if}
+      </div>
 
       <button
         class="import-btn"
         onclick={handleTextImport}
         disabled={isLoading}
       >
-        {isLoading ? "Importing..." : "Choose File"}
+        {isLoading ? "Importing..." : "Choose File & Import"}
       </button>
 
       {#if errorMessage}
@@ -480,74 +514,21 @@
     </div>
   {/if}
 
-  <!-- Step 2d: Cloze Text/Markdown Import -->
-  {#if currentStep === "cloze"}
-    <div class="text-import-form">
-      <p class="cloze-intro">
-        Import a text or markdown file as cloze deletion cards. Each paragraph or line becomes
-        a separate card. Markdown headers and formatting are stripped automatically.
-      </p>
-
-      <div class="form-group">
-        <label for="cloze-deck-select" class="form-label">Deck</label>
-        <NeuSelect
-          id="cloze-deck-select"
-          options={availableDecks.map(d => ({ value: d.id, label: d.name }))}
-          bind:value={clozeDeckId}
-          size="sm"
-          searchable={true}
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="cloze-tags" class="form-label">Tags (comma-separated)</label>
-        <input
-          id="cloze-tags"
-          type="text"
-          class="form-input neu-pressed"
-          bind:value={clozeTags}
-          placeholder="e.g. culture, exam-prep"
-        />
-      </div>
-
-      <div class="form-row">
-        <div>
-          <label class="form-label">Auto-generate cloze deletions</label>
-          <p class="form-hint">Wraps key terms in {'{{c1::…}}'} for lines without existing cloze syntax</p>
-        </div>
-        <button
-          class="toggle-switch {autoCloze ? 'active' : ''}"
-          onclick={() => (autoCloze = !autoCloze)}
-          role="switch"
-          aria-checked={autoCloze}
-        >
-          <span class="toggle-knob"></span>
-        </button>
-      </div>
-
-      <button
-        class="import-btn"
-        onclick={handleClozeImport}
-        disabled={isLoading}
-      >
-        {#if isLoading}
-          Importing...
-        {:else}
-          Choose File (.txt, .md, .csv)
-        {/if}
-      </button>
-
-      {#if errorMessage}
-        <p class="error-message">{errorMessage}</p>
-      {/if}
-    </div>
-  {/if}
-
-  <!-- Step 3: Result -->
+  <!-- ───────── Step 3: Result ───────── -->
   {#if currentStep === "result" && importResult}
     <div class="result-step">
-      <svg class="result-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+      <svg
+        class="result-icon"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M5 13l4 4L19 7"
+        />
       </svg>
       <h3 class="result-title">Import Complete</h3>
 
@@ -574,9 +555,7 @@
         </div>
       </div>
 
-      <button class="done-btn" onclick={handleDone}>
-        Done
-      </button>
+      <button class="import-btn" onclick={handleDone}>Done</button>
     </div>
   {/if}
 </NeuDialog>
@@ -586,23 +565,26 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    padding: 6px 10px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
     background: none;
     border: none;
     cursor: pointer;
-    font-family: var(--sans);
-    font-size: 13px;
-    color: var(--text-secondary);
-    padding: 4px 0;
+    border-radius: var(--radius-sm);
     margin-bottom: 12px;
   }
 
   .back-button:hover {
     color: var(--text-primary);
+    background: var(--bg-subtle);
   }
 
   .back-icon {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 
   .format-grid {
@@ -613,24 +595,29 @@
 
   .format-card {
     width: 100%;
-    padding: 16px 20px;
     text-align: left;
+    padding: 16px 20px;
     border: none;
     cursor: pointer;
     border-radius: var(--radius-md);
+    transition: transform 0.1s ease;
+  }
+
+  .format-card:hover {
+    transform: translateY(-1px);
   }
 
   .format-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    width: 100%;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .format-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
   }
 
   .format-name {
@@ -643,33 +630,29 @@
   .format-description {
     font-family: var(--sans);
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--text-muted);
   }
 
   .format-badge {
     font-family: var(--sans);
     font-size: 10px;
     font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 12px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
     flex-shrink: 0;
   }
 
   .badge-recommended {
-    background: var(--accent-soft, rgba(196, 113, 79, 0.1));
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--accent);
   }
 
-  .badge-new {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3B82F6;
-  }
-
   .badge-destructive {
-    background: var(--danger-soft, rgba(192, 68, 74, 0.1));
-    color: var(--danger, #c0444a);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    color: var(--danger);
   }
 
   .import-step {
@@ -677,12 +660,11 @@
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    padding: 20px 0;
   }
 
   .file-picker {
     width: 100%;
-    padding: 32px 20px;
+    padding: 32px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -693,29 +675,15 @@
     transition: all 0.15s ease;
   }
 
-  .file-picker:hover:not(:disabled) {
-    transform: scale(1.01);
-  }
-
   .file-picker:disabled {
-    opacity: 0.7;
+    opacity: 0.6;
     cursor: not-allowed;
   }
 
-  .file-icon,
-  .spinner {
+  .file-icon {
     width: 32px;
     height: 32px;
-    color: var(--text-secondary);
-  }
-
-  .spinner {
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    color: var(--text-muted);
   }
 
   .file-picker-text {
@@ -727,21 +695,34 @@
 
   .file-picker-hint {
     font-family: var(--sans);
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
+  }
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .warning-box {
     padding: 16px;
-    background: var(--danger-soft, rgba(192, 68, 74, 0.08));
+    background: color-mix(in srgb, var(--danger) 8%, transparent);
     border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
   }
 
   .warning-text {
     font-family: var(--sans);
     font-size: 13px;
     color: var(--text-primary);
-    margin: 0;
+    line-height: 1.5;
   }
 
   .warning-actions {
@@ -762,35 +743,28 @@
   }
 
   .danger-btn {
-    background: var(--danger, #c0444a);
+    background: var(--danger);
     color: white;
   }
 
   .danger-btn:disabled {
-    opacity: 0.7;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
   .error-message {
     font-family: var(--sans);
-    font-size: 13px;
-    color: var(--danger, #c0444a);
-    text-align: center;
-    margin: 0;
+    font-size: 12px;
+    color: var(--danger);
+    margin-top: 4px;
   }
+
+  /* ── Unified text/cloze import form ── */
 
   .text-import-form {
     display: flex;
     flex-direction: column;
     gap: 16px;
-  }
-
-  .cloze-intro {
-    font-family: var(--sans);
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 0;
-    line-height: 1.5;
   }
 
   .form-group {
@@ -806,13 +780,35 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .notetype-badge {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+    letter-spacing: 0.04em;
   }
 
   .form-hint {
     font-family: var(--sans);
     font-size: 11px;
     color: var(--text-muted);
-    margin: 2px 0 0 0;
+    font-style: italic;
+  }
+
+  .form-hint code {
+    font-family: "SF Mono", Monaco, Consolas, monospace;
+    font-size: 10px;
+    background: var(--bg-deep);
+    padding: 1px 4px;
+    border-radius: 3px;
   }
 
   .form-select,
@@ -863,7 +859,6 @@
     align-items: center;
     justify-content: space-between;
     padding: 4px 0;
-    gap: 12px;
   }
 
   .toggle-switch {
@@ -876,7 +871,6 @@
     cursor: pointer;
     transition: background 0.2s ease;
     box-shadow: var(--neu-down);
-    flex-shrink: 0;
   }
 
   .toggle-switch.active {
@@ -891,7 +885,7 @@
     height: 18px;
     border-radius: 50%;
     background: white;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     transition: left 0.2s ease;
   }
 
@@ -901,7 +895,7 @@
 
   .import-btn {
     width: 100%;
-    padding: 12px 20px;
+    padding: 12px;
     font-family: var(--sans);
     font-size: 14px;
     font-weight: 600;
@@ -910,11 +904,11 @@
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: opacity 0.15s ease;
+    transition: all 0.15s ease;
   }
 
-  .import-btn:hover:not(:disabled) {
-    opacity: 0.9;
+  .import-btn:hover {
+    background: color-mix(in srgb, var(--accent) 88%, black);
   }
 
   .import-btn:disabled {
@@ -922,18 +916,19 @@
     cursor: not-allowed;
   }
 
+  /* ── Result ── */
+
   .result-step {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    padding: 20px 0;
   }
 
   .result-icon {
     width: 48px;
     height: 48px;
-    color: var(--accent);
+    color: var(--success, #34c759);
   }
 
   .result-title {
@@ -941,7 +936,6 @@
     font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0;
   }
 
   .result-stats {
@@ -957,33 +951,21 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    text-align: center;
   }
 
   .stat-label {
     font-family: var(--sans);
     font-size: 11px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
   }
 
   .stat-value {
-    font-family: var(--serif, var(--sans));
+    font-family: var(--sans);
     font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
-  }
-
-  .done-btn {
-    padding: 10px 32px;
-    font-family: var(--sans);
-    font-size: 14px;
-    font-weight: 600;
-    color: white;
-    background: var(--accent);
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

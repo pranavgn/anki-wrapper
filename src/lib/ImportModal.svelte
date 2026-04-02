@@ -52,6 +52,7 @@
     notes_updated: number;
     notes_skipped: number;
     decks_added: string[];
+    notetype_used?: string;
   };
 
   // State
@@ -553,6 +554,12 @@
               : "—"}
           </div>
         </div>
+        {#if importResult.notetype_used}
+          <div class="stat-item">
+            <div class="stat-label">Note Type</div>
+            <div class="stat-value">{importResult.notetype_used}</div>
+          </div>
+        {/if}
       </div>
 
       <button class="import-btn" onclick={handleDone}>Done</button>

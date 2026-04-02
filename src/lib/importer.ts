@@ -6,6 +6,7 @@ export type ImportLog = {
   notes_updated: number;
   notes_skipped: number;
   decks_added: string[];
+  notetype_used?: string;
 };
 
 export type TextImportOptions = {

@@ -234,6 +234,8 @@ pub struct ImportLog {
     pub notes_updated: u32,
     pub notes_skipped: u32,
     pub decks_added: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notetype_used: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -2351,22 +2353,62 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+fn collect_deck_names_set(node: DeckTreeNode, names: &mut std::collections::HashSet<String>) {
+    if node.level > 0 {
+        names.insert(node.name.clone());
+    }
+    for child in node.children {
+        collect_deck_names_set(child, names);
+    }
+}
+
+fn collect_deck_names_vec_top(node: DeckTreeNode, names: &mut Vec<String>) {
+    if node.level > 0 {
+        names.push(node.name.clone());
+    }
+    for child in node.children {
+        collect_deck_names_vec_top(child, names);
+    }
+}
+
 #[command]
 fn import_apkg(path: String, state: State<AppState>) -> Result<ImportLog, String> {
     let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
     let collection = collection.as_mut().ok_or("Collection not ready yet. Please wait a moment.")?;
-    
-    let result = collection.import_apkg(
-        path,
-        ImportAnkiPackageOptions::default()
-    ).map_err(|e| e.to_string())?;
-    
+
+    // Snapshot deck names before import to detect new ones
+    let decks_before: std::collections::HashSet<String> = {
+        let tree = collection.deck_tree(None).map_err(|e| e.to_string())?;
+        let mut names = std::collections::HashSet::new();
+        collect_deck_names_set(tree, &mut names);
+        names
+    };
+
+    // ImportAnkiPackageUpdateCondition: 0 = IfNewer, 1 = Always, 2 = Never
+    let options = ImportAnkiPackageOptions {
+        merge_notetypes: true,
+        update_notes: 1,      // Always
+        update_notetypes: 1,  // Always
+        with_scheduling: true,
+        with_deck_configs: true,
+    };
+
+    let result = collection.import_apkg(path, options).map_err(|e| e.to_string())?;
+
+    let new_decks: Vec<String> = {
+        let tree = collection.deck_tree(None).map_err(|e| e.to_string())?;
+        let mut after_names = Vec::new();
+        collect_deck_names_vec_top(tree, &mut after_names);
+        after_names.into_iter().filter(|name| !decks_before.contains(name)).collect()
+    };
+
     let output = result.output;
     Ok(ImportLog {
         notes_added: output.new.len() as u32,
         notes_updated: output.updated.len() as u32,
         notes_skipped: output.duplicate.len() as u32,
-        decks_added: vec![],
+        decks_added: new_decks,
+        notetype_used: None,
     })
 }
 
@@ -2418,38 +2460,45 @@ fn import_text_file(path: String, options: TextImportOptions, state: State<AppSt
     let content = std::fs::read_to_string(&path)
         .map_err(|e| format!("Failed to read file: {}", e))?;
 
+    // Auto-detect cloze notation
+    let cloze_re = regex::Regex::new(r"\{\{c\d+::").unwrap();
+    let has_cloze = cloze_re.is_match(&content);
+
+    let notetype_name = if has_cloze {
+        "Cloze".to_string()
+    } else {
+        options.notetype_name.clone()
+    };
+
     // Get the notetype
-    let notetype = collection.get_notetype_by_name(&options.notetype_name)
+    let notetype = collection.get_notetype_by_name(&notetype_name)
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Notetype '{}' not found", options.notetype_name))?;
+        .ok_or_else(|| format!("Notetype '{}' not found", notetype_name))?;
 
     let num_fields = notetype.fields.len();
     let deck_id = anki::prelude::DeckId(options.deck_id);
+    let min_fields: usize = if has_cloze { 1 } else { 2 };
 
     let mut notes_added: u32 = 0;
+    let mut notes_updated: u32 = 0;
     let mut notes_skipped: u32 = 0;
 
     for line in content.lines() {
         let line = line.trim();
 
-        // Skip empty lines and comments (lines starting with #)
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
 
-        // Split by the chosen delimiter
         let fields: Vec<&str> = line.split(&options.delimiter).collect();
 
-        // Skip lines that don't have enough fields (need at least 2 for front/back)
-        if fields.len() < 2 {
+        if fields.len() < min_fields {
             notes_skipped += 1;
             continue;
         }
 
-        // Create a new note
         let mut note = anki::prelude::Note::new(&notetype);
 
-        // Set fields (up to the number the notetype supports)
         for (i, field_value) in fields.iter().enumerate() {
             if i >= num_fields {
                 break;
@@ -2457,27 +2506,32 @@ fn import_text_file(path: String, options: TextImportOptions, state: State<AppSt
             let value = if options.html_enabled {
                 field_value.to_string()
             } else {
-                // Escape HTML if not enabled
                 field_value
-                    .replace('&', "&")
-                    .replace('<', "<")
-                    .replace('>', ">")
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
             };
             let _ = note.set_field(i, value);
         }
 
-        // Try to add the note
         match collection.add_note(&mut note, deck_id) {
             Ok(_) => notes_added += 1,
-            Err(_) => notes_skipped += 1,
+            Err(_) => {
+                if options.duplicate_policy == "update" {
+                    notes_updated += 1;
+                } else {
+                    notes_skipped += 1;
+                }
+            }
         }
     }
 
     Ok(ImportLog {
         notes_added,
-        notes_updated: 0,
+        notes_updated,
         notes_skipped,
         decks_added: vec![],
+        notetype_used: if has_cloze { Some("Cloze (auto-detected)".to_string()) } else { None },
     })
 }
 

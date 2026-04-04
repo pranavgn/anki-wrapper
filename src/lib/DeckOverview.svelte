@@ -4,6 +4,8 @@
   import { addToast } from "./toast";
   import { getChartColors } from "./chartTheme";
   import CalendarWidget from "./widgets/CalendarWidget.svelte";
+  import DeckSettings from "./DeckSettings.svelte";
+  import DeckOptions from "./DeckOptions.svelte";
 
   interface DeckStat {
     id: number;
@@ -17,17 +19,26 @@
     is_filtered: boolean;
   }
 
-  let { 
+  let {
     deck,
     onStudy,
     onBrowse,
-    onStats
-  }: { 
+    onStats,
+    onDeckRenamed = (newName: string) => {},
+    onDeckDeleted = () => {},
+  }: {
     deck: DeckStat;
     onStudy: (deckId: number, deckName: string) => void;
     onBrowse: () => void;
     onStats: () => void;
+    onDeckRenamed?: (newName: string) => void;
+    onDeckDeleted?: () => void;
   } = $props();
+
+  let showDeckSettings = $state(false);
+  let showDeckOptions = $state(false);
+  let renamedName = $state<string | null>(null);
+  const displayName = $derived(renamedName ?? deck.short_name ?? deck.name);
 
   // Real data state
   let weekData = $state<number[]>([]);
@@ -108,11 +119,30 @@
   <div class="text-center mb-10">
     <div class="text-6xl mb-4" style="animation: float 3s ease-in-out infinite;">📚</div>
     <h1 style="font-family: var(--serif); font-size: 32px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
-      {deck.short_name || deck.name}
+      {displayName}
     </h1>
     <p style="font-family: var(--sans); font-size: 14px; color: var(--text-secondary);">
       {totalCards} cards · {streak} day streak 🔥
     </p>
+    <button
+      onclick={() => showDeckSettings = true}
+      class="neu-subtle neu-btn"
+      style="
+        margin-top: 12px;
+        padding: 8px 16px;
+        border-radius: var(--radius-md);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      "
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-secondary);">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <span style="font-family: var(--sans); font-size: 13px; color: var(--text-secondary);">Deck Settings</span>
+    </button>
   </div>
 
   <!-- Stat Pills -->
@@ -395,6 +425,29 @@
       </span>
     </button>
   </div>
+  <!-- Deck Settings Modal -->
+  <DeckSettings
+    deckId={deck.id}
+    deckName={displayName}
+    isFiltered={deck.is_filtered}
+    isOpen={showDeckSettings}
+    onClose={() => showDeckSettings = false}
+    onRenamed={(newName) => {
+      renamedName = newName;
+      onDeckRenamed(newName);
+    }}
+    onDeleted={onDeckDeleted}
+    onOpenOptions={() => showDeckOptions = true}
+  />
+
+  <!-- Deck Options Modal -->
+  <DeckOptions
+    deckId={deck.id}
+    deckName={displayName}
+    isFiltered={deck.is_filtered}
+    isOpen={showDeckOptions}
+    onClose={() => showDeckOptions = false}
+  />
 </div>
 
 <style>

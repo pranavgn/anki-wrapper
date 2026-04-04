@@ -287,8 +287,21 @@
     console.debug("State after startReview: currentPage=", currentPage, ", currentDeckId=", currentDeckId);
   }
 
-  function openDeckOverview(deckId: number, deckName: string) {
-    activeDeck = { id: deckId, name: deckName };
+  async function openDeckOverview(deckId: number, deckName: string) {
+    try {
+      const allDecks = await invoke<any[]>("get_all_decks");
+      activeDeck = allDecks.find(d => d.id === deckId) ?? {
+        id: deckId, name: deckName, short_name: deckName,
+        level: 0, new_count: 0, learn_count: 0,
+        review_count: 0, card_count: 0, is_filtered: false,
+      };
+    } catch {
+      activeDeck = {
+        id: deckId, name: deckName, short_name: deckName,
+        level: 0, new_count: 0, learn_count: 0,
+        review_count: 0, card_count: 0, is_filtered: false,
+      };
+    }
     currentDeckId = deckId;
     currentDeckName = deckName;
     navigate('deckOverview');
@@ -749,6 +762,18 @@
                 onStudy={startReview}
                 onBrowse={() => navigate('browser')}
                 onStats={() => navigate('stats')}
+                onDeckRenamed={(newName) => {
+                  if (activeDeck) activeDeck = { ...activeDeck, name: newName, short_name: newName };
+                  currentDeckName = newName;
+                  window.dispatchEvent(new CustomEvent('refresh-decks'));
+                }}
+                onDeckDeleted={() => {
+                  activeDeck = null;
+                  currentDeckId = null;
+                  currentDeckName = "";
+                  navigate('dashboard');
+                  window.dispatchEvent(new CustomEvent('refresh-decks'));
+                }}
               />
             </div>
           {:else if currentPage === 'study' && currentDeckId}
@@ -791,6 +816,7 @@
                 <CardBrowserComponent
                   initialQuery={browserQuery}
                   onClose={() => { currentPage = 'dashboard'; browserQuery = ''; }}
+                  onEdit={handleEditCard}
                 />
               {:else}
                 <div class="flex items-center justify-center p-12">

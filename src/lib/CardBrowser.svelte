@@ -8,12 +8,14 @@
   import CardDetailPanel from "./CardDetailPanel.svelte";
 
   // Props
-  let { 
+  let {
     initialQuery = "",
-    onClose = () => {}
-  }: { 
-    initialQuery?: string; 
+    onClose = () => {},
+    onEdit = (card: any) => {}
+  }: {
+    initialQuery?: string;
     onClose?: () => void;
+    onEdit?: (card: any) => void;
   } = $props();
 
   // Mode: cards or notes
@@ -793,8 +795,12 @@
           noteId={selectedNoteId}
           onClose={closeDetail}
           onFlagChange={(cardId, flag) => {
-            // Update the flag in the rows array without re-fetching
             rows = rows.map(row => row.card_id === cardId ? { ...row, flag } : row);
+          }}
+          onEdit={onEdit}
+          onDelete={() => {
+            closeDetail();
+            performSearch(debouncedQuery);
           }}
         />
       </div>

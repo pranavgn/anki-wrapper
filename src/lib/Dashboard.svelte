@@ -10,6 +10,7 @@
   import CalendarWidget from "./widgets/CalendarWidget.svelte";
   import { pluginEngine } from "./pluginEngine";
   import NeuSelect from "./ui/NeuSelect.svelte";
+  import DeckSettings from "./DeckSettings.svelte";
 
   let {
     onStudy = (deckId: number, deckName: string) => {},
@@ -46,6 +47,10 @@
   let searchOpenRef = false; // Ref to track state without triggering effects
   let searchInputEl: HTMLInputElement | null = $state(null);
   let searchWrapEl: HTMLDivElement | null = $state(null);
+
+  // Deck settings modal state
+  let settingsDeckId: number | null = $state(null);
+  let settingsDeckName: string = $state("");
 
   const sortOptions = [
     { value: 'name'  as const, label: 'A–Z'   },
@@ -275,6 +280,15 @@
         <div class="decks-scroll">
           <DecksGridWidget
             {onStudy}
+            onDeckSettings={(deckId, deckName) => {
+              settingsDeckId = deckId;
+              settingsDeckName = deckName;
+            }}
+            onDeckDelete={(deckId, deckName) => {
+              // For now, just show a toast. In a full implementation,
+              // you might want to show a confirmation dialog here.
+              addToast(`Delete "${deckName}" - use Deck Settings for delete options`, "info");
+            }}
             compact={true}
             search={deckSearch}
             sortBy={deckSortBy}
@@ -290,6 +304,29 @@
     </div>
   </div>
 </div>
+
+<!-- Deck Settings Modal -->
+{#if settingsDeckId !== null}
+  <DeckSettings
+    deckId={settingsDeckId}
+    deckName={settingsDeckName}
+    isOpen={true}
+    onClose={() => settingsDeckId = null}
+    onRenamed={(newName) => {
+      settingsDeckName = newName;
+      loadDeckStats(true);
+    }}
+    onDeleted={() => {
+      settingsDeckId = null;
+      loadDeckStats(true);
+    }}
+    onOpenOptions={() => {
+      // Navigate to deck overview to open options
+      onStudy(settingsDeckId!, settingsDeckName);
+      settingsDeckId = null;
+    }}
+  />
+{/if}
 
 <style>
   .dashboard-layout {

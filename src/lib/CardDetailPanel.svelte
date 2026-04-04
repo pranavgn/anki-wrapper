@@ -9,13 +9,15 @@
     noteId = null,
     onClose = () => {},
     onFlagChange = (cardId: number, flag: number) => {},
-    onEdit = (card: any) => {}
+    onEdit = (card: any) => {},
+    onDelete = () => {}
   }: {
     cardId: number | null;
     noteId?: number | null;
     onClose?: () => void;
     onFlagChange?: (cardId: number, flag: number) => void;
     onEdit?: (card: any) => void;
+    onDelete?: () => void;
   } = $props();
 
   // State
@@ -80,7 +82,8 @@
     try {
       await invoke('delete_notes', { noteIds: [detail.note_id] });
       addToast('Note deleted', 'success');
-      onClose();
+      showDeleteConfirm = false;
+      onDelete();
     } catch (e) {
       addToast('Failed to delete note', 'error');
     }

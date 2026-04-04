@@ -18,12 +18,16 @@
 
   let {
     onStudy = (deckId: number, deckName: string) => {},
+    onDeckSettings = (deckId: number, deckName: string) => {},
+    onDeckDelete = (deckId: number, deckName: string) => {},
     compact = false,
     search = '',
     sortBy = 'name' as 'name' | 'due' | 'new' | 'total',
     filterBy = 'all' as 'all' | 'due' | 'new',
   }: {
     onStudy?: (deckId: number, deckName: string) => void;
+    onDeckSettings?: (deckId: number, deckName: string) => void;
+    onDeckDelete?: (deckId: number, deckName: string) => void;
     compact?: boolean;
     search?: string;
     sortBy?: 'name' | 'due' | 'new' | 'total';
@@ -36,6 +40,9 @@
   let selectionMode = $state(false);
   let selectedDecks: Set<number> = $state(new Set());
   let selectMode = $state(false);
+  
+  // Deck menu state
+  let openMenuDeckId: number | null = $state(null);
   
   // Keyboard navigation state
   let focusedDeckIndex = $state(-1);
@@ -349,6 +356,7 @@
               {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 16}px;` : ''}
               {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
               {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
+              {openMenuDeckId === deck.id ? 'z-index: 100;' : ''}
             "
             role="button"
             tabindex="0"
@@ -418,6 +426,82 @@
                   {/if}
                 </div>
               </div>
+              
+              <!-- Deck menu button -->
+              <button
+                class="deck-menu-btn"
+                style="
+                  flex-shrink: 0;
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 4px;
+                  border: none;
+                  background: transparent;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: var(--text-muted);
+                  transition: background 0.12s, color 0.12s;
+                "
+                onclick={(e) => { e.stopPropagation(); openMenuDeckId = openMenuDeckId === deck.id ? null : deck.id; }}
+                aria-label="Deck options"
+              >
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                  <circle cx="8" cy="3" r="1.5" />
+                  <circle cx="8" cy="8" r="1.5" />
+                  <circle cx="8" cy="13" r="1.5" />
+                </svg>
+              </button>
+              
+              <!-- Deck menu dropdown -->
+              {#if openMenuDeckId === deck.id}
+                <div
+                  class="deck-menu-dropdown"
+                  style="
+                    position: absolute;
+                    top: 100%;
+                    right: 0;
+                    z-index: 150;
+                    min-width: 160px;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    padding: 4px;
+                    animation: fadeIn 0.15s ease-out;
+                  "
+                >
+                  <button
+                    class="w-full px-4 py-2.5 text-left text-sm text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer flex items-center gap-2"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      onDeckSettings(deck.id, deck.short_name || deck.name);
+                      openMenuDeckId = null;
+                    }}
+                  >
+                    <svg class="h-4 w-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Deck Settings
+                  </button>
+                  
+                  <button
+                    class="w-full px-4 py-2.5 text-left text-sm text-danger hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      onDeckDelete(deck.id, deck.short_name || deck.name);
+                      openMenuDeckId = null;
+                    }}
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Deck
+                  </button>
+                </div>
+              {/if}
             </div>
           </div>
         {/each}
@@ -442,6 +526,7 @@
               {deck.level > 0 ? `margin-left: ${(deck.level - 1) * 20}px;` : ''}
               {dragOverDeckId === deck.id ? 'outline: 2px dashed var(--accent); outline-offset: 4px;' : ''}
               {draggedDeckId === deck.id ? 'opacity: 0.5;' : ''}
+              {openMenuDeckId === deck.id ? 'z-index: 100;' : ''}
             "
             role="button"
             tabindex="0"
@@ -539,6 +624,82 @@
                 <span style="font-size: 12px; font-weight: 600; font-family: var(--sans); color: #34D399; background: rgba(16,185,129,0.15); padding: 2px 8px; border-radius: 6px;">{deck.review_count} due</span>
               {/if}
             </div>
+            
+            <!-- Deck menu button -->
+            <button
+              class="deck-menu-btn absolute top-4 right-4"
+              style="
+                width: 28px;
+                height: 28px;
+                border-radius: 6px;
+                border: none;
+                background: var(--bg-card);
+                box-shadow: var(--neu-subtle);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-muted);
+                transition: background 0.12s, color 0.12s;
+              "
+              onclick={(e) => { e.stopPropagation(); openMenuDeckId = openMenuDeckId === deck.id ? null : deck.id; }}
+              aria-label="Deck options"
+            >
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <circle cx="8" cy="3" r="1.5" />
+                <circle cx="8" cy="8" r="1.5" />
+                <circle cx="8" cy="13" r="1.5" />
+              </svg>
+            </button>
+            
+            <!-- Deck menu dropdown -->
+            {#if openMenuDeckId === deck.id}
+              <div
+                class="deck-menu-dropdown"
+                style="
+                  position: absolute;
+                  top: 40px;
+                  right: 4px;
+                  z-index: 150;
+                  min-width: 160px;
+                  background: var(--bg-card);
+                  border: 1px solid var(--border);
+                  border-radius: var(--radius-md);
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                  padding: 4px;
+                  animation: fadeIn 0.15s ease-out;
+                "
+              >
+                <button
+                  class="w-full px-4 py-2.5 text-left text-sm text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer flex items-center gap-2"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    onDeckSettings(deck.id, deck.short_name || deck.name);
+                    openMenuDeckId = null;
+                  }}
+                >
+                  <svg class="h-4 w-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Deck Settings
+                </button>
+                
+                <button
+                  class="w-full px-4 py-2.5 text-left text-sm text-danger hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    onDeckDelete(deck.id, deck.short_name || deck.name);
+                    openMenuDeckId = null;
+                  }}
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Deck
+                </button>
+              </div>
+            {/if}
           </div>
         {/each}
 
@@ -664,5 +825,21 @@
       opacity: 1;
       transform: translate(-50%, 0);
     }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .deck-menu-btn:hover {
+    background: var(--bg-subtle) !important;
+    color: var(--text-primary) !important;
   }
 </style>

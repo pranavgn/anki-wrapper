@@ -2282,6 +2282,9 @@ pub fn run() {
             import_text_file,
             export_deck_apkg,
             export_collection_colpkg,
+            // Note/card editing
+            update_note,
+            set_card_deck,
             // Tag commands
             get_all_tags,
             get_note_tags,
@@ -2476,7 +2479,18 @@ fn import_text_file(path: String, options: TextImportOptions, state: State<AppSt
         .ok_or_else(|| format!("Notetype '{}' not found", notetype_name))?;
 
     let num_fields = notetype.fields.len();
-    let deck_id = anki::prelude::DeckId(options.deck_id);
+
+    // Create a deck from the filename
+    let file_path = std::path::Path::new(&path);
+    let deck_name = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Imported")
+        .to_string();
+    let deck = collection.get_or_create_normal_deck(&deck_name)
+        .map_err(|e| e.to_string())?;
+    let deck_id = anki::prelude::DeckId(deck.id.0);
+
     let min_fields: usize = if has_cloze { 1 } else { 2 };
 
     let mut notes_added: u32 = 0;
@@ -2530,7 +2544,7 @@ fn import_text_file(path: String, options: TextImportOptions, state: State<AppSt
         notes_added,
         notes_updated,
         notes_skipped,
-        decks_added: vec![],
+        decks_added: vec![deck_name],
         notetype_used: if has_cloze { Some("Cloze (auto-detected)".to_string()) } else { None },
     })
 }
@@ -2621,6 +2635,38 @@ fn set_note_tags(note_id: i64, tags: Vec<String>, state: State<AppState>) -> Res
     note.tags = tags;
     collection.update_note(&mut note).map_err(|e| e.to_string())?;
     
+    Ok(())
+}
+
+#[command]
+fn update_note(note_id: i64, fields: Vec<String>, tags: Vec<String>, state: State<AppState>) -> Result<(), String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+
+    let mut note = collection.storage.get_note(NoteId(note_id))
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Note {} not found", note_id))?;
+
+    for (i, field_value) in fields.into_iter().enumerate() {
+        if i < note.fields().len() {
+            note.set_field(i, field_value).map_err(|e| e.to_string())?;
+        }
+    }
+
+    note.tags = tags;
+    collection.update_note(&mut note).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[command]
+fn set_card_deck(card_id: i64, deck_id: i64, state: State<AppState>) -> Result<(), String> {
+    let mut collection = state.collection.lock().map_err(|_| "Failed to lock collection")?;
+    let collection = collection.as_mut().ok_or("Collection not initialized")?;
+
+    let cids = vec![CardId(card_id)];
+    collection.set_deck(&cids, DeckId(deck_id)).map_err(|e| e.to_string())?;
+
     Ok(())
 }
 
